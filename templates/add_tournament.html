@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+
+{% block content %}
+<h1 class="mb-4">Add Tournament</h1>
+
+<form method="POST" action="{{ url_for('main.add_tournament') }}">
+    <div class="form-group">
+        <label for="name">Tournament Name</label>
+        <input type="text" class="form-control" id="name" name="name" required>
+    </div>
+    <div class="form-group">
+        <label for="date">Date</label>
+        <input type="date" class="form-control" id="date" name="date" required>
+    </div>
+    <div class="form-group">
+        <label for="location">Location</label>
+        <input type="text" class="form-control" id="location" name="location" required>
+    </div>
+    <div class="form-group">
+        <label for="participants">Participants</label>
+        <select multiple class="form-control" id="participants" name="participants">
+            {% for user in users %}
+                {% if user.role == 'Member' %}
+                    <option value="{{ user.id }}">{{ user.username }}</option>
+                {% endif %}
+            {% endfor %}
+        </select>
+    </div>
+    <button type="submit" class="btn btn-primary">Add Tournament</button>
+</form>
+
+{% endblock %}

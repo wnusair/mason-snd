@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+
+{% block content %}
+<h1 class="mb-4">Tournaments</h1>
+
+{% if current_user.role in ['Head of Metrics', 'Chair', 'Chairman', 'Data Chairman'] %}
+<a href="{{ url_for('main.add_tournament') }}" class="btn btn-primary mb-3">Add New Tournament</a>
+{% endif %}
+
+<table class="table table-striped">
+    <thead>
+        <tr>
+            <th>Tournament Name</th>
+            <th>Date</th>
+            <th>Location</th>
+            <th>Action</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for tournament in tournaments %}
+        <tr>
+            <td>{{ tournament.name }}</td>
+            <td>{{ tournament.date }}</td>
+            <td>{{ tournament.location }}</td>
+            <td>
+                <a href="{{ url_for('main.tournament_detail', tournament_id=tournament.id) }}" class="btn btn-sm btn-info">View Details</a>
+                {% if current_user.role in ['Head of Metrics', 'Chair', 'Chairman', 'Data Chairman'] %}
+                <a href="{{ url_for('main.edit_tournament', tournament_id=tournament.id) }}" class="btn btn-sm btn-warning">Edit</a>
+                <a href="{{ url_for('main.delete_tournament', tournament_id=tournament.id) }}" class="btn btn-sm btn-danger" onclick="return confirm('Are you sure you want to delete this tournament?');">Delete</a>
+                {% endif %}
+            </td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+
+{% endblock %}

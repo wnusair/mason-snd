@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+
+{% block content %}
+<h1 class="mb-4">{{ event.name }}</h1>
+<p><strong>Description:</strong> {{ event.description }}</p>
+
+{% if current_user.role in ['Event Leader', 'Head of Metrics', 'Chair', 'Chairman', 'Data Chairman'] %}
+<h2 class="mt-4">Participants</h2>
+<div class="table-responsive">
+    <table class="table table-striped">
+        <thead>
+            <tr>
+                <th>Rank</th>
+                <th>Name</th>
+                <th>Metrics Points</th>
+                <th>Action</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for rank, participant in enumerate(sorted_participants, start=1) %}
+            <tr>
+                <td>{{ rank }}</td>
+                <td>{{ participant.username }}</td>
+                <td>{{ participant_points[participant.id] }}</td>
+                <td>
+                    <a href="{{ url_for('main.member_detail', member_id=participant.id) }}" class="btn btn-sm btn-info">View Details</a>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+{% if current_user.role in ['Head of Metrics', 'Chair', 'Chairman', 'Data Chairman'] %}
+<a href="{{ url_for('main.edit_event', event_id=event.id) }}" class="btn btn-primary">Edit Event</a>
+{% endif %}
+
+{% else %}
+<p>You do not have access to this page unless you are an Event Leader or higher.</p>
+{% endif %}
+
+{% endblock %}

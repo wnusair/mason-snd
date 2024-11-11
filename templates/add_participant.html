@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+
+{% block content %}
+<h1 class="mb-4">Add Participant to {{ event.name }}</h1>
+
+<form method="POST" action="{{ url_for('main.add_participant', event_id=event.id) }}">
+    <div class="form-group">
+        <label for="username">Username</label>
+        <input type="text" class="form-control" id="username" name="username" required>
+    </div>
+    <div class="form-group">
+        <label for="email">Email</label>
+        <input type="email" class="form-control" id="email" name="email" required>
+    </div>
+    <button type="submit" class="btn btn-primary">Add Participant</button>
+</form>
+
+{% endblock %}

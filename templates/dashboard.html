@@ -1,0 +1,93 @@
+{% extends "base.html" %}
+
+{% block content %}
+<h1 class="mb-4">Dashboard & Analytics</h1>
+
+{% if current_user.role in ['Head of Metrics', 'Chair', 'Chairman', 'Data Chairman', 'Event Leader'] %}
+
+    <div class="row">
+        <div class="col-md-6">
+            <h2>Team Statistics</h2>
+            <div class="table-responsive">
+                <table class="table table-striped">
+                    <tbody>
+                        <tr><th>Total Events</th><td>{{ team_stats.total_events }}</td></tr>
+                        <tr><th>Total Tournaments</th><td>{{ team_stats.total_tournaments }}</td></tr>
+                        <tr><th>Total Team Members</th><td>{{ team_stats.total_members }}</td></tr>
+                        <tr><th>Total Points</th><td>{{ "%.2f"|format(total_points_team) }}</td></tr>
+                        <tr><th>Team Improvement Rate</th>
+                            <td>
+                                {% if team_improvement_rate is not none %}
+                                    The team is improving at a rate of {{ "%.2f"|format(team_improvement_rate) }} points per year.
+                                {% else %}
+                                    Not enough data to calculate team improvement rate.
+                                {% endif %}
+                            </td>
+                        </tr>
+                        <tr>
+                            <th>Team's Next Predicted Weekly Score</th>
+                            <td>
+                                {% if team_next_predicted_score is not none %}
+                                    {{ "%.2f"|format(team_next_predicted_score) }}
+                                {% else %}
+                                    Not enough data
+                                {% endif %}
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <h2>Your Performance</h2>
+            <div class="table-responsive">
+                <table class="table table-striped">
+                    <tbody>
+                        <tr>
+                            <th>Your Performance Trend</th>
+                            <td>{{ user_trend if user_trend is not none else 'Not enough data' }}</td>
+                        </tr>
+                        <tr>
+                            <th>Your Next Predicted Score</th>
+                            <td>{% if next_predicted_score is not none %}{{ "%.2f"|format(next_predicted_score) }}{% else %}Not enough data{% endif %}</td>
+                        </tr>
+                        <tr>
+                            <th>Total Metrics Points</th>
+                            <td>{{ "%.2f"|format(total_points_user) }}</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+{% elif current_user.role == 'Member' %}
+    <div class="row">
+        <div class="col-md-6">
+            <h2>Your Performance</h2>
+            <div class="table-responsive">
+                <table class="table table-striped">
+                    <tbody>
+                        <tr>
+                            <th>Your Performance Trend</th>
+                            <td>{{ user_trend if user_trend is not none else 'Not enough data' }}</td>
+                        </tr>
+                        <tr>
+                            <th>Your Next Predicted Score</th>
+                            <td>{% if next_predicted_score is not none %}{{ "%.2f"|format(next_predicted_score) }}{% else %}Not enough data{% endif %}</td>
+                        </tr>
+                        <tr>
+                            <th>Total Metrics Points</th>
+                            <td>{{ "%.2f"|format(total_points) }}</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+{% else %}
+    <p>Welcome, {{ current_user.username }}! You are logged in as an {{ current_user.role }}.</p>
+{% endif %}
+
+
+{% endblock %}
