@@ -7,7 +7,7 @@
 <h1>mason-snd Application Documentation</h1>
 
 <h2>Overview</h2>
-<p>This document provides an overview of the key components of your Flask application, specifically focusing on the files <strong>routes.py</strong>, <strong>main.py</strong>, <strong>auth.py</strong>, <strong>forms.py</strong>, <strong>postres.py</strong>, and <strong>templates/dashboard.html</strong>.</p>
+<p>This document provides an overview of the key components of your Flask application, specifically focusing on the files <strong>routes.py</strong>, <strong>main.py</strong>, <strong>auth.py</strong>, <strong>forms.py</strong>, <strong>postres.py</strong>, and <strong>templates/dashboard.html</strong> because they are the most used, and important. On another note, this project has over 2.4k lines of code! I am so proud of myself and the William Mason High School Speecha and Debate exec team for encouraging me!</p>
 
 <h2>routes.py</h2>
 <p>This file contains the route handlers that define the application's endpoints. It uses Flask Blueprints to segment different parts of your application into modules.</p>
