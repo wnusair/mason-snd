@@ -437,6 +437,7 @@ def edit_statistic(id):
         if score:
             stat.score = float(score)
             stat.notes = notes
+            stat.added_by_user_id = current_user.id
             db.session.commit()
             flash('Statistics updated successfully', 'success')
             return redirect(url_for('main.member_detail', member_id=stat.user_id))
@@ -529,7 +530,7 @@ def member_detail(member_id):
 
         if score:
             score = float(score)
-            new_stat = Statistics(user_id=member.id, score=score, notes=notes)
+            new_stat = Statistics(user_id=member.id, score=score, notes=notes, added_by_user_id=current_user.id)
 
             if metric_type == 'tournament':
                 event_id = request.form.get('event_id')
@@ -571,6 +572,7 @@ def member_detail(member_id):
 
     events = Event.query.all()
     return render_template('member_detail.html', member=member, events=events, statistics_info=statistics_info)
+
 @main.route('/delete_team_member/<int:member_id>')
 @login_required
 def delete_team_member(member_id):
