@@ -1,17 +1,23 @@
-# update_statistics.py
-from app import app, db  # Import your app object
-from models import Statistics, User
+from werkzeug.security import check_password_hash
+from app import db
+from models import User
 
-def populate_added_by_user_id():
-    # Set a default user (you can choose an appropriate one)
-    default_user = User.query.first()  # Replace with a specific user if needed
-    if default_user:
-        for stat in Statistics.query.all():
-            if stat.added_by_user_id is None:
-                stat.added_by_user_id = default_user.id
-        db.session.commit()
-        print("Updated all statistics with a default added_by_user_id.")
+def get_user_info(user_id):
+    user = User.query.get(int(user_id))
+    if not user:
+        return "User not found."
 
-# Use the application context
-with app.app_context():
-    populate_added_by_user_id()
+    print(f"Username: {user.username}")
+    print(f"Email: {user.email}")
+
+    # Prompt for password to check if it matches
+    entered_password = input("Enter the password to verify: ")
+
+    if check_password_hash(user.password_hash, entered_password):
+        print("Password verified successfully.")
+    else:
+        print("Password verification failed.")
+
+user_id = input("Enter user ID: ")
+with db.app_context():
+    get_user_info(user_id)

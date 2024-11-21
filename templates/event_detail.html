@@ -12,20 +12,39 @@
             <tr>
                 <th>Rank</th>
                 <th>Name</th>
-                <th>Metrics Points</th>
+                <th>Weighted Points</th>
+                <th>Raw Points</th>
+                <th>Trend Increase</th>
+                <th>Projected Movement</th>
                 <th>Action</th>
             </tr>
         </thead>
         <tbody>
             {% for rank, participant in enumerate(sorted_participants, start=1) %}
-            <tr>
-                <td>{{ rank }}</td>
-                <td>{{ participant.username }}</td>
-                <td>{{ participant_points[participant.id] }}</td>
-                <td>
-                    <a href="{{ url_for('main.member_detail', member_id=participant.id) }}" class="btn btn-sm btn-info">View Details</a>
-                </td>
-            </tr>
+                {% set trend = participant_trends[participant.id] %}
+                {% set score = participant_points[participant.id] %}
+                {% set total_score = weighted_scores[participant.id] %}
+                {% set change = projected_changes.get(participant.id) %}
+                {% set color_class = 'text-success' if trend == 'Improving' else 'text-warning' if trend == 'Stable' else 'text-dark' if trend == 'No Data' else 'text-danger' %}
+                <tr>
+                    <td>{{ rank }}</td>
+                    <td>{{ participant.username }}</td>
+                    <td>{{ "%.2f" % total_score }}</td>
+
+                    
+                    <td>{{ "%.2f" % score }}</td>
+                    <td class="{{ color_class }}">{{ trend }}</td>
+                    <td>
+                        {% if change == 'up' %}
+                        <span class="up-arrow">&#9650;</span>
+                        {% elif change == 'down' %}
+                        <span class="down-arrow">&#9660;</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        <a href="{{ url_for('main.member_detail', member_id=participant.id) }}" class="btn btn-sm btn-info">View Details</a>
+                    </td>
+                </tr>
             {% endfor %}
         </tbody>
     </table>

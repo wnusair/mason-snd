@@ -11,7 +11,7 @@ def get_user_performance_trend(user_id):
     scores = [stat.score for stat in user_stats]
 
     if len(dates) < 2:
-        return None, None
+        return "No Data", 0  # Indicate no data if insufficient points
 
     X = np.array([(d - dates[0]).days for d in dates]).reshape(-1, 1)
     y = np.array(scores)
@@ -19,10 +19,66 @@ def get_user_performance_trend(user_id):
     model = LinearRegression()
     model.fit(X, y)
 
-    trend = "Improving" if model.coef_[0] > 0 else "Declining"
-    next_prediction = model.predict([[X[-1][0] + 1]])[0]  # Predict next day's score
+    # Calculate percentage change if possible
+    if scores[0] != 0:
+        percentage_change = ((scores[-1] - scores[0]) / scores[0]) * 100
+    else:
+        percentage_change = float('inf')  # Handle division by zero
+
+    # Enhanced trend logic using both slope and percentage change
+    if model.coef_[0] > 0 and percentage_change > 10:  # Example threshold change
+        trend = "Improving"
+    elif model.coef_[0] < 0 and percentage_change < -10:  # Example threshold change
+        trend = "Declining"
+    else:
+        trend = "Stable"
+
+    next_prediction = model.predict([[X[-1][0] + 1]])[0]
 
     return trend, next_prediction
+
+def projected_movements(participants, participant_predictions, weighted_scores):
+    projected_changes = {}
+    current_rankings = sorted(participants, key=lambda p: participant_predictions[p.id], reverse=True)
+    projected_rankings = sorted(participants, key=lambda p: participant_predictions[p.id] + (participant_predictions[p.id] - weighted_scores[p.id]), reverse=True)
+
+    for idx, participant in enumerate(current_rankings):
+        projected_rank = projected_rankings.index(participant)
+        if projected_rank < idx:
+            projected_changes[participant.id] = 'up'
+        elif projected_rank > idx:
+            projected_changes[participant.id] = 'down'
+
+    return projected_changes
+
+def get_user_performance_slope(user_id):
+    user_stats = Statistics.query.filter_by(user_id=user_id).order_by(Statistics.date).all()
+    dates = [stat.date for stat in user_stats]
+    scores = [stat.score for stat in user_stats]
+    if len(dates) < 2:
+        return 0  # Return a slope of 0 if not enough data
+    X = np.array([(d - dates[0]).days for d in dates]).reshape(-1, 1)
+    y = np.array(scores)
+    model = LinearRegression()
+    model.fit(X, y)
+    return model.coef_[0]  # Return the slope
+
+def calculate_weighted_score(points, user_id, max_trend_value=5):
+    trend_slope = get_user_performance_slope(user_id)
+
+    # Scale trend slope to a 1-100 range
+    scaled_trend = (trend_slope / max_trend_value) * 100
+
+    # Combine points and scaled trend
+    weight_points = 0.7
+    weight_trend = 0.3
+
+    weighted_score = (weight_points * points) + (weight_trend * scaled_trend)
+    return weighted_score
+
+
+
+
 
 def get_team_next_predicted_score():
     team_stats = Statistics.query.order_by(Statistics.date).all()
@@ -75,7 +131,7 @@ def get_user_next_predicted_score(user_id):
     scores = [stat.score for stat in user_stats]
 
     if len(dates) < 2:
-        return None  # Not enough data to predict
+        return 0  # Similar to the trend, return 0 if not enough points to predict
 
     X = np.array([(d - dates[0]).days for d in dates]).reshape(-1, 1)
     y = np.array(scores)
@@ -83,7 +139,6 @@ def get_user_next_predicted_score(user_id):
     model = LinearRegression()
     model.fit(X, y)
 
-    # Predict the next score given the latest date
     next_day_since_start = (dates[-1] - dates[0]).days + 1
     next_prediction = model.predict([[next_day_since_start]])[0]
 
