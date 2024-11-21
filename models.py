@@ -10,7 +10,8 @@ class User(db.Model):
     is_participant = db.Column(db.Boolean, default=False)
     events = db.relationship('Event', secondary='event_participants', back_populates='participants')
     tournaments = db.relationship('Tournament', secondary='tournament_participants', back_populates='participants')
-    statistics = db.relationship('Statistics', back_populates='user')
+    # Specify the foreign key used in the statistics relationship
+    statistics = db.relationship('Statistics', foreign_keys='Statistics.user_id', back_populates='user')
 
     def set_password(self, password):
         self.password_hash = generate_password_hash(password)
@@ -55,10 +56,13 @@ class Statistics(db.Model):
     date = db.Column(db.DateTime, default=db.func.current_timestamp())
     rank = db.Column(db.Integer)
     group = db.Column(db.String(20))
+    added_by_user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=True)  # New field
 
-    user = db.relationship('User', back_populates='statistics')
+    user = db.relationship('User', foreign_keys=[user_id], back_populates='statistics')  # Specify foreign key
+    added_by_user = db.relationship('User', foreign_keys=[added_by_user_id])  # Relationship for 'added_by'
     event = db.relationship('Event', back_populates='statistics')
     tournament = db.relationship('Tournament', back_populates='statistics')
+
 
 event_participants = db.Table('event_participants',
     db.Column('user_id', db.Integer, db.ForeignKey('user.id'), primary_key=True),

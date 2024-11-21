@@ -12,7 +12,9 @@ from analytics import (
     get_user_performance_trend,
     get_team_improvement_rate,
     get_team_next_predicted_score,
-    get_user_next_predicted_score
+    calculate_weighted_score,
+    get_user_next_predicted_score,
+    projected_movements
 )
 
 main = Blueprint('main', __name__)
@@ -32,15 +34,16 @@ def dashboard():
 
         # personal stats
         user_stats = get_user_stats(current_user.id)
-        user_trend, next_predicted_score = get_user_performance_trend(current_user.id)
+        user_trend_tuple = get_user_performance_trend(current_user.id)  # Adjusted this line
+        user_trend = user_trend_tuple[0]  # Extracting the trend
+        next_predicted_score = get_user_next_predicted_score(current_user.id) # Assuming you have this function
+
         member_stats = Statistics.query.filter_by(user_id=current_user.id).all()
         total_points_user = sum(stat.score for stat in member_stats)
 
         # Calculate the total points for all users
         total_points_team = db.session.query(func.sum(Statistics.score)).scalar() or 0
 
-        
-        
         return render_template(
             'dashboard.html',
             team_stats=team_stats,
@@ -54,10 +57,10 @@ def dashboard():
             next_predicted_score=next_predicted_score
         )
 
-    # Existing member logic unchanged
     elif current_user.role == 'Member':
         user_stats = get_user_stats(current_user.id)
-        user_trend, next_predicted_score = get_user_performance_trend(current_user.id)
+        user_trend = get_user_performance_trend(current_user.id)  # Adjusted this line
+        next_predicted_score = get_user_next_predicted_score(current_user.id)  # Assuming you have this function
         member_stats = Statistics.query.filter_by(user_id=current_user.id).all()
         total_points = sum(stat.score for stat in member_stats)
 
@@ -150,46 +153,51 @@ def events():
     events = Event.query.all()
     return render_template('events.html', events=events)
 
-@main.route('/event/<int:event_id>', methods=['GET', 'POST'])
+@main.route('/event/<int:event_id>', methods=['GET'])
 @login_required
 def event_detail(event_id):
     event = Event.query.get_or_404(event_id)
 
-    # Check user's role to restrict access to certain roles
     if current_user.role not in ['Event Leader', 'Head of Metrics', 'Chair', 'Chairman', 'Data Chairman']:
         flash('You do not have permission to view this page.')
         return redirect(url_for('main.events'))
 
-    # Calculate total metrics points for each participant
     participant_points = {}
+    weighted_scores = {}
+    participant_trends = {}
+    participant_predictions = {}
+
     for participant in event.participants:
         stats = Statistics.query.filter_by(user_id=participant.id).all()
         total_points = sum(stat.score for stat in stats)
+
+        # Calculate weighted scores
+        weighted_scores[participant.id] = calculate_weighted_score(total_points, participant.id)
         participant_points[participant.id] = total_points
+
+        # Calculate the trend for each participant
+        trend, prediction = get_user_performance_trend(participant.id)
+        participant_trends[participant.id] = trend
+        participant_predictions[participant.id] = prediction
 
     sorted_participants = sorted(
         event.participants,
-        key=lambda participant: participant_points[participant.id],
+        key=lambda participant: weighted_scores[participant.id],
         reverse=True
     )
 
-    if request.method == 'POST':
-        user_id = request.form.get('user_id')
-        if user_id:
-            user = User.query.get(user_id)
-            if user:
-                event.participants.append(user)
-                db.session.commit()
-                flash('Participant added successfully')
-            else:
-                flash('User not found')
+    # Calculate projected movements using weighted scores
+    projected_changes = projected_movements(event.participants, participant_predictions, weighted_scores)
 
     return render_template(
         'event_detail.html',
         event=event,
         users=User.query.all(),
         participant_points=participant_points,
+        weighted_scores=weighted_scores,
         sorted_participants=sorted_participants,
+        participant_trends=participant_trends,
+        projected_changes=projected_changes,  # Pass projected changes
         enumerate=enumerate
     )
 
@@ -437,6 +445,7 @@ def edit_statistic(id):
         if score:
             stat.score = float(score)
             stat.notes = notes
+            stat.added_by_user_id = current_user.id
             db.session.commit()
             flash('Statistics updated successfully', 'success')
             return redirect(url_for('main.member_detail', member_id=stat.user_id))
@@ -529,7 +538,7 @@ def member_detail(member_id):
 
         if score:
             score = float(score)
-            new_stat = Statistics(user_id=member.id, score=score, notes=notes)
+            new_stat = Statistics(user_id=member.id, score=score, notes=notes, added_by_user_id=current_user.id)
 
             if metric_type == 'tournament':
                 event_id = request.form.get('event_id')
@@ -571,6 +580,7 @@ def member_detail(member_id):
 
     events = Event.query.all()
     return render_template('member_detail.html', member=member, events=events, statistics_info=statistics_info)
+
 @main.route('/delete_team_member/<int:member_id>')
 @login_required
 def delete_team_member(member_id):
