@@ -63,6 +63,18 @@ class Statistics(db.Model):
     event = db.relationship('Event', back_populates='statistics')
     tournament = db.relationship('Tournament', back_populates='statistics')
 
+class StatisticLog(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    action = db.Column(db.String(10), nullable=False)  # 'edit' or 'delete'
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    affected_user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    statistic_id = db.Column(db.Integer, db.ForeignKey('statistics.id'), nullable=False)
+    timestamp = db.Column(db.DateTime, default=db.func.current_timestamp())
+
+    user = db.relationship('User', foreign_keys=[user_id])
+    affected_user = db.relationship('User', foreign_keys=[affected_user_id])
+    statistic = db.relationship('Statistics')
+
 
 event_participants = db.Table('event_participants',
     db.Column('user_id', db.Integer, db.ForeignKey('user.id'), primary_key=True),

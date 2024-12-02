@@ -1,6 +1,6 @@
 from flask import Blueprint, render_template, request, redirect, url_for, flash, jsonify, abort
 from flask_login import login_required, current_user
-from models import User, Event, Tournament, Statistics
+from models import User, Event, Tournament, Statistics, StatisticLog
 from app import db
 from utils import allowed_file, parse_csv, generate_sample_csv
 from sqlalchemy import func
@@ -443,10 +443,22 @@ def edit_statistic(id):
         score = request.form.get('score')
         notes = request.form.get('notes')
         if score:
+            old_score = stat.score
             stat.score = float(score)
             stat.notes = notes
             stat.added_by_user_id = current_user.id
             db.session.commit()
+
+            # Log the change
+            log_entry = StatisticLog(
+                action='edit', 
+                user_id=current_user.id, 
+                affected_user_id=stat.user_id,
+                statistic_id=stat.id
+            )
+            db.session.add(log_entry)
+            db.session.commit()
+
             flash('Statistics updated successfully', 'success')
             return redirect(url_for('main.member_detail', member_id=stat.user_id))
         else:
@@ -459,12 +471,35 @@ def delete_statistic(id):
     if not has_permission_to_edit(current_user):
         flash('You do not have permission to edit statistics.')
         return redirect(url_for('main.dashboard'))
-    
+
     stat = Statistics.query.get_or_404(id)
+    affected_user_id = stat.user_id
+    statistic_id = stat.id
     db.session.delete(stat)
     db.session.commit()
+
+    # Log the deletion
+    log_entry = StatisticLog(
+        action='delete', 
+        user_id=current_user.id, 
+        affected_user_id=affected_user_id,
+        statistic_id=statistic_id
+    )
+    db.session.add(log_entry)
+    db.session.commit()
+
     flash('Statistic deleted successfully', 'success')
-    return redirect(url_for('main.member_detail', member_id=stat.user_id))
+    return redirect(url_for('main.member_detail', member_id=affected_user_id))
+
+@main.route('/statistics_log', methods=['GET'])
+@login_required
+def statistics_log():
+    if current_user.role not in ['Head of Metrics', 'Chair', 'Chairman', 'Data Chairman']:
+        flash('You do not have permission to view the statistics log.')
+        return redirect(url_for('main.dashboard'))
+
+    logs = StatisticLog.query.order_by(StatisticLog.timestamp.desc()).all()
+    return render_template('statistics_log.html', logs=logs)
 
 @main.route('/tournament/<int:tournament_id>', methods=['GET', 'POST'])
 @login_required
