@@ -1,0 +1,58 @@
+INFO:werkzeug:172.31.196.67 - - [02/Dec/2024 23:43:11] "GET /statistics_log HTTP/1.1" 500 -
+INFO:werkzeug:172.31.196.67 - - [02/Dec/2024 23:43:11] "GET /static/css/styles.css HTTP/1.1" 304 -
+INFO:werkzeug:172.31.196.67 - - [02/Dec/2024 23:43:11] "GET /static/js/main.js HTTP/1.1" 304 -
+INFO:werkzeug:172.31.196.67 - - [02/Dec/2024 23:43:11] "GET /static/img/logo.png HTTP/1.1" 304 -
+ERROR:app:Exception on /statistics_log [GET]
+Traceback (most recent call last):
+  File "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/flask/app.py", line 1473, in wsgi_app
+    response = self.full_dispatch_request()
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/flask/app.py", line 882, in full_dispatch_request
+    rv = self.handle_user_exception(e)
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/flask/app.py", line 880, in full_dispatch_request
+    rv = self.dispatch_request()
+         ^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/flask/app.py", line 865, in dispatch_request
+    return self.ensure_sync(self.view_functions[rule.endpoint])(**view_args)  # type: ignore[no-any-return]
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/flask_login/utils.py", line 290, in decorated_view
+    return current_app.ensure_sync(func)(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/workspace/routes.py", line 501, in statistics_log
+    logs = StatisticLog.query.order_by(StatisticLog.timestamp.desc()).all()
+           ^^^^^^^^^^^^
+NameError: name 'StatisticLog' is not defined
+INFO:werkzeug:172.31.196.67 - - [02/Dec/2024 23:43:12] "GET /statistics_log HTTP/1.1" 500 -
+INFO:werkzeug:172.31.196.67 - - [02/Dec/2024 23:43:12] "GET /static/css/styles.css HTTP/1.1" 304 -
+INFO:werkzeug:172.31.196.67 - - [02/Dec/2024 23:43:12] "GET /static/js/main.js HTTP/1.1" 304 -
+INFO:werkzeug:172.31.196.67 - - [02/Dec/2024 23:43:12] "GET /static/img/logo.png HTTP/1.1" 304 -
+ERROR:app:Exception on /statistics_log [GET]
+Traceback (most recent call last):
+  File "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/flask/app.py", line 1473, in wsgi_app
+    response = self.full_dispatch_request()
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/flask/app.py", line 882, in full_dispatch_request
+    rv = self.handle_user_exception(e)
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/flask/app.py", line 880, in full_dispatch_request
+    rv = self.dispatch_request()
+         ^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/flask/app.py", line 865, in dispatch_request
+    return self.ensure_sync(self.view_functions[rule.endpoint])(**view_args)  # type: ignore[no-any-return]
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/flask_login/utils.py", line 290, in decorated_view
+    return current_app.ensure_sync(func)(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/workspace/routes.py", line 501, in statistics_log
+    logs = StatisticLog.query.order_by(StatisticLog.timestamp.desc()).all()
+           ^^^^^^^^^^^^
+NameError: name 'StatisticLog' is not defined
+INFO:werkzeug:172.31.196.67 - - [02/Dec/2024 23:43:13] "GET /statistics_log HTTP/1.1" 500 -
+INFO:werkzeug:172.31.196.67 - - [02/Dec/2024 23:43:13] "GET /static/js/main.js HTTP/1.1" 304 -
+INFO:werkzeug:172.31.196.67 - - [02/Dec/2024 23:43:13] "GET /static/css/styles.css HTTP/1.1" 304 -
+INFO:werkzeug:172.31.196.67 - - [02/Dec/2024 23:43:13] "GET /static/img/logo.png HTTP/1.1" 304 -
+INFO:werkzeug:172.31.196.67 - - [02/Dec/2024 23:43:14] "GET /dashboard HTTP/1.1" 200 -
+INFO:werkzeug:172.31.196.67 - - [02/Dec/2024 23:43:14] "GET /static/css/styles.css HTTP/1.1" 304 -
+INFO:werkzeug:172.31.196.67 - - [02/Dec/2024 23:43:14] "GET /static/js/main.js HTTP/1.1" 304 -
+INFO:werkzeug:172.31.196.67 - - [02/Dec/2024 23:43:14] "GET /static/img/logo.png HTTP/1.1" 304 -
