@@ -567,7 +567,7 @@ def member_detail(member_id):
     statistics_info = []
     for stat in member_stats:
         stat_info = {
-            'id': stat.id,  # Ensure 'id' is included
+            'id': stat.id,
             'event_name': stat.event.name if stat.event else "N/A",
             'tournament_name': stat.tournament.name if stat.tournament else "N/A",
             'score': stat.score,
@@ -577,9 +577,9 @@ def member_detail(member_id):
             'date': stat.date.strftime('%Y-%m-%d'),
         }
         statistics_info.append(stat_info)
-
     events = Event.query.all()
     return render_template('member_detail.html', member=member, events=events, statistics_info=statistics_info)
+
 
 @main.route('/delete_team_member/<int:member_id>')
 @login_required

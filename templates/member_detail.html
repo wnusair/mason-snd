@@ -57,13 +57,21 @@
 <script>
 document.addEventListener('DOMContentLoaded', function() {
     const ctx = document.getElementById('performanceChart');
+
+    // Convert statistics_info to JSON which is serializable
+    const sortedStatistics = [...{{ statistics_info|tojson }}];
+
+    function calculateWeekLabels(stats) {
+        return stats.map((stat, index) => 'Week ' + (index + 1));
+    }
+
     new Chart(ctx, {
         type: 'line',
         data: {
-            labels: [{% for stat in member.statistics|sort(attribute='date') %}'{{ stat.tournament.name if stat.tournament else "Other Metrics" }}',{% endfor %}],
+            labels: calculateWeekLabels(sortedStatistics),
             datasets: [{
                 label: 'Performance Score',
-                data: [{% for stat in member.statistics|sort(attribute='date') %}{{ stat.score }},{% endfor %}],
+                data: sortedStatistics.map(stat => stat.score),
                 borderColor: 'rgb(75, 192, 192)',
                 tension: 0.1
             }]
