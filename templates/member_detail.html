@@ -62,7 +62,7 @@ document.addEventListener('DOMContentLoaded', function() {
     const sortedStatistics = [...{{ statistics_info|tojson }}];
 
     function calculateWeekLabels(stats) {
-        return stats.map((stat, index) => 'Week ' + (index + 1));
+        return stats.map((stat, index) => 'Week ' + (stats.length - index));
     }
 
     new Chart(ctx, {

@@ -56,6 +56,7 @@ class Statistics(db.Model):
     date = db.Column(db.DateTime, default=db.func.current_timestamp())
     rank = db.Column(db.Integer)
     group = db.Column(db.String(20))
+    logs = db.relationship('StatisticLog', back_populates='statistic', cascade='all, delete')
     added_by_user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=True)  # New field
 
     user = db.relationship('User', foreign_keys=[user_id], back_populates='statistics')  # Specify foreign key
@@ -73,7 +74,7 @@ class StatisticLog(db.Model):
 
     user = db.relationship('User', foreign_keys=[user_id])
     affected_user = db.relationship('User', foreign_keys=[affected_user_id])
-    statistic = db.relationship('Statistics')
+    statistic = db.relationship('Statistics', back_populates='logs', cascade="all, delete")
 
 
 event_participants = db.Table('event_participants',

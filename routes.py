@@ -472,21 +472,28 @@ def delete_statistic(id):
         flash('You do not have permission to edit statistics.')
         return redirect(url_for('main.dashboard'))
 
+    # Fetch the statistic to be deleted
     stat = Statistics.query.get_or_404(id)
     affected_user_id = stat.user_id
     statistic_id = stat.id
+
+    # Delete the statistic
     db.session.delete(stat)
+    
     db.session.commit()
 
-    # Log the deletion
+
+    # Log the change
     log_entry = StatisticLog(
         action='delete', 
         user_id=current_user.id, 
-        affected_user_id=affected_user_id,
-        statistic_id=statistic_id
+        affected_user_id=stat.user_id,
+        statistic_id=1
     )
     db.session.add(log_entry)
     db.session.commit()
+    
+    # Commit both the log and the statistic deletion
 
     flash('Statistic deleted successfully', 'success')
     return redirect(url_for('main.member_detail', member_id=affected_user_id))
