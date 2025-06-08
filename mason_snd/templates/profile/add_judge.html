@@ -1,0 +1,36 @@
+{% extends "profile/base.html" %}
+
+{% block title %}Add Judge{% endblock %}
+
+{% block content %}
+{% for message in get_flashed_messages() %}
+<div class="alert alert-info" role="alert">
+    {{ message }}
+</div>
+{% endfor %}
+
+<form method="post">
+    <label for="judge_first_name">Judge First Name</label>
+    <input type="text" name="judge_first_name" placeholder="First Name">
+
+    <br>
+
+    <label for="judge_last_name">Judge Last Name</label>
+    <input type="text" name="judge_last_name" placeholder="Last Name">
+
+    <br>
+
+    <label for="judge_email">Judge Email</label>
+    <input type="email" name="judge_email" placeholder="example@gmail.com">
+
+    <br>
+
+    <label for="judge_phone">Judge Phone</label>
+    <input type="tel" name="judge_phone" placeholder="(xxx) xxx-xxxx">
+ 
+    <br>
+
+    <button type="submit">Add Judge</button>
+</form>
+
+{% endblock %}

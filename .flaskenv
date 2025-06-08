@@ -1,0 +1,2 @@
+FLASK_APP=mason_snd:create_app
+FLASK_ENV=development

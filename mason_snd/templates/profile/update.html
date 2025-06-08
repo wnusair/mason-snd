@@ -3,6 +3,14 @@
 {% block title %}Edit Profile{% endblock %}
 
 {% block content %}
+
+{% for message in get_flashed_messages() %}
+<div class="alert alert-info" role="alert">
+    {{ message }}
+</div>
+{% endfor %}
+
+
 <h1>Edit Profile</h1>
 <form method="POST">
     <label>First Name</label>

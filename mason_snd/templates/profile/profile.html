@@ -29,6 +29,8 @@
     {% if judge_link %}
         <a href="{{ url_for('profile.index', user_id=judge_link) }}">View Parent</a>
     {% endif %}
+    <a href="{{ url_for('profile.add_judge') }}">Add Judge</a>
+
 {% endif %}
 
 <a href="{{ url_for('profile.update') }}">Edit Profile</a>

@@ -1,0 +1,36 @@
+{% extends "profile/base.html" %}
+
+{% block title %}Add Child{% endblock %}
+
+{% block content %}
+{% for message in get_flashed_messages() %}
+<div class="alert alert-info" role="alert">
+    {{ message }}
+</div>
+{% endfor %}
+
+<form method="post">
+    <label for="child_first_name">Child First Name</label>
+    <input type="text" name="child_first_name" placeholder="First Name">
+
+    <br>
+
+    <label for="child_last_name">Child Last Name</label>
+    <input type="text" name="child_last_name" placeholder="Last Name">
+
+    <br>
+
+    <label for="child_email">Child Email</label>
+    <input type="email" name="child_email" placeholder="example@gmail.com">
+
+    <br>
+
+    <label for="child_phone">Child Phone</label>
+    <input type="tel" name="child_phone" placeholder="(xxx) xxx-xxxx">
+ 
+    <br>
+
+    <button type="submit">Add Child</button>
+</form>
+
+{% endblock %}

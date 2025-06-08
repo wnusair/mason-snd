@@ -109,21 +109,25 @@ def update():
 
         db.session.commit()
         flash('Profile updated successfully', 'success')
-        return redirect(url_for('profile.index'))
+        return redirect(url_for('profile.index', user_id=user_id))
 
     return render_template('profile/update.html', user=user)
 
 @profile_bp.route('/add_judge', methods=['POST', 'GET'])
 def add_judge():
     user_id = session.get('user_id')
-    
+    user = User.query.filter_by(id=user_id).first()
+
     if not user_id:
         flash('Log in first!')
         return redirect(url_for('auth.login'))
     
-    if request.method == 'POST':
-        user = User.query.filter_by(id=user_id).first()
+    if user.is_parent:
+        flash('You are not a child')
+        return redirect(url_for('profile.index', user_id=user_id))
 
+    
+    if request.method == 'POST':
         """
         
         judge first name
@@ -140,25 +144,87 @@ def add_judge():
         
         """
 
-        judge_first_name = request.form.get("judge_first_name")
-        judge_last_name = request.form.get("judge_last_name")
-        judge_email = request.form.get("judge_email")
-        judge_phone = request.form.get("judge_phone")
+        judge_first_name = request.form.get("judge_first_name").lower()
+        judge_last_name = request.form.get("judge_last_name").lower()
+        judge_email = request.form.get("judge_email").lower()
+        judge_phone = request.form.get("judge_phone").lower()
 
 
         judge_account = User.query.filter_by(first_name=judge_first_name, last_name=judge_last_name, phone_number=judge_phone).first()
 
         if not judge_account:
             create_ghost(judge_first_name, judge_last_name, judge_email, judge_phone, user)
-        
-        judge_relationship = Judges(
+            judge_account = User.query.filter_by(first_name=judge_first_name, last_name=judge_last_name, phone_number=judge_phone).first()
+
+        existing_relationship = Judges.query.filter_by(judge_id=judge_account.id, child_id=user_id).first()
+        if not existing_relationship:
+            judge_relationship = Judges(
             background_check=False,
             judge_id=judge_account.id,
             child_id=user_id
-        )
+            )
 
-        db.session.add(judge_relationship)
-        db.session.commit()
+            db.session.add(judge_relationship)
+            db.session.commit()
 
-        return redirect(url_for('profile.index'))
-    return render_template('add_judge.html')
+        return redirect(url_for('profile.index', user_id=user_id))
+    return render_template('profile/add_judge.html')
+
+
+@profile_bp.route('/add_child', methods=['POST', 'GET'])
+def add_child():
+    user_id = session.get('user_id')
+    user = User.query.filter_by(id=user_id).first()
+
+    if not user_id:
+        flash('Log in first!')
+        return redirect(url_for('auth.login'))
+    
+    if not user.is_parent:
+        flash('You are not a parent')
+        return redirect(url_for('profile.index', user_id=user_id))
+
+    
+    if request.method == 'POST':
+
+        """
+        
+        child first name
+        child last name
+        child email
+        child phone number
+
+        check if account exists
+        if not exists -> make ghost account
+
+        add child relationship
+
+
+        
+        """
+
+        child_first_name = request.form.get("child_first_name").lower()
+        child_last_name = request.form.get("child_last_name").lower()
+        child_email = request.form.get("child_email").lower()
+        child_phone = request.form.get("child_phone").lower()
+
+
+        child_account = User.query.filter_by(first_name=child_first_name, last_name=child_last_name, phone_number=child_phone).first()
+
+        if not child_account:
+            create_ghost(child_first_name, child_last_name, child_email, child_phone, user)
+            child_account = User.query.filter_by(first_name=child_first_name, last_name=child_last_name, phone_number=child_phone).first()
+
+        existing_relationship = Judges.query.filter_by(judge_id=user_id, child_id=child_account.id).first()
+        if not existing_relationship:
+            child_relationship = Judges(
+            background_check=False,
+            judge_id=user_id,
+            child_id=child_account.id
+            )
+
+            db.session.add(child_relationship)
+            db.session.commit()
+
+        return redirect(url_for('profile.index', user_id=user_id))
+    return render_template('profile/add_child.html')
