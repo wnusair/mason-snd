@@ -1,0 +1,48 @@
+{% extends "profile/base.html" %}
+
+{% block title %}Edit Profile{% endblock %}
+
+{% block content %}
+<h1>Edit Profile</h1>
+<form method="POST">
+    <label>First Name</label>
+    <input type="text" name="first_name" value="{{ user.first_name }}" required><br>
+
+    <label>Last Name</label>
+    <input type="text" name="last_name" value="{{ user.last_name }}" required><br>
+
+    <label>Email</label>
+    <input type="email" name="email" value="{{ user.email }}" required><br>
+
+    <label>Phone Number</label>
+    <input type="text" name="phone_number" value="{{ user.phone_number }}"><br>
+
+    <label>New Password (leave blank to keep current)</label>
+    <input type="password" name="password"><br>
+
+    {% if user.is_parent %}
+        <label>Child First Name</label>
+        <input type="text" name="child_first_name" value="{{ user.child_first_name }}"><br>
+
+        <label>Child Last Name</label>
+        <input type="text" name="child_last_name" value="{{ user.child_last_name }}"><br>
+    {% else %}
+        <label>Emergency Contact First Name</label>
+        <input type="text" name="emergency_first_name" value="{{ user.emergency_contact_first_name }}"><br>
+
+        <label>Emergency Contact Last Name</label>
+        <input type="text" name="emergency_last_name" value="{{ user.emergency_contact_last_name }}"><br>
+
+        <label>Emergency Contact Phone</label>
+        <input type="text" name="emergency_contact_phone" value="{{ user.emergency_contact_number }}"><br>
+
+        <label>Emergency Contact Email</label>
+        <input type="email" name="emergency_contact_email" value="{{ user.emergency_contact_email }}"><br>
+
+        <label>Emergency Contact Relationship</label>
+        <input type="text" name="emergency_contact_relationship" value="{{ user.emergency_contact_relationship }}"><br>
+    {% endif %}
+
+    <button type="submit">Save Changes</button>
+</form>
+{% endblock %}

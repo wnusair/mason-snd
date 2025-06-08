@@ -1,0 +1,30 @@
+{% extends "auth/base.html" %}
+{% block title %}Login{% endblock %}
+
+{% block content %}
+
+{% for message in get_flashed_messages() %}
+<div class="alert alert-info" role="alert">
+    {{ message }}
+</div>
+{% endfor %}
+
+<form action="login" method="post">
+    <div>
+        <label for="email">Email</label>
+        <br>
+        <input type="email" name="email">
+
+        <br><br>
+
+        <label for="password">Password</label>
+        <br>
+        <input type="password" name="password">
+
+        <br><br>
+
+        <button type="submit">Submit</button>
+    </div>
+</form>
+
+{% endblock %}

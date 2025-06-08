@@ -1,0 +1,36 @@
+{% extends "profile/base.html" %}
+
+{% block title %}Home{% endblock %}
+
+{% block content %}
+
+<h1>{{ user.first_name + ' ' + user.last_name }} - {{ user.id }}</h1>
+
+<br>
+
+<p>{{ user.email }}</p>
+
+<br>
+{% if user.is_parent %}
+    <div>
+        is parent
+        <p>{{ user.child_first_name }} {{ user.child_last_name }}</p>
+    </div>
+    {% if judge_link %}
+        <a href="{{ url_for('profile.index', user_id=judge_link) }}">View Child</a>
+    {% endif %}
+{% else %}
+    <div>
+        is child
+        <p>{{ user.emergency_contact_first_name }} {{ user.emergency_contact_last_name }}</p>
+        <p>{{ user.emergency_contact_phone }}</p>
+        <p>{{ user.emergency_contact_email }}</p>
+    </div>
+    {% if judge_link %}
+        <a href="{{ url_for('profile.index', user_id=judge_link) }}">View Parent</a>
+    {% endif %}
+{% endif %}
+
+<a href="{{ url_for('profile.update') }}">Edit Profile</a>
+
+{% endblock %}
