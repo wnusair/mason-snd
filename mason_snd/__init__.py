@@ -20,9 +20,11 @@ def create_app():
 
     from mason_snd.blueprints.auth.auth import auth_bp
     from mason_snd.blueprints.profile.profile import profile_bp
+    from mason_snd.blueprints.events.events import events_bp
 
     app.register_blueprint(auth_bp, url_prefix='/auth')
     app.register_blueprint(profile_bp, url_prefix='/profile')
+    app.register_blueprint(events_bp, url_prefix='/events')
 
     with app.app_context():
         db.create_all()

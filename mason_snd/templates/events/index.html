@@ -4,6 +4,8 @@
 
 {% block content %}
 
-<a href="{{ url_for('auth.add_popup') }}">Add Popup</a>
+{% for event in events %}
+<h1>{{ event }}</h1>
+{% endfor %}
 
 {% endblock %}
