@@ -26,8 +26,9 @@ def index():
 def add_event():
     user_id = session.get('user_id')
     user = User.query.filter_by(id=user_id).first()
-    if not user_id and user.role <= 2:
-        flash('Bruzz is not logged in and/or isnt an admin')
+
+    if not user_id or user is None or user.role < 2:
+        flash('Bruzz is not logged in and/or isn\'t an admin')
         return redirect(url_for('auth.login'))
     
     if request.method == 'POST':
@@ -37,6 +38,21 @@ def add_event():
         owner_last_name = request.form.get('owner_last_name')
         event_emoji = request.form.get('event_emoji')
 
-        owner = User.query.filter_by(first_name = owner_first_name.lower(), last_name = owner_last_name.first())
+        owner = User.query.filter_by(first_name=owner_first_name.lower(), last_name=owner_last_name.lower()).first()
         
+        if not owner:
+            flash("This person does not exist", "error")
+            return redirect(url_for("events.add_event"))
+
+        new_event = Event(
+            event_name=event_name,
+            event_description=event_description,
+            event_emoji=event_emoji,
+            owner_id=owner.id
+        )
+
+        db.session.add(new_event)
+        db.session.commit()
+        return redirect(url_for('events.index'))
+
     return render_template('events/add_event.html')

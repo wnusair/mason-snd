@@ -1,0 +1,33 @@
+{% extends "profile/base.html" %}
+
+{% block title %}Home{% endblock %}
+
+{% block content %}
+
+<form method="post">
+    <label for="event_name">Event Name</label>
+    <input type="text" name="event_name">
+
+    <br>
+    <label for="event_description">Event Description</label>
+    <input type="text" name="event_description">
+
+    <br>
+    <label for="owner_first_name">Event Leader First Name</label>
+    <input type="text" name="owner_first_name">
+
+    <br>
+    <label for="owner_last_name">Event Leader Last Name</label>
+    <input type="text" name="owner_last_name">
+
+    <br>
+    <label for="event_emoji">Event Emoji</label>
+    <input type="text" name="event_emoji">
+
+    <br>
+
+    <button type="submit">Create Event</button>
+    
+</form>
+
+{% endblock %}
