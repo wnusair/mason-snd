@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+
+{% block content %}
+<h1>Manage Members for {{ event.event_name }}</h1>
+
+<form method="POST">
+    <table>
+        <thead>
+            <tr>
+                <th>Member Name</th>
+                <th>Current Effort Score</th>
+                <th>Add Effort Score</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for member in members %}
+            <tr>
+                <td>{{ member.user.first_name }} {{ member.user.last_name }}</td>
+                <td>{{ member.effort_score }}</td>
+                <td>
+                    <input type="number" name="effort_score_{{ member.user.id }}" min="0" placeholder="0" />
+                    /10
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    <button type="submit">Save Scores</button>
+</form>
+{% endblock %}

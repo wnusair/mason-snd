@@ -1,0 +1,19 @@
+{% extends "profile/base.html" %}
+
+{% block title %}Edit Event{% endblock %}
+
+{% block content %}
+<h1>Edit Event</h1>
+<form action="{{ url_for('events.edit_event', event_id=event.id) }}" method="POST">
+    <label for="event_name">Event Name:</label>
+    <input type="text" id="event_name" name="event_name" value="{{ event.event_name }}" required>
+
+    <label for="event_description">Event Description:</label>
+    <textarea id="event_description" name="event_description" required>{{ event.event_description }}</textarea>
+
+    <label for="event_emoji">Event Emoji:</label>
+    <input type="text" id="event_emoji" name="event_emoji" value="{{ event.event_emoji }}" required>
+
+    <button type="submit">Save Changes</button>
+</form>
+{% endblock %}

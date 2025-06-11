@@ -5,7 +5,32 @@
 {% block content %}
 
 {% for event in events %}
-<h1>{{ event }}</h1>
+<h1>{{ event.event_name }}</h1>
+<p>{{ event.event_description }}</p>
+<p>{{ event.event_emoji }}</p>
+<p>Event leader: {{ event.owner.first_name }} {{ event.owner.last_name }}</p>
+
+
+{% if event.event_name not in user_events %}
+<form action="{{ url_for('events.join_event', event_id=event.id) }}" method="post">
+    <button type="submit">Join {{ event.event_name }}</button>
+</form>
+{% else %}
+<form action="{{ url_for('events.leave_event', event_id=event.id) }}" method="post">
+    <button type="submit">Leave {{ event.event_name }}</button>
+</form>
+{% endif %}
+
+{% if event.owner_id == user.id %}
+<a href="{{ url_for('events.edit_event', event_id=event.id) }}">Edit Event</a>
+<a href="{{ url_for('events.manage_members', event_id=event.id) }}">Manage Members</a>
+{% endif %}
+
 {% endfor %}
+
+{% if user.role < 2 %}
+<a href="{{ url_for('events.add_event') }}">Add Event</a>
+{% endif %}
+
 
 {% endblock %}
