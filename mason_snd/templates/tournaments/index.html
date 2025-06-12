@@ -3,6 +3,33 @@
 
 {% block content %}
 
+<table>
+    <thead>
+        <tr>
+            <th>Name</th>
+            <th>Date</th>
+            <th>Location</th>
+            <th>Signup Deadline</th>
+            <th>Performance Deadline</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for tournament in tournaments %}
+        <tr>
+            <td>{{ tournament.name }}</td>
+            <td>{{ tournament.date }}</td>
+            <td>{{ tournament.address }}</td>
+            <td>{{ tournament.signup_deadline }}</td>
+            <td>{{ tournament.performance_deadline }}</td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+
+<a href="{{ url_for('tournaments.signup') }}">Tournament Sign Up</a>
+
+{% if user.role >= 2 %}
 <a href="{{ url_for('tournaments.add_tournament') }}">Add Tournament</a>
+{% endif %}
 
 {% endblock %}

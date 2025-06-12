@@ -2,7 +2,7 @@ from flask import Blueprint, render_template, request, redirect, url_for, flash,
 
 from mason_snd.extensions import db
 from mason_snd.models.auth import User, Judges
-from mason_snd.models.tournaments import Tournament
+from mason_snd.models.tournaments import Tournament, Form_Responses, Form_Fields
 
 from werkzeug.security import generate_password_hash, check_password_hash
 
@@ -15,7 +15,17 @@ tournaments_bp = Blueprint('tournaments', __name__, template_folder='templates')
 
 @tournaments_bp.route('/')
 def index():
-    return render_template('tournaments/index.html')
+    tournaments = Tournament.query.all()
+
+    user_id = session.get("user_id")
+    user = User.query.filter_by(id=user_id).first()
+
+    for tournament in tournaments:
+        print(tournament.name,tournament.date,tournament.address,tournament.signup_deadline,tournament.performance_deadline)
+
+    return render_template('tournaments/index.html', tournaments=tournaments, user=user)
+
+from datetime import datetime
 
 @tournaments_bp.route('/add_tournament', methods=['POST', 'GET'])
 def add_tournament():
@@ -29,21 +39,111 @@ def add_tournament():
     if request.method == "POST":
         name = request.form.get("name")
         address = request.form.get("address")
-        date = request.form.get("date")
-        signup_deadline = request.form.get("signup_deadline")
-        performance_deadline = request.form.get("performance_deadline")
+        date_str = request.form.get("date")  # "YYYY-MM-DDTHH:MM"
+        signup_deadline_str = request.form.get("signup_deadline")  # "YYYY-MM-DDTHH:MM"
+        performance_deadline_str = request.form.get("performance_deadline")  # "YYYY-MM-DDTHH:MM"
         created_at = datetime.now(EST)
 
+        try:
+            # Convert string inputs to datetime objects
+            date = datetime.strptime(date_str, "%Y-%m-%dT%H:%M")  # Now parses datetime
+            signup_deadline = datetime.strptime(signup_deadline_str, "%Y-%m-%dT%H:%M")
+            performance_deadline = datetime.strptime(performance_deadline_str, "%Y-%m-%dT%H:%M")
+        except ValueError:
+            flash("Invalid date format. Please use the date pickers.", "error")
+            return render_template("tournaments/add_tournament.html")
+
         new_tournament = Tournament(
-            name = name,
-            date = date,
-            address = address,
-            signup_deadline = signup_deadline,
-            performance_deadline = performance_deadline,
-            created_at = created_at
+            name=name,
+            date=date,
+            address=address,
+            signup_deadline=signup_deadline,
+            performance_deadline=performance_deadline,
+            created_at=created_at
         )
 
         db.session.add(new_tournament)
         db.session.commit()
 
     return render_template("tournaments/add_tournament.html")
+
+@tournaments_bp.route('/add_form', methods=['GET', 'POST'])
+def add_form():
+    user_id = session.get('user_id')
+    user = User.query.filter_by(id=user_id).first()
+    if not user_id:
+        flash("Please log in", "error")
+        return redirect(url_for('auth.login'))
+
+    tournaments = Tournament.query.all()
+
+    if request.method == 'POST':
+        tournament_id = request.form.get('tournament_id')
+
+        # Get multiple field inputs
+        labels = request.form.getlist('label')
+        types = request.form.getlist('type')
+        options_list = request.form.getlist('options')
+        # Note: for checkboxes, if not checked the value is not submitted.
+        required_vals = request.form.getlist('required')
+
+        # Create a field entry for each input group
+        for i in range(len(labels)):
+            label = labels[i]
+            field_type = types[i]
+            options = options_list[i] if options_list[i] != "" else None
+            # Each field row has its own checkbox input. If checkbox exists, its value (e.g. "on") appears
+            required = (str(required_vals[i]).lower() in ["on", "true", "1"]) if i < len(required_vals) else False
+
+            new_field = Form_Fields(
+                label=label,
+                type=field_type,
+                options=options,
+                required=required,
+                tournament_id=tournament_id
+            )
+            db.session.add(new_field)
+        db.session.commit()
+        flash("Form fields added successfully.", "success")
+        return redirect(url_for('tournaments.index'))
+
+    return render_template("tournaments/add_form.html", tournaments=tournaments)
+
+@tournaments_bp.route('/signup', methods=['GET', 'POST'])
+def signup():
+    tournaments = Tournament.query.all()
+    if request.method == 'POST':
+        tournament_id = request.form.get('tournament_id')
+        tournament = Tournament.query.get(tournament_id)
+        if not tournament:
+            flash("Tournament not found.", "error")
+            return redirect(url_for('tournaments.signup'))
+        
+        print("Tournament found")
+
+        # For each field in the selected tournament, capture the user's response
+        for field in tournament.form_fields:
+            field_name = f'field_{field.id}'
+            response_value = request.form.get(field_name)
+            new_response = Form_Responses(
+                tournament_id=tournament.id,
+                user_id=session.get('user_id'),
+                field_id=field.id,
+                response=response_value,
+                submitted_at=datetime.now(EST)
+            )
+            db.session.add(new_response)
+        db.session.commit()
+        flash("Your responses have been submitted.", "success")
+        return redirect(url_for('tournaments.index'))
+    else:
+        # if a tournament is selected via query string, show its form fields
+        tournament_id = request.args.get('tournament_id')
+        selected_tournament = Tournament.query.get(tournament_id) if tournament_id else None
+        fields = selected_tournament.form_fields if selected_tournament else []
+        return render_template(
+            "tournaments/signup.html",
+            tournaments=tournaments,
+            selected_tournament=selected_tournament,
+            fields=fields
+        )

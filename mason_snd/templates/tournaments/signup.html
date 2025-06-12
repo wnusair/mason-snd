@@ -1,0 +1,62 @@
+{% extends "tournaments/base.html" %}
+{% block title %}Tournament Signup{% endblock %}
+
+{% block content %}
+<h2>Tournament Signup</h2>
+<form method="GET">
+    <label for="tournament_id">Select Tournament:</label>
+    <select name="tournament_id" id="tournament_id" onchange="this.form.submit()">
+        <option value="">-- Select Tournament --</option>
+        {% for tournament in tournaments %}
+        <option value="{{ tournament.id }}" {% if selected_tournament and selected_tournament.id == tournament.id %}selected{% endif %}>{{ tournament.name }}</option>
+        {% endfor %}
+    </select>
+</form>
+
+{% if selected_tournament %}
+<form method="POST">
+    <input type="hidden" name="tournament_id" value="{{ selected_tournament.id }}">
+    {% for field in fields %}
+    <div class="form-group">
+        <label>{{ field.label }} {% if field.required %}*{% endif %}</label>
+        {% if field.type == 'text' %}
+            <input type="text" name="field_{{ field.id }}" {% if field.required %}required{% endif %}>
+        {% elif field.type == 'radio' %}
+            {% if field.options %}
+                {% for opt in field.options.split(',') %}
+                <label>
+                    <input type="radio" name="field_{{ field.id }}" value="{{ opt.strip() }}" {% if loop.first and field.required %}required{% endif %}>
+                    {{ opt.strip() }}
+                </label>
+                {% endfor %}
+            {% else %}
+                <p class="error">No options available for this field.</p>
+            {% endif %}
+        {% elif field.type == 'dropdown' %}
+            {% if field.options %}
+                <select name="field_{{ field.id }}" {% if field.required %}required{% endif %}>
+                    {% for opt in field.options.split(',') %}
+                    <option value="{{ opt.strip() }}">{{ opt.strip() }}</option>
+                    {% endfor %}
+                </select>
+            {% else %}
+                <p class="error">No options available for this field.</p>
+            {% endif %}
+        {% elif field.type == 'checkbox' %}
+            {% if field.options %}
+                {% for opt in field.options.split(',') %}
+                <label>
+                    <input type="checkbox" name="field_{{ field.id }}" value="{{ opt.strip() }}">
+                    {{ opt.strip() }}
+                </label>
+                {% endfor %}
+            {% else %}
+                <p class="error">No options available for this field.</p>
+            {% endif %}
+        {% endif %}
+    </div>
+    {% endfor %}
+    <button type="submit">Submit Responses</button>
+</form>
+{% endif %}
+{% endblock %}
