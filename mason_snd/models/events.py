@@ -1,5 +1,8 @@
 from ..extensions import db
 
+from datetime import datetime
+import pytz
+
 class Event(db.Model):
     id = db.Column(db.Integer, primary_key=True)
 
@@ -9,7 +12,7 @@ class Event(db.Model):
     event_emoji = db.Column(db.String)
     
     owner_id = db.Column(db.Integer, db.ForeignKey('user.id'))
-    owner = db.relationship('User', foreign_keys=[owner_id], backref='owner')
+    owner = db.relationship('User', foreign_keys=[owner_id], backref='event')
 
 class User_Event(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -19,21 +22,21 @@ class User_Event(db.Model):
     event_id = db.Column(db.Integer, db.ForeignKey('event.id'))
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'))
 
-    event = db.relationship('Event', foreign_keys=[event_id], backref='event')
-    user = db.relationship('User', foreign_keys=[user_id], backref='user')
+    event = db.relationship('Event', foreign_keys=[event_id], backref='user_event')
+    user = db.relationship('User', foreign_keys=[user_id], backref='user_event')
 
 class Effort_Score(db.Model):
     id = db.Column(db.Integer, primary_key=True)
 
     score = db.Column(db.Integer)
-    timestamp = db.Column() # datetime eastern time
+    timestamp = db.Column(db.DateTime, default=lambda: datetime.now(pytz.timezone('US/Eastern'))) # datetime eastern time
 
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'))
-    user = db.relationship('User', foreign_keys=[user_id], backref='user')
+    user = db.relationship('User', foreign_keys=[user_id], backref='effort_score_user')
 
     event_id = db.Column(db.Integer, db.ForeignKey('event.id'))
-    event = db.relationship('Event', foreign_keys=[event_id], backref='event')
+    event = db.relationship('Event', foreign_keys=[event_id], backref='effort_score')
 
-    given_by_id = db.Column(db.Integer, db.ForeignKey('given_by.id'))
-    given_by = db.relationship('User', foreign_keys=[given_by_id], backref='given_by')
+    given_by_id = db.Column(db.Integer, db.ForeignKey('user.id'))
+    given_by = db.relationship('User', foreign_keys=[given_by_id], backref='effort_score_given_by')
 

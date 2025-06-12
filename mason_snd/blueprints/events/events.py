@@ -1,7 +1,7 @@
 from flask import Blueprint, render_template, request, redirect, url_for, flash, session
 
 from mason_snd.extensions import db
-from mason_snd.models.events import Event, User_Event
+from mason_snd.models.events import Event, User_Event, Effort_Score
 from mason_snd.models.auth import User
 
 from werkzeug.security import generate_password_hash, check_password_hash
@@ -117,12 +117,23 @@ def manage_members(event_id):
             new_score = request.form.get(f"effort_score_{ue.user_id}")
             if new_score and new_score.isdigit():
                 new_score = int(new_score)
+
+                # Update the User_Event table
                 ue.effort_score += new_score
+
+                # Update the Effort_Score table
+                effort_score_entry = Effort_Score(
+                    score=new_score,
+                    user_id=ue.user_id,
+                    event_id=event_id,
+                    given_by_id=user_id  # The logged-in user assigning the score
+                )
+                db.session.add(effort_score_entry)
 
                 # Update the user's total score
                 user = User.query.get(ue.user_id)
                 if user:
-                    user.total_score = (user.total_score or 0) + new_score
+                    user.points = (user.points or 0) + new_score
 
         db.session.commit()
         flash("Effort scores updated successfully.", "success")
@@ -189,3 +200,23 @@ def add_event():
         return redirect(url_for('events.index'))
 
     return render_template('events/add_event.html')
+
+@events_bp.route('/delete_event/<int:event_id>', methods=['POST'])
+def delete_event(event_id):
+    user_id = session.get('user_id')
+    user = User.query.filter_by(id=user_id).first()
+    if not user_id:
+        flash("You must be logged in to delete an event", "error")
+        return redirect(url_for('auth.login'))
+    
+    if user.role < 2:
+        flash("You do not have admin permissions to delete event.", "error")
+        return redirect(url_for('auth.login'))
+    
+    event = Event.query.filter_by(id=event_id).first()
+
+    db.session.delete(event)
+    db.session.commit()
+
+    flash("You have successfully deleted the event", "success")
+    return redirect(url_for('events.index'))

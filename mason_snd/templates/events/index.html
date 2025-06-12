@@ -1,4 +1,4 @@
-{% extends "profile/base.html" %}
+{% extends "events/base.html" %}
 
 {% block title %}Home{% endblock %}
 
@@ -24,6 +24,10 @@
 {% if event.owner_id == user.id %}
 <a href="{{ url_for('events.edit_event', event_id=event.id) }}">Edit Event</a>
 <a href="{{ url_for('events.manage_members', event_id=event.id) }}">Manage Members</a>
+{% endif %}
+{% if user.role >= 2 %}
+<a href="{{ url_for('events.delete_event', event_id=event.id) }}">Delete Event</a>
+
 {% endif %}
 
 {% endfor %}
