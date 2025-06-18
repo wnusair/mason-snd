@@ -11,6 +11,7 @@
             <th>Location</th>
             <th>Signup Deadline</th>
             <th>Performance Deadline</th>
+            <th>Action</th>
         </tr>
     </thead>
     <tbody>
@@ -21,6 +22,7 @@
             <td>{{ tournament.address }}</td>
             <td>{{ tournament.signup_deadline }}</td>
             <td>{{ tournament.performance_deadline }}</td>
+            <td><a href="{{ url_for('tournaments.delete_tournament', tournament_id=tournament.id) }}">Delete Tournament</a></td>
         </tr>
         {% endfor %}
     </tbody>

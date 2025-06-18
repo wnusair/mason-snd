@@ -2,7 +2,7 @@ from flask import Blueprint, render_template, request, redirect, url_for, flash,
 
 from mason_snd.extensions import db
 from mason_snd.models.auth import User, Judges
-from mason_snd.models.tournaments import Tournament, Form_Responses, Form_Fields
+from mason_snd.models.tournaments import Tournament, Form_Responses, Form_Fields, Tournament_Signups
 
 from werkzeug.security import generate_password_hash, check_password_hash
 
@@ -17,8 +17,12 @@ tournaments_bp = Blueprint('tournaments', __name__, template_folder='templates')
 def index():
     tournaments = Tournament.query.all()
 
-    user_id = session.get("user_id")
+    user_id = session.get('user_id')
     user = User.query.filter_by(id=user_id).first()
+
+    if not user_id:
+        flash("Please Log in", "error")
+        return redirect(url_for('auth.login'))
 
     for tournament in tournaments:
         print(tournament.name,tournament.date,tournament.address,tournament.signup_deadline,tournament.performance_deadline)
@@ -30,7 +34,6 @@ from datetime import datetime
 @tournaments_bp.route('/add_tournament', methods=['POST', 'GET'])
 def add_tournament():
     user_id = session.get('user_id')
-    user = User.query.filter_by(id=user_id).first()
 
     if not user_id:
         flash("Please Log in", "error")
@@ -64,6 +67,19 @@ def add_tournament():
 
         db.session.add(new_tournament)
         db.session.commit()
+
+        users = User.query.all()
+        current_tournament = Tournament.query.filter_by(name=name).first()
+
+        for user in users:
+            tournament_signup = Tournament_Signups(
+                user_id = user.id,
+                tournament_id = current_tournament.id
+            )
+
+            db.session.add(tournament_signup)
+            db.session.commit()
+
 
     return render_template("tournaments/add_tournament.html")
 
@@ -112,6 +128,16 @@ def add_form():
 @tournaments_bp.route('/signup', methods=['GET', 'POST'])
 def signup():
     tournaments = Tournament.query.all()
+
+    user_id = session.get('user_id')
+    user = User.query.filter_by(id=user_id).first()
+
+    now = datetime.now(EST)  # Get the current time in EST
+
+    if not user_id:
+        flash("Please Log in", "error")
+        return redirect(url_for('auth.login'))
+
     if request.method == 'POST':
         tournament_id = request.form.get('tournament_id')
         tournament = Tournament.query.get(tournament_id)
@@ -120,6 +146,14 @@ def signup():
             return redirect(url_for('tournaments.signup'))
         
         print("Tournament found")
+
+        my_tournament_signup = Tournament_Signups.query.filter_by(user_id=user_id, tournament_id=tournament_id).first()
+        bringing_judge = request.form.get('bringing_judge_yes')
+
+        if bringing_judge:
+            my_tournament_signup.bringing_judge = True
+        
+        my_tournament_signup.is_going = True
 
         # For each field in the selected tournament, capture the user's response
         for field in tournament.form_fields:
@@ -140,10 +174,39 @@ def signup():
         # if a tournament is selected via query string, show its form fields
         tournament_id = request.args.get('tournament_id')
         selected_tournament = Tournament.query.get(tournament_id) if tournament_id else None
+
+        # Localize signup_deadline for all tournaments
+        for tournament in tournaments:
+            if tournament.signup_deadline:
+                tournament.signup_deadline = EST.localize(tournament.signup_deadline)
+
         fields = selected_tournament.form_fields if selected_tournament else []
+
+
         return render_template(
             "tournaments/signup.html",
             tournaments=tournaments,
             selected_tournament=selected_tournament,
-            fields=fields
+            fields=fields,
+            now=now  # Pass the current time to the template
         )
+
+@tournaments_bp.route('/delete_tournament/<int:tournament_id>', methods=['POST'])
+def delete_tournament(tournament_id):
+    tournaments = Tournament.query.all()
+
+    user_id = session.get('user_id')
+    user = User.query.filter_by(id=user_id).first()
+
+    now = datetime.now(EST)
+
+    if not user_id:
+        flash("Please Log in", "error")
+        return redirect(url_for('auth.login'))
+
+    tournament = Tournament.query.filter_by(id=tournament_id).first()
+
+    db.session.delete(tournament)
+    db.session.commit()
+
+    return redirect(url_for('tournaments.index'))

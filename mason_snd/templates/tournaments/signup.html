@@ -8,7 +8,12 @@
     <select name="tournament_id" id="tournament_id" onchange="this.form.submit()">
         <option value="">-- Select Tournament --</option>
         {% for tournament in tournaments %}
-        <option value="{{ tournament.id }}" {% if selected_tournament and selected_tournament.id == tournament.id %}selected{% endif %}>{{ tournament.name }}</option>
+        <option value="{{ tournament.id }}" 
+            {% if selected_tournament and selected_tournament.id == tournament.id %}selected{% endif %}
+            {% if tournament.signup_deadline and tournament.signup_deadline < now %}disabled{% endif %}>
+            {{ tournament.name }}
+            {% if tournament.signup_deadline and tournament.signup_deadline < now %} (Closed){% endif %}
+        </option>
         {% endfor %}
     </select>
 </form>
@@ -56,7 +61,14 @@
         {% endif %}
     </div>
     {% endfor %}
+
+    <label for="bringing_judge">
+        <input type="radio" name="bringing_judge_yes" value="Yes">
+        <input type="radio" name="bringing_judge_no" value="No">
+    </label>
+    
     <button type="submit">Submit Responses</button>
+
 </form>
 {% endif %}
 {% endblock %}

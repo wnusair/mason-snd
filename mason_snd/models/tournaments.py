@@ -12,7 +12,7 @@ class Tournament(db.Model):
     address = db.Column(db.String(255), nullable=False)
     signup_deadline = db.Column(db.DateTime, nullable=False)
     performance_deadline = db.Column(db.DateTime, nullable=False)
-    created_at = db.Column(db.DateTime, default=lambda: datetime.now(EST), nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.now(EST), nullable=False)
 
 class Form_Fields(db.Model):
     __tablename__ = 'form_fields'
@@ -38,3 +38,15 @@ class Form_Responses(db.Model):
     tournament = db.relationship('Tournament', foreign_keys=[tournament_id], backref='form_responses')
     field = db.relationship('Form_Fields', foreign_keys=[field_id], backref='responses')
     user = db.relationship('User', foreign_keys=[user_id], backref='form_responses')
+
+class Tournament_Signups(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+
+    bringing_judge = db.Column(db.Boolean, default=False)
+    is_going = db.Column(db.Boolean, default=False)
+
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'))
+    tournament_id = db.Column(db.Integer, db.ForeignKey('tournament.id'))
+
+    user = db.relationship('User', foreign_keys=[user_id], backref='tournament_signups')
+    tournament = db.relationship('Tournament', foreign_keys=[tournament_id], backref='tournament_signups')
