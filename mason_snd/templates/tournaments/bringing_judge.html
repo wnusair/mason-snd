@@ -1,0 +1,15 @@
+{% extends "tournaments/base.html" %}
+{% block title %}Select Judge{% endblock %}
+
+{% block content %}
+<h2>Select a Judge to Bring</h2>
+<form method="post">
+    <label for="judge_id">Judges:</label>
+    <select name="judge_id" id="judge_id" required>
+        {% for judge_id, judge_name in judge_options %}
+            <option value="{{ judge_id }}" {% if selected_judge_id == judge_id %}selected{% endif %}>{{ judge_name }}</option>
+        {% endfor %}
+    </select>
+    <button type="submit">Submit</button>
+</form>
+{% endblock %}

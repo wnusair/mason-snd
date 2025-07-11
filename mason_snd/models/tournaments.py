@@ -47,6 +47,13 @@ class Tournament_Signups(db.Model):
 
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'))
     tournament_id = db.Column(db.Integer, db.ForeignKey('tournament.id'))
+    judge_id = db.Column(
+        db.Integer,
+        db.ForeignKey('user.id', name='fk_tournament_signups_judge_id_user'),
+        nullable=True,
+        default=0
+    )
 
     user = db.relationship('User', foreign_keys=[user_id], backref='tournament_signups')
     tournament = db.relationship('Tournament', foreign_keys=[tournament_id], backref='tournament_signups')
+    judge = db.relationship('User', foreign_keys=[user_id], backref="judge_id_tournament_signup")

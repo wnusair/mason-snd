@@ -1,1 +1,1 @@
-- make it so you can claim a ghost account
+- It is time to create the system of doing performace for all those who signed up with alerts in profile

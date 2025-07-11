@@ -148,17 +148,19 @@ def signup():
         print("Tournament found")
 
         my_tournament_signup = Tournament_Signups.query.filter_by(user_id=user_id, tournament_id=tournament_id).first()
-        bringing_judge = request.form.get('bringing_judge_yes')
+        bringing_judge = False
 
-        if bringing_judge:
-            my_tournament_signup.bringing_judge = True
-        
         my_tournament_signup.is_going = True
 
         # For each field in the selected tournament, capture the user's response
         for field in tournament.form_fields:
             field_name = f'field_{field.id}'
             response_value = request.form.get(field_name)
+            # Check for the "Are you bringing a judge?" question
+            if field.label.strip().lower() == "are you bringing a judge?":
+                if response_value and response_value.lower() in ["yes", "true", "on", "1"]:
+                    print("bringing judge")
+                    bringing_judge = True
             new_response = Form_Responses(
                 tournament_id=tournament.id,
                 user_id=session.get('user_id'),
@@ -168,6 +170,10 @@ def signup():
             )
             db.session.add(new_response)
         db.session.commit()
+        
+        if bringing_judge:
+            return redirect(url_for('tournaments.bringing_judge', tournament_id=tournament_id))
+
         flash("Your responses have been submitted.", "success")
         return redirect(url_for('tournaments.index'))
     else:
@@ -182,7 +188,6 @@ def signup():
 
         fields = selected_tournament.form_fields if selected_tournament else []
 
-
         return render_template(
             "tournaments/signup.html",
             tournaments=tournaments,
@@ -190,6 +195,45 @@ def signup():
             fields=fields,
             now=now  # Pass the current time to the template
         )
+
+@tournaments_bp.route('/bringing_judge/<int:tournament_id>', methods=['POST', 'GET'])
+def bringing_judge(tournament_id):
+    user_id = session.get('user_id')
+
+    if not user_id:
+        flash("Log in first")
+        return redirect(url_for('auth.login'))
+
+    # Get all Judges entries where the current user is the child
+    judges = Judges.query.filter_by(child_id=user_id).all()
+
+    # Build a list of tuples: (judge_id, judge_name)
+    judge_options = []
+    for judge in judges:
+        judge_user = User.query.filter_by(id=judge.judge_id).first()
+        if judge_user:
+            judge_options.append((judge.judge_id, f"{judge_user.first_name} {judge_user.last_name}"))
+
+    selected_judge_id = None
+
+    if request.method == "POST":
+        selected_judge_id = request.form.get("judge_id")
+
+        user_tournament_signup = Tournament_Signups.query.filter_by(user_id=user_id, tournament_id=tournament_id).first()
+
+        if user_tournament_signup:
+            print("found tournament signup")
+            user_tournament_signup.bringing_judge = True
+            user_tournament_signup.judge_id = selected_judge_id
+            db.session.commit()
+
+            return redirect(url_for('tournaments.index'))
+
+    return render_template(
+        'tournaments/bringing_judge.html',
+        judge_options=judge_options,
+        selected_judge_id=selected_judge_id
+    )
 
 @tournaments_bp.route('/delete_tournament/<int:tournament_id>', methods=['POST'])
 def delete_tournament(tournament_id):
