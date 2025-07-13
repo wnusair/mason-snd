@@ -2,7 +2,7 @@ from flask import Blueprint, render_template, request, redirect, url_for, flash,
 
 from mason_snd.extensions import db
 from mason_snd.models.auth import User, Judges
-from mason_snd.models.tournaments import Tournament, Form_Responses, Form_Fields, Tournament_Signups
+from mason_snd.models.tournaments import Tournament, Tournament_Performance, Tournaments_Attended, Form_Responses, Form_Fields, Tournament_Signups
 
 from werkzeug.security import generate_password_hash, check_password_hash
 
@@ -254,3 +254,109 @@ def delete_tournament(tournament_id):
     db.session.commit()
 
     return redirect(url_for('tournaments.index'))
+
+
+@tournaments_bp.route('/my_tournaments')
+def my_tournaments():
+    user_id = session.get('user_id')
+
+    if not user_id:
+        flash("Must Be Logged In")
+        return redirect(url_for('auth.login'))
+
+    tournaments = Tournament.query.all()
+
+    # Localize performance_deadline for all tournaments
+    for tournament in tournaments:
+        if tournament.performance_deadline and tournament.performance_deadline.tzinfo is None:
+            tournament.performance_deadline = EST.localize(tournament.performance_deadline)
+
+    now = datetime.now(EST)
+
+    return render_template('tournaments/my_tournaments.html', tournaments=tournaments, now=now)
+
+@tournaments_bp.route('/tournament_results/<int:tournament_id>', methods=['GET', 'POST'])
+def tournament_results(tournament_id):
+    user_id = session.get('user_id')
+    if not user_id:
+        flash("Must Be Logged In")
+        return redirect(url_for('auth.login'))
+
+    if request.method == 'POST':
+        # Check if results already submitted
+        existing_results = Tournament_Performance.query.filter_by(
+            user_id=user_id,
+            tournament_id=tournament_id
+        ).first()
+
+        if existing_results:
+            flash("You have already submitted results for this tournament")
+            return redirect(url_for('tournaments.my_tournaments'))
+
+        # Get form data
+        bid_str = request.form.get('bid')  # 'yes' or 'no'
+        rank_str = request.form.get('rank')
+        stage_str = request.form.get('stage')
+
+        # Convert bid to boolean
+        bid = True if bid_str == 'yes' else False
+
+        # Convert rank to int safely
+        try:
+            rank = int(rank_str)
+        except (ValueError, TypeError):
+            flash("Invalid rank submitted")
+            return redirect(request.url)
+
+        # Convert stage to numeric value
+        stage_map = {
+            "None": 0,
+            "Double Octafinals": 1,
+            "Octafinals": 2,
+            "Quarter Finals": 3,
+            "Semifinals": 4,
+            "Finals": 5
+        }
+        stage = stage_map.get(stage_str, 0)
+
+        # Calculate points
+        points = 0
+        user = User.query.filter_by(id=user_id).first()
+
+        user_bids = user.bids if user.bids is not None else 0
+
+        if user_bids == 0 and bid:
+            points += 15
+        elif user_bids > 0 and bid:
+            points += 5
+        if stage != 0:
+            points += (stage + 1)
+
+        if rank in [10, 9, 8, 7]:
+            points += 1
+        elif rank in [6, 5, 4]:
+            points += 2
+        elif rank in [3, 2, 1]:
+            points += 3
+
+        points += 1  # General participation or submission point?
+
+        # Save to DB
+        tournament_performance = Tournament_Performance(
+            points=points,
+            bid=bid,
+            rank=rank,
+            stage=stage,
+            user_id=user_id,
+            tournament_id=tournament_id
+        )
+
+        user.points += points
+        
+        db.session.add(tournament_performance)
+        db.session.commit()
+
+
+        return redirect(url_for('profile.index', user_id=user_id))
+
+    return render_template("tournaments/tournament_results.html")

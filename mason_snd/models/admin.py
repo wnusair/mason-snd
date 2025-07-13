@@ -1,12 +1,28 @@
 from ..extensions import db
 
-class Popup(db.Model):
+from datetime import datetime
+import pytz
+
+# Define EST timezone
+EST = pytz.timezone('US/Eastern')
+
+
+class User_Requirements(db.Model):
     id = db.Column(db.Integer, primary_key=True)
 
-    message = db.Column(db.String, nullable=False)
+    urgent = db.Column(db.Boolean)
+    complete = db.Column(db.Boolean)
+    deadline = db.Column(db.DateTime, default=datetime.now(EST), nullable=False)
 
-    admin_id = db.Column(db.Integer, db.ForeignKey('user.id'))
-    recipient_id = db.Column(db.Integer, db.ForeignKey('user.id'))
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'))
+    requirement_id = db.Column(db.Integer, db.ForeignKey('requirement.id'))
+    
+    requirement = db.relationship('Requirements', foreign_keys=[requirement_id], backref='requirement')
+    user = db.relationship('User', foreign_keys=[user_id], backref='user')
 
-    admin = db.relationship('User', foreign_keys=[admin_id], backref='admin')
-    recipient = db.relationship('User', foreign_keys=[recipient_id], backref='recipient')
+class Requirements(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+
+    body = db.Column(db.String)
+
+

@@ -26,6 +26,7 @@ class User(db.Model):
 
     points = db.Column(db.Integer, default=0)
     drops = db.Column(db.Integer, default=0)
+    bids = db.Column(db.Integer, default=0)
 
     tournaments_attended_number = db.Column(db.Integer, default=0)
     #tournaments_attended_name = db.relationship('tournaments', backref='attendee')

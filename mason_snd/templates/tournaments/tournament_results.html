@@ -1,0 +1,31 @@
+{% extends "tournaments/base.html" %}
+{% block title %}Tournament Results{% endblock %}
+
+{% block content %}
+
+<form method="post">
+    <label for="bid">Did you get a bid?</label>
+    <select name="bid" id="bid">
+        <option value="yes">Yes</option>
+        <option value="no">No</option>
+    </select>
+    <br><br>
+
+    <label for="rank">What was your rank?</label>
+    <input type="number" name="rank" id="rank" required>
+    <br><br>
+
+    <label for="stage">What stage did you reach?</label>
+    <select name="stage" id="stage">
+        <option value="double_octafinals">Double Octafinals</option>
+        <option value="octafinals">Octafinals</option>
+        <option value="quarterfinals">Quarterfinals</option>
+        <option value="semifinals">Semifinals</option>
+        <option value="finals">Finals</option>
+    </select>
+    <br><br>
+
+    <button type="submit">Submit</button>
+</form>
+
+{% endblock %}

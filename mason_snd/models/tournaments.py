@@ -57,3 +57,27 @@ class Tournament_Signups(db.Model):
     user = db.relationship('User', foreign_keys=[user_id], backref='tournament_signups')
     tournament = db.relationship('Tournament', foreign_keys=[tournament_id], backref='tournament_signups')
     judge = db.relationship('User', foreign_keys=[user_id], backref="judge_id_tournament_signup")
+
+class Tournaments_Attended(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'))
+    tournament_id = db.Column(db.Integer, db.ForeignKey('tournament.id'))
+
+    user = db.relationship('User', foreign_keys=[user_id], backref='tournaments_attended')
+    tournament = db.relationship('Tournament', foreign_keys=[tournament_id], backref='tournaments_attended')
+
+class Tournament_Performance(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+
+    points = db.Column(db.Integer)
+    bid = db.Column(db.Boolean)
+    rank = db.Column(db.Integer)
+    stage = db.Column(db.Integer)
+    # 0 = nothing, 1 = double octas, 2 = octas, 3 = quarters, 4 = semis, 5 = finals
+
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'))
+    tournament_id = db.Column(db.Integer, db.ForeignKey('tournament.id'))
+
+    user = db.relationship('User', foreign_keys=[user_id], backref='tournament_performances')
+    tournament = db.relationship('Tournament', foreign_keys=[tournament_id], backref='tournament_performances')

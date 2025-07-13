@@ -1,0 +1,21 @@
+{% extends "tournaments/base.html" %}
+{% block title %}My Tournaments{% endblock %}
+
+{% block content %}
+
+{% for tournament in tournaments %}
+<h2>{{ tournament.name }}</h2>
+<p>{{ tournament.signup_deadline }}</p>
+<p>{{ tournament.address }}</p>
+<p>{{ tournament.performance_deadline }}</p>
+<p>{{ tournament.date }}</p>
+
+{% if now >= tournament.performance_deadline %}
+<a href="{{ url_for('tournaments.tournament_results', tournament_id=tournament.id) }}"><span style="color: red;">Submit Results - LATE</span></a>
+{% else %}
+<a href="{{ url_for('tournaments.tournament_results', tournament_id=tournament.id) }}">Submit Results</a>
+{% endif %}
+
+{% endfor %}
+
+{% endblock %}
