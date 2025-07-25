@@ -2,6 +2,7 @@ from flask import Blueprint, session, redirect, url_for, render_template, reques
 from werkzeug.security import generate_password_hash
 from mason_snd.extensions import db
 from mason_snd.models.auth import User, Judges
+from mason_snd.models.admin import User_Requirements, Requirements
 
 profile_bp = Blueprint('profile', __name__, template_folder='templates')
 
@@ -22,6 +23,8 @@ def create_ghost(first_name, last_name, email, phone_number, creator):
 
     print("Ghost created")
 
+
+    
 
 
 @profile_bp.route('/user/<int:user_id>')

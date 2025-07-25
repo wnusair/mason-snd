@@ -10,8 +10,7 @@ EST = pytz.timezone('US/Eastern')
 class User_Requirements(db.Model):
     id = db.Column(db.Integer, primary_key=True)
 
-    urgent = db.Column(db.Boolean)
-    complete = db.Column(db.Boolean)
+    complete = db.Column(db.Boolean, default=False)
     deadline = db.Column(db.DateTime, default=datetime.now(EST), nullable=False)
 
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'))

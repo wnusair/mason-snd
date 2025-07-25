@@ -2,10 +2,99 @@ from flask import Blueprint, render_template, request, redirect, url_for, flash,
 
 from mason_snd.extensions import db
 from mason_snd.models.auth import User, Judges
+from mason_snd.models.admin import User_Requirements, Requirements
 
 from werkzeug.security import generate_password_hash, check_password_hash
+import datetime
+import pytz
 
 auth_bp = Blueprint('auth', __name__, template_folder='templates')
+
+def make_all_requirements():
+    requirements_body = [
+        "Final Forms Signed",
+        "Membership Fee paid",
+        "Tournament Performance Submitted",
+        "Event joined",
+        "Permission slip for GMV tournaments has been signed",
+        "Tournament Fee paid",
+        "Has completed background check",
+        "Has accepted or denied judging request from their child",
+        "Has completed judge training",
+        "Has filled out the judging form for their tournament"
+    ]
+
+    existing_reqs = {req.body for req in Requirements.query.all()}
+    for requirement in requirements_body:
+        if requirement not in existing_reqs:
+            new_req = Requirements(body=requirement)
+            db.session.add(new_req)
+            db.session.commit()
+    print("Requirements checked and created if missing")
+
+def make_user_requirement(user_id, requirement_id, deadline):
+    user_requirement = User_Requirements(deadline=deadline, user_id=user_id, requirement_id=requirement_id)
+
+    db.session.add(user_requirement)
+    db.session.commit()
+
+def get_requirements(user):
+    requirements_body = [
+        "Final Forms Signed",
+        "Membership Fee paid",
+        "Tournament Performance Submitted",
+        "Event joined",
+        "Permission slip for GMV tournaments has been signed",
+        "Tournament Fee paid",
+        "Has completed background check",
+        "Has accepted or denied judging request from their child",
+        "Has completed judge training",
+        "Has filled out the judging form for their tournament"
+    ]
+    existing_reqs = {req.body for req in Requirements.query.all()}
+    missing_reqs = [req for req in requirements_body if req not in existing_reqs]
+    if missing_reqs:
+        make_all_requirements()
+    # Return all requirements for the user (customize as needed)
+    
+def make_child_reqs(user):
+    eastern = pytz.timezone('US/Eastern')
+    now = datetime.datetime.now(eastern)
+    # Example: set deadlines 7 days from now for each requirement
+    requirement_deadlines = {
+        "1": now + datetime.timedelta(days=7),
+        "2": now + datetime.timedelta(days=7),
+        "3": now + datetime.timedelta(days=7),
+        "4": now + datetime.timedelta(days=7),
+        "5": now + datetime.timedelta(days=7),
+        "6": now + datetime.timedelta(days=7)
+        #"7": now + datetime.timedelta(days=7),
+        #"8": now + datetime.timedelta(days=7),
+        #"9": now + datetime.timedelta(days=7),
+        #"10": now + datetime.timedelta(days=7)
+    }
+    for requirement_id, deadline in requirement_deadlines.items():
+        make_user_requirement(user, requirement_id, deadline)
+
+def make_judge_reqs(user):
+    eastern = pytz.timezone('US/Eastern')
+    now = datetime.datetime.now(eastern)
+    # Example: set deadlines 7 days from now for each requirement
+    requirement_deadlines = {
+        #"1": now + datetime.timedelta(days=7),
+        #"2": now + datetime.timedelta(days=7),
+        #"3": now + datetime.timedelta(days=7),
+        #"4": now + datetime.timedelta(days=7),
+        #"5": now + datetime.timedelta(days=7),
+        #"6": now + datetime.timedelta(days=7)
+        "7": now + datetime.timedelta(days=7),
+        "8": now + datetime.timedelta(days=7),
+        "9": now + datetime.timedelta(days=7),
+        "10": now + datetime.timedelta(days=7)
+    }
+    for requirement_id, deadline in requirement_deadlines.items():
+        make_user_requirement(user, requirement_id, deadline)
+
 
 @auth_bp.route('/logout')
 def logout():
@@ -23,6 +112,7 @@ def login():
 
         if user and check_password_hash(user.password, password):
             session['user_id'] = user.id
+            get_requirements(user)
             flash("Logged in successfully!")
             return redirect(url_for('profile.index', user_id=user.id))
         else:
@@ -179,6 +269,11 @@ def register():
 
             db.session.add(judge)
             db.session.commit()
+        
+        if is_parent:
+            make_judge_reqs(parent_user)
+        else:
+            make_child_reqs(child_user)
 
         flash("Registration successful!", "success")
         return redirect(url_for("auth.login"))

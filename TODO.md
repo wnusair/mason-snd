@@ -1,1 +1,4 @@
 - It is time to create the system of doing performace for all those who signed up with alerts in profile
+
+
+- ask donahue for more reqs and their deadliens

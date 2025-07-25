@@ -1,7 +1,8 @@
 from flask import Blueprint, render_template, request, redirect, url_for, flash, session
 
 from mason_snd.extensions import db
-from mason_snd.models.auth import User, Popup
+from mason_snd.models.auth import User
+from mason_snd.models.admin import User_Requirements, Requirements
 
 from werkzeug.security import generate_password_hash, check_password_hash
 
@@ -10,6 +11,12 @@ admin_bp = Blueprint('admin', __name__, template_folder='templates')
 user_id = session.get('user_id')
 user = User.query.filter_by(id=user_id).first()
 print(user)
+
+def create_requirements():
+    """
+    
+    
+    """
 
 @admin_bp.route('/')
 def index():
