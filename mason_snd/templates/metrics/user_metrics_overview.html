@@ -1,0 +1,110 @@
+{% extends "metrics/base.html" %}
+{% block title %}User Metrics Overview{% endblock %}
+
+{% block content %}
+
+{% macro next_direction(column) -%}
+  {%- if sort == column -%}
+    {%- if direction == 'asc' -%}
+      desc
+    {%- elif direction == 'desc' -%}
+      default
+    {%- else -%}
+      asc
+    {%- endif -%}
+  {%- else -%}
+    asc
+  {%- endif -%}
+{%- endmacro %}
+
+<h2>User Metrics Overview</h2>
+
+<div class="mb-3">
+  <a href="{{ url_for('metrics.download_user_metrics', sort=sort, direction=direction) }}" class="btn btn-success">Download as CSV</a>
+</div>
+
+<table class="table table-striped">
+    <thead>
+        <tr>
+            <th>
+              <a href="{{ url_for('metrics.index', sort='name', direction=next_direction('name'), page=users.page) }}">
+                Name
+                {% if sort == 'name' %}
+                  {% if direction == 'asc' %}▲{% elif direction == 'desc' %}▼{% endif %}
+                {% endif %}
+              </a>
+            </th>
+            <th>
+              <a href="{{ url_for('metrics.index', sort='bids', direction=next_direction('bids'), page=users.page) }}">
+                Bids
+                {% if sort == 'bids' %}
+                  {% if direction == 'asc' %}▲{% elif direction == 'desc' %}▼{% endif %}
+                {% endif %}
+              </a>
+            </th>
+            <th>
+              <a href="{{ url_for('metrics.index', sort='tournament_points', direction=next_direction('tournament_points'), page=users.page) }}">
+                Points (Tournaments)
+                {% if sort == 'tournament_points' %}
+                  {% if direction == 'asc' %}▲{% elif direction == 'desc' %}▼{% endif %}
+                {% endif %}
+              </a>
+            </th>
+            <th>
+              <a href="{{ url_for('metrics.index', sort='effort_points', direction=next_direction('effort_points'), page=users.page) }}">
+                Points (Effort)
+                {% if sort == 'effort_points' %}
+                  {% if direction == 'asc' %}▲{% elif direction == 'desc' %}▼{% endif %}
+                {% endif %}
+              </a>
+            </th>
+            <th>
+              <a href="{{ url_for('metrics.index', sort='total_points', direction=next_direction('total_points'), page=users.page) }}">
+                Total Points
+                {% if sort == 'total_points' %}
+                  {% if direction == 'asc' %}▲{% elif direction == 'desc' %}▼{% endif %}
+                {% endif %}
+              </a>
+            </th>
+            <th>
+              <a href="{{ url_for('metrics.index', sort='weighted_points', direction=next_direction('weighted_points'), page=users.page) }}">
+                Weighted Points<br><small>(70% Perf, 30% Effort)</small>
+                {% if sort == 'weighted_points' %}
+                  {% if direction == 'asc' %}▲{% elif direction == 'desc' %}▼{% endif %}
+                {% endif %}
+              </a>
+            </th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for user in users.items %}
+        <tr>
+            <td>{{ user.first_name }} {{ user.last_name }}</td>
+            <td>{{ user.bids or 0 }}</td>
+            <td>{{ user.tournament_points or 0 }}</td>
+            <td>{{ user.effort_points or 0 }}</td>
+            <td>{{ (user.tournament_points or 0) + (user.effort_points or 0) }}</td>
+            <td>{{ ((user.tournament_points or 0) * 0.7 + (user.effort_points or 0) * 0.3) | round(2) }}</td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+
+
+<nav aria-label="User pagination">
+  <ul class="pagination">
+    {% if users.has_prev %}
+      <li class="page-item"><a class="page-link" href="{{ url_for('metrics.index', page=users.prev_num, sort=sort, direction=direction) }}">Previous</a></li>
+    {% else %}
+      <li class="page-item disabled"><span class="page-link">Previous</span></li>
+    {% endif %}
+    <li class="page-item disabled"><span class="page-link">Page {{ users.page }} of {{ users.pages }}</span></li>
+    {% if users.has_next %}
+      <li class="page-item"><a class="page-link" href="{{ url_for('metrics.index', page=users.next_num, sort=sort, direction=direction) }}">Next</a></li>
+    {% else %}
+      <li class="page-item disabled"><span class="page-link">Next</span></li>
+    {% endif %}
+  </ul>
+</nav>
+
+{% endblock %}

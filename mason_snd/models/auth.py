@@ -31,6 +31,18 @@ class User(db.Model):
     tournaments_attended_number = db.Column(db.Integer, default=0)
     #tournaments_attended_name = db.relationship('tournaments', backref='attendee')
 
+    @property
+    def tournament_points(self):
+        from mason_snd.models.tournaments import Tournament_Performance
+        performances = Tournament_Performance.query.filter_by(user_id=self.id).all()
+        return sum([p.points or 0 for p in performances])
+
+    @property
+    def effort_points(self):
+        from mason_snd.models.events import Effort_Score
+        scores = Effort_Score.query.filter_by(user_id=self.id).all()
+        return sum([s.score or 0 for s in scores])
+
     account_claimed = db.Column(db.Boolean, default=False)
 
 class Judges(db.Model):

@@ -1,24 +1,45 @@
+
 {% extends "tournaments/base.html" %}
 {% block title %}Tournament Signup{% endblock %}
 
 {% block content %}
 <h2>Tournament Signup</h2>
-<form method="GET">
-    <label for="tournament_id">Select Tournament:</label>
-    <select name="tournament_id" id="tournament_id" onchange="this.form.submit()">
-        <option value="">-- Select Tournament --</option>
+<table class="table table-striped">
+    <thead>
+        <tr>
+            <th>Name</th>
+            <th>Date</th>
+            <th>Location</th>
+            <th>Signup Deadline</th>
+            <th>Signup</th>
+        </tr>
+    </thead>
+    <tbody>
         {% for tournament in tournaments %}
-        <option value="{{ tournament.id }}" 
-            {% if selected_tournament and selected_tournament.id == tournament.id %}selected{% endif %}
-            {% if tournament.signup_deadline and tournament.signup_deadline < now %}disabled{% endif %}>
-            {{ tournament.name }}
-            {% if tournament.signup_deadline and tournament.signup_deadline < now %} (Closed){% endif %}
-        </option>
+        <tr>
+            <td>{{ tournament.name }}</td>
+            <td>{{ tournament.date.strftime('%B %d, %Y %I:%M %p') if tournament.date else '' }}</td>
+            <td>{{ tournament.address }}</td>
+            <td>{{ tournament.signup_deadline.strftime('%B %d, %Y %I:%M %p') if tournament.signup_deadline else '' }}
+                {% if tournament.signup_deadline and tournament.signup_deadline < now %}<span class="text-danger"> (Closed)</span>{% endif %}
+            </td>
+            <td>
+                {% if tournament.signup_deadline and tournament.signup_deadline < now %}
+                    <button class="btn btn-secondary" disabled>Signup Closed</button>
+                {% else %}
+                    <form method="GET" style="display:inline;">
+                        <input type="hidden" name="tournament_id" value="{{ tournament.id }}">
+                        <button type="submit" class="btn btn-primary">Signup</button>
+                    </form>
+                {% endif %}
+            </td>
+        </tr>
         {% endfor %}
-    </select>
-</form>
+    </tbody>
+</table>
 
 {% if selected_tournament %}
+<h3>Signup for {{ selected_tournament.name }}</h3>
 <form method="POST">
     <input type="hidden" name="tournament_id" value="{{ selected_tournament.id }}">
     {% for field in fields %}
@@ -61,9 +82,7 @@
         {% endif %}
     </div>
     {% endfor %}
-    
     <button type="submit">Submit Responses</button>
-
 </form>
 {% endif %}
 {% endblock %}

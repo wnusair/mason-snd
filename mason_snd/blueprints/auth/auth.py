@@ -117,11 +117,16 @@ def req_checks(user):
 
             if performance_submitted != None:
                 user_req = User_Requirements.query.filter_by(user_id=user.id, requirement_id=3).first()
+                print(user_req.complete)
                 user_req.complete = True
+                print(user_req.complete)
+
                 print("Performance submitted")
             else:
                 user_req = User_Requirements.query.filter_by(user_id=user.id, requirement_id=3).first()
+                print(user_req.complete)
                 user_req.complete = False
+                print(user_req.complete)
                 print("Performance needed to be submit")
 
         # checks if the user is in an event
@@ -130,6 +135,9 @@ def req_checks(user):
             user_req = User_Requirements.query.filter_by(user_id=user.id, requirement_id=4).first()
             user_req.complete = True
             print("Is in event")
+        else:
+            user_req = User_Requirements.query.filter_by(user_id=user.id, requirement_id=4).first()
+            user_req.complete = False
 
         
 
@@ -141,6 +149,9 @@ def req_checks(user):
         if tournament_judge != None:
             user_req = User_Requirements.query.filter_by(user_id=user.id, requirement_id=8).first()
             user_req.completed = False
+    
+
+    db.session.commit()
     
 
 

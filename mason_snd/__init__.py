@@ -22,11 +22,13 @@ def create_app():
     from mason_snd.blueprints.profile.profile import profile_bp
     from mason_snd.blueprints.events.events import events_bp
     from mason_snd.blueprints.tournaments.tournaments import tournaments_bp
+    from mason_snd.blueprints.metrics.metrics import metrics_bp
 
     app.register_blueprint(auth_bp, url_prefix='/auth')
     app.register_blueprint(profile_bp, url_prefix='/profile')
     app.register_blueprint(events_bp, url_prefix='/events')
     app.register_blueprint(tournaments_bp, url_prefix='/tournaments')
+    app.register_blueprint(metrics_bp, url_prefix='/metrics')
 
     with app.app_context():
         db.create_all()
