@@ -76,11 +76,15 @@ def index(user_id):
         if parent:
             judge_link = parent.id
 
+    user_requirements = User_Requirements.query.filter_by(user_id=user_id, complete=False).all()
+
     # Render the profile page with the correct judge_link
     return render_template(
         'profile/profile.html',
         judge_link=judge_link,
-        user=target_user
+        user=target_user,
+        user_requirements=user_requirements,
+        requirements={r.id: r for r in Requirements.query.all()}
     )
 
 @profile_bp.route('/update', methods=['GET', 'POST'])
@@ -112,7 +116,7 @@ def update():
 
         db.session.commit()
         flash('Profile updated successfully', 'success')
-        return redirect(url_for('profile.index', user_id=user_id))
+        return redirect(url_for('profile.index', user_id=user.id))
 
     return render_template('profile/update.html', user=user)
 

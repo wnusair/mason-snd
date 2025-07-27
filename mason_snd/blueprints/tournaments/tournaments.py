@@ -2,7 +2,7 @@ from flask import Blueprint, render_template, request, redirect, url_for, flash,
 
 from mason_snd.extensions import db
 from mason_snd.models.auth import User, Judges
-from mason_snd.models.tournaments import Tournament, Tournament_Performance, Tournaments_Attended, Form_Responses, Form_Fields, Tournament_Signups
+from mason_snd.models.tournaments import Tournament, Tournament_Performance, Tournaments_Attended, Form_Responses, Form_Fields, Tournament_Signups, Tournament_Judges
 
 from werkzeug.security import generate_password_hash, check_password_hash
 
@@ -225,6 +225,15 @@ def bringing_judge(tournament_id):
             print("found tournament signup")
             user_tournament_signup.bringing_judge = True
             user_tournament_signup.judge_id = selected_judge_id
+
+            judge_acceptance = Tournament_Judges(
+                accepted=False,
+                judge_id=selected_judge_id,
+                child_id=user_id,
+                tournament_id=tournament_id
+            )
+
+            db.session.add(judge_acceptance)
             db.session.commit()
 
             return redirect(url_for('tournaments.index'))

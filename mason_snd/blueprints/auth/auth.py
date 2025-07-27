@@ -3,6 +3,8 @@ from flask import Blueprint, render_template, request, redirect, url_for, flash,
 from mason_snd.extensions import db
 from mason_snd.models.auth import User, Judges
 from mason_snd.models.admin import User_Requirements, Requirements
+from mason_snd.models.events import User_Event
+from mason_snd.models.tournaments import Tournament_Judges, Tournaments_Attended, Tournament, Tournament_Performance
 
 from werkzeug.security import generate_password_hash, check_password_hash
 import datetime
@@ -20,8 +22,7 @@ def make_all_requirements():
         "Tournament Fee paid",
         "Has completed background check",
         "Has accepted or denied judging request from their child",
-        "Has completed judge training",
-        "Has filled out the judging form for their tournament"
+        "Has completed judge training"
     ]
 
     existing_reqs = {req.body for req in Requirements.query.all()}
@@ -48,14 +49,18 @@ def get_requirements(user):
         "Tournament Fee paid",
         "Has completed background check",
         "Has accepted or denied judging request from their child",
-        "Has completed judge training",
-        "Has filled out the judging form for their tournament"
+        "Has completed judge training"
     ]
     existing_reqs = {req.body for req in Requirements.query.all()}
     missing_reqs = [req for req in requirements_body if req not in existing_reqs]
     if missing_reqs:
         make_all_requirements()
-    # Return all requirements for the user (customize as needed)
+    
+    if user.is_parent:
+        make_judge_reqs(user)
+    else:
+        make_child_reqs(user)
+
     
 def make_child_reqs(user):
     eastern = pytz.timezone('US/Eastern')
@@ -70,11 +75,12 @@ def make_child_reqs(user):
         "6": now + datetime.timedelta(days=7)
         #"7": now + datetime.timedelta(days=7),
         #"8": now + datetime.timedelta(days=7),
-        #"9": now + datetime.timedelta(days=7),
-        #"10": now + datetime.timedelta(days=7)
+        #"9": now + datetime.timedelta(days=7)
     }
     for requirement_id, deadline in requirement_deadlines.items():
-        make_user_requirement(user, requirement_id, deadline)
+        req = User_Requirements.query.filter_by(user_id=user.id, requirement_id=requirement_id).first()
+        if req is None:
+            make_user_requirement(user.id, requirement_id, deadline)
 
 def make_judge_reqs(user):
     eastern = pytz.timezone('US/Eastern')
@@ -89,11 +95,53 @@ def make_judge_reqs(user):
         #"6": now + datetime.timedelta(days=7)
         "7": now + datetime.timedelta(days=7),
         "8": now + datetime.timedelta(days=7),
-        "9": now + datetime.timedelta(days=7),
-        "10": now + datetime.timedelta(days=7)
+        "9": now + datetime.timedelta(days=7)
     }
     for requirement_id, deadline in requirement_deadlines.items():
-        make_user_requirement(user, requirement_id, deadline)
+        req = User_Requirements.query.filter_by(user_id=user.id, requirement_id=requirement_id).first()
+        if req is None:
+            make_user_requirement(user.id, requirement_id, deadline)
+
+def req_checks(user):
+
+    # child
+    if user.is_parent == False:
+        # check if perfomrance submited
+        attended_tournament = Tournaments_Attended.query.filter_by(user_id=user.id).all()
+
+        print("Checking if submitted performance")
+        if attended_tournament != None:
+            recent_tournament = attended_tournament[-1]
+
+            performance_submitted = Tournament_Performance.query.filter_by(user_id=user.id, tournament_id=recent_tournament.tournament_id).first()
+
+            if performance_submitted != None:
+                user_req = User_Requirements.query.filter_by(user_id=user.id, requirement_id=3).first()
+                user_req.complete = True
+                print("Performance submitted")
+            else:
+                user_req = User_Requirements.query.filter_by(user_id=user.id, requirement_id=3).first()
+                user_req.complete = False
+                print("Performance needed to be submit")
+
+        # checks if the user is in an event
+        user_in_event = User_Event.query.filter_by(user_id=user.id).first()
+        if user_in_event != None:
+            user_req = User_Requirements.query.filter_by(user_id=user.id, requirement_id=4).first()
+            user_req.complete = True
+            print("Is in event")
+
+        
+
+    # judge
+    if user.is_parent:
+        # request judging
+        tournament_judge = Tournament_Judges.query.filter_by(judge_id=user.id, accepted=False).all()
+
+        if tournament_judge != None:
+            user_req = User_Requirements.query.filter_by(user_id=user.id, requirement_id=8).first()
+            user_req.completed = False
+    
 
 
 @auth_bp.route('/logout')
@@ -113,6 +161,7 @@ def login():
         if user and check_password_hash(user.password, password):
             session['user_id'] = user.id
             get_requirements(user)
+            req_checks(user)
             flash("Logged in successfully!")
             return redirect(url_for('profile.index', user_id=user.id))
         else:

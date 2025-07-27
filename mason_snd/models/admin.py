@@ -14,7 +14,7 @@ class User_Requirements(db.Model):
     deadline = db.Column(db.DateTime, default=datetime.now(EST), nullable=False)
 
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'))
-    requirement_id = db.Column(db.Integer, db.ForeignKey('requirement.id'))
+    requirement_id = db.Column(db.Integer, db.ForeignKey('requirements.id'))
     
     requirement = db.relationship('Requirements', foreign_keys=[requirement_id], backref='requirement')
     user = db.relationship('User', foreign_keys=[user_id], backref='user')

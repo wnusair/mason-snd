@@ -16,6 +16,19 @@
         is parent
         <p>{{ user.child_first_name }} {{ user.child_last_name }}</p>
     </div>
+    <br>
+    <br>
+    <br>
+
+    <div>
+        {% for user_requirement in user_requirements %}
+            <h3>{{ requirements[user_requirement.requirement_id].body }}</h3>
+        {% endfor %}
+    </div>
+
+    <br>
+    <br>
+    <br>
     {% if judge_link %}
         <a href="{{ url_for('profile.index', user_id=judge_link) }}">View Child</a>
     {% endif %}
@@ -26,6 +39,22 @@
         <p>{{ user.emergency_contact_phone }}</p>
         <p>{{ user.emergency_contact_email }}</p>
     </div>
+        <br>
+    <br>
+    <br>
+
+    <div>
+        {% for user_requirement in user_requirements %}
+            <h3>{{ requirements[user_requirement.requirement_id].body }}</h3>
+        {% endfor %}
+    </div>
+
+    <br>
+    <br>
+    <br>
+
+    
+
     {% if judge_link %}
         <a href="{{ url_for('profile.index', user_id=judge_link) }}">View Parent</a>
     {% endif %}

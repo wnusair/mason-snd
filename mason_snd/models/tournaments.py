@@ -81,3 +81,16 @@ class Tournament_Performance(db.Model):
 
     user = db.relationship('User', foreign_keys=[user_id], backref='tournament_performances')
     tournament = db.relationship('Tournament', foreign_keys=[tournament_id], backref='tournament_performances')
+
+class Tournament_Judges(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+
+    accepted = db.Column(db.Boolean, default=False)
+
+    judge_id = db.Column(db.Integer, db.ForeignKey('user.id'))
+    child_id = db.Column(db.Integer, db.ForeignKey('user.id'))
+    tournament_id = db.Column(db.Integer, db.ForeignKey('tournament.id'))
+
+    judge = db.relationship('User', foreign_keys=[judge_id], backref='tournament_judges_judge')
+    child = db.relationship('User', foreign_keys=[child_id], backref='tournament_judges_child')
+    tournament = db.relationship('Tournament', foreign_keys=[tournament_id], backref='tournament_judges')

@@ -12,12 +12,6 @@ user_id = session.get('user_id')
 user = User.query.filter_by(id=user_id).first()
 print(user)
 
-def create_requirements():
-    """
-    
-    
-    """
-
 @admin_bp.route('/')
 def index():
     if user.role <= 1:
