@@ -1,0 +1,66 @@
+{% extends "metrics/base.html" %}
+{% block title %}User Details{% endblock %}
+
+{% block content %}
+<h2>{{ user.first_name }} {{ user.last_name }}</h2>
+
+<div class="card">
+    <div class="card-body">
+        <h5 class="card-title">Performance Overview</h5>
+        <p>Bids: {{ user.bids }}</p>
+        <p>Total Points: {{ total_points }}</p>
+        <p>Tournament Points: {{ user.tournament_points }}</p>
+        <p>Effort Points: {{ user.effort_points }}</p>
+        <p>Weighted Points: {{ weighted_points | round(2) }}</p>
+    </div>
+</div>
+
+<div class="mt-4">
+    <h4>Tournament Performance Over Time</h4>
+    <canvas id="performanceChart"></canvas>
+</div>
+
+<div class="mt-4">
+    <h4>Tournaments Attended</h4>
+    <ul class="list-group">
+        {% for performance in performances %}
+        <li class="list-group-item">
+            <a href="{{ url_for('tournaments.tournament_results', tournament_id=performance.tournament.id) }}">
+                {{ performance.tournament.name }}
+            </a>: {{ performance.points }} points
+        </li>
+        {% endfor %}
+    </ul>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+    const ctx = document.getElementById('performanceChart').getContext('2d');
+    const performanceChart = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: {{ labels | tojson }},
+            datasets: [{
+                label: 'Tournament Points',
+                data: {{ data | tojson }},
+                borderColor: 'rgba(75, 192, 192, 1)',
+                tension: 0.1
+            },
+            {
+                label: 'Predicted',
+                data: {{ prediction | tojson }},
+                borderColor: 'rgba(255, 99, 132, 1)',
+                borderDash: [5, 5],
+                tension: 0.1
+            }]
+        },
+        options: {
+            scales: {
+                y: {
+                    beginAtZero: true
+                }
+            }
+        }
+    });
+</script>
+{% endblock %}

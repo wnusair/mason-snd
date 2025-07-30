@@ -1,0 +1,82 @@
+{% extends "metrics/base.html" %}
+{% block title %}Tournaments Overview{% endblock %}
+
+{% block content %}
+<h2>Tournaments Overview</h2>
+
+<div class="mb-3">
+    <a href="{{ url_for('metrics.index') }}" class="btn btn-secondary">User Metrics</a>
+    <a href="{{ url_for('metrics.events_overview') }}" class="btn btn-secondary">Events Overview</a>
+    <a href="{{ url_for('metrics.download_tournaments', sort=sort, direction=direction) }}" class="btn btn-success">Download as CSV</a>
+    <a href="{{ url_for('metrics.settings') }}" class="btn btn-primary">Settings</a>
+</div>
+
+<canvas id="tournamentPointsChart"></canvas>
+
+<table class="table table-striped mt-4">
+    <thead>
+        <tr>
+            <th><a href="{{ url_for('metrics.tournaments_overview', sort='name', direction=next_direction('name')) }}">Name</a></th>
+            <th><a href="{{ url_for('metrics.tournaments_overview', sort='total_points', direction=next_direction('total_points')) }}">Total Points</a></th>
+            <th><a href="{{ url_for('metrics.tournaments_overview', sort='total_bids', direction=next_direction('total_bids')) }}">Total Bids</a></th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for tournament in tournaments.items %}
+        <tr>
+            <td><a href="{{ url_for('metrics.tournament_detail', tournament_id=tournament.id) }}">{{ tournament.name }}</a></td>
+            <td>{{ tournament_points[tournament.id] }}</td>
+            <td>{{ tournament_bids[tournament.id] }}</td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+
+<nav aria-label="Tournament pagination">
+  <ul class="pagination">
+    {% if tournaments.has_prev %}
+      <li class="page-item"><a class="page-link" href="{{ url_for('metrics.tournaments_overview', page=tournaments.prev_num, sort=sort, direction=direction) }}">Previous</a></li>
+    {% else %}
+      <li class="page-item disabled"><span class="page-link">Previous</span></li>
+    {% endif %}
+    <li class="page-item disabled"><span class="page-link">Page {{ tournaments.page }} of {{ tournaments.pages }}</span></li>
+    {% if tournaments.has_next %}
+      <li class="page-item"><a class="page-link" href="{{ url_for('metrics.tournaments_overview', page=tournaments.next_num, sort=sort, direction=direction) }}">Next</a></li>
+    {% else %}
+      <li class="page-item disabled"><span class="page-link">Next</span></li>
+    {% endif %}
+  </ul>
+</nav>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+    const ctx = document.getElementById('tournamentPointsChart').getContext('2d');
+    const tournamentPointsChart = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: {{ chart_labels | tojson }},
+            datasets: [{
+                label: 'Total Points per Tournament',
+                data: {{ chart_data | tojson }},
+                backgroundColor: 'rgba(54, 162, 235, 0.2)',
+                borderColor: 'rgba(54, 162, 235, 1)',
+                borderWidth: 1
+            },
+            {
+                label: 'Predicted',
+                data: {{ chart_prediction | tojson }},
+                backgroundColor: 'rgba(255, 99, 132, 0.2)',
+                borderColor: 'rgba(255, 99, 132, 1)',
+                borderWidth: 1
+            }]
+        },
+        options: {
+            scales: {
+                y: {
+                    beginAtZero: true
+                }
+            }
+        }
+    });
+</script>
+{% endblock %}

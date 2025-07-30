@@ -1,8 +1,11 @@
-from flask import Blueprint, render_template, request, redirect, url_for, flash, session
+from flask import Blueprint, render_template, request, redirect, url_for, flash, session, Response
+import csv
+from io import StringIO
 
 from mason_snd.extensions import db
 from mason_snd.models.events import Event, User_Event, Effort_Score
 from mason_snd.models.auth import User
+from mason_snd.models.metrics import MetricsSettings
 
 from werkzeug.security import generate_password_hash, check_password_hash
 
@@ -220,3 +223,53 @@ def delete_event(event_id):
 
     flash("You have successfully deleted the event", "success")
     return redirect(url_for('events.index'))
+
+@events_bp.route('/download_event_members/<int:event_id>')
+def download_event_members(event_id):
+    """Download CSV of event members with their points breakdown"""
+    event = Event.query.get_or_404(event_id)
+    
+    # Get metrics settings for weighted points calculation
+    settings = MetricsSettings.query.first()
+    if not settings:
+        tournament_weight, effort_weight = 0.7, 0.3
+    else:
+        tournament_weight, effort_weight = settings.tournament_weight, settings.effort_weight
+    
+    # Get all members of the event
+    user_events = User_Event.query.filter_by(event_id=event_id).all()
+    
+    # Prepare CSV
+    si = StringIO()
+    writer = csv.writer(si)
+    # Write header row
+    writer.writerow([
+        'Name', 'Bids', 'Tournament Points', 'Effort Points', 'Total Points', 'Weighted Points', 'Event Effort Score'
+    ])
+    
+    for ue in user_events:
+        user = ue.user
+        tournament_points = user.tournament_points or 0
+        effort_points = user.effort_points or 0
+        total_points = tournament_points + effort_points
+        weighted_points = round(tournament_points * tournament_weight + effort_points * effort_weight, 2)
+        
+        writer.writerow([
+            f"{user.first_name} {user.last_name}",
+            user.bids or 0,
+            tournament_points,
+            effort_points,
+            total_points,
+            weighted_points,
+            ue.effort_score or 0
+        ])
+    
+    output = si.getvalue()
+    si.close()
+    return Response(
+        output,
+        mimetype='text/csv',
+        headers={
+            'Content-Disposition': f'attachment; filename=event_{event.event_name}_members.csv'
+        }
+    )

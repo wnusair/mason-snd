@@ -20,7 +20,10 @@
 <h2>User Metrics Overview</h2>
 
 <div class="mb-3">
+  <a href="{{ url_for('metrics.tournaments_overview') }}" class="btn btn-secondary">Tournaments Overview</a>
+  <a href="{{ url_for('metrics.events_overview') }}" class="btn btn-secondary">Events Overview</a>
   <a href="{{ url_for('metrics.download_user_metrics', sort=sort, direction=direction) }}" class="btn btn-success">Download as CSV</a>
+  <a href="{{ url_for('metrics.settings') }}" class="btn btn-primary">Settings</a>
 </div>
 
 <table class="table table-striped">
@@ -68,12 +71,13 @@
             </th>
             <th>
               <a href="{{ url_for('metrics.index', sort='weighted_points', direction=next_direction('weighted_points'), page=users.page) }}">
-                Weighted Points<br><small>(70% Perf, 30% Effort)</small>
+                Weighted Points
                 {% if sort == 'weighted_points' %}
                   {% if direction == 'asc' %}▲{% elif direction == 'desc' %}▼{% endif %}
                 {% endif %}
               </a>
             </th>
+            <th>Actions</th>
         </tr>
     </thead>
     <tbody>
@@ -85,6 +89,7 @@
             <td>{{ user.effort_points or 0 }}</td>
             <td>{{ (user.tournament_points or 0) + (user.effort_points or 0) }}</td>
             <td>{{ ((user.tournament_points or 0) * 0.7 + (user.effort_points or 0) * 0.3) | round(2) }}</td>
+            <td><a href="{{ url_for('metrics.user_detail', user_id=user.id) }}" class="btn btn-sm btn-info">View Details</a></td>
         </tr>
         {% endfor %}
     </tbody>
