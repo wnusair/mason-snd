@@ -8,11 +8,57 @@
 </div>
 
 <form method="POST">
-    <table class="table">
+    <table class="table table-striped">
         <thead>
             <tr>
-                <th>Member Name</th>
-                <th>Current Effort Score</th>
+                <th>
+                  <a href="{{ url_for('events.manage_members', event_id=event.id, sort='name', direction=next_direction('name')) }}">
+                    Member Name
+                    {% if sort == 'name' %}
+                      {% if direction == 'asc' %}▲{% elif direction == 'desc' %}▼{% endif %}
+                    {% endif %}
+                  </a>
+                </th>
+                <th>
+                  <a href="{{ url_for('events.manage_members', event_id=event.id, sort='effort_score', direction=next_direction('effort_score')) }}">
+                    Effort Score
+                    {% if sort == 'effort_score' %}
+                      {% if direction == 'asc' %}▲{% elif direction == 'desc' %}▼{% endif %}
+                    {% endif %}
+                  </a>
+                </th>
+                <th>
+                  <a href="{{ url_for('events.manage_members', event_id=event.id, sort='tournament_points', direction=next_direction('tournament_points')) }}">
+                    Tournament Points
+                    {% if sort == 'tournament_points' %}
+                      {% if direction == 'asc' %}▲{% elif direction == 'desc' %}▼{% endif %}
+                    {% endif %}
+                  </a>
+                </th>
+                <th>
+                  <a href="{{ url_for('events.manage_members', event_id=event.id, sort='effort_points', direction=next_direction('effort_points')) }}">
+                    Effort Points
+                    {% if sort == 'effort_points' %}
+                      {% if direction == 'asc' %}▲{% elif direction == 'desc' %}▼{% endif %}
+                    {% endif %}
+                  </a>
+                </th>
+                <th>
+                  <a href="{{ url_for('events.manage_members', event_id=event.id, sort='total_points', direction=next_direction('total_points')) }}">
+                    Total Points
+                    {% if sort == 'total_points' %}
+                      {% if direction == 'asc' %}▲{% elif direction == 'desc' %}▼{% endif %}
+                    {% endif %}
+                  </a>
+                </th>
+                <th>
+                  <a href="{{ url_for('events.manage_members', event_id=event.id, sort='weighted_points', direction=next_direction('weighted_points')) }}">
+                    Weighted Points
+                    {% if sort == 'weighted_points' %}
+                      {% if direction == 'asc' %}▲{% elif direction == 'desc' %}▼{% endif %}
+                    {% endif %}
+                  </a>
+                </th>
                 <th>Add Effort Score</th>
             </tr>
         </thead>
@@ -21,6 +67,10 @@
             <tr>
                 <td><a href="{{ url_for('metrics.user_detail', user_id=member.user.id) }}">{{ member.user.first_name }} {{ member.user.last_name }}</a></td>
                 <td>{{ member.effort_score }}</td>
+                <td>{{ member.tournament_points }}</td>
+                <td>{{ member.effort_points }}</td>
+                <td>{{ member.total_points }}</td>
+                <td>{{ member.weighted_points }}</td>
                 <td>
                     <input type="number" name="effort_score_{{ member.user.id }}" min="0" placeholder="0" />
                     /10

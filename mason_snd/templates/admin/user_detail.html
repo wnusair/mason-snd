@@ -1,0 +1,50 @@
+{% extends "admin/index.html" %}
+{% block content %}
+<h2>User Details: {{ user.first_name }} {{ user.last_name }}</h2>
+
+<ul class="list-group mb-3">
+  <li class="list-group-item"><b>Email:</b> {{ user.email }}</li>
+  <li class="list-group-item"><b>Phone:</b> {{ user.phone_number }}</li>
+  <li class="list-group-item"><b>Tournament Points:</b> {{ tournament_points }}</li>
+  <li class="list-group-item"><b>Effort Points:</b> {{ effort_points }}</li>
+  <li class="list-group-item"><b>Total Points:</b> {{ total_points }}</li>
+  <li class="list-group-item"><b>Weighted Points:</b> {{ weighted_points }}</li>
+</ul>
+
+<h4>Events Attended</h4>
+<ul class="list-group mb-3">
+  {% for event in events %}
+    <li class="list-group-item">{{ event.event_name }}</li>
+  {% else %}
+    <li class="list-group-item">No events found.</li>
+  {% endfor %}
+</ul>
+
+{% if user.is_parent %}
+  <h4>Child Info</h4>
+  <ul class="list-group mb-3">
+    <li class="list-group-item"><b>First Name:</b> {{ child_info.first_name }}</li>
+    <li class="list-group-item"><b>Last Name:</b> {{ child_info.last_name }}</li>
+  </ul>
+{% endif %}
+
+<h4>Emergency Contact</h4>
+<ul class="list-group mb-3">
+  <li class="list-group-item"><b>Name:</b> {{ emergency_contact.first_name }} {{ emergency_contact.last_name }}</li>
+  <li class="list-group-item"><b>Number:</b> {{ emergency_contact.number }}</li>
+  <li class="list-group-item"><b>Relationship:</b> {{ emergency_contact.relationship }}</li>
+  <li class="list-group-item"><b>Email:</b> {{ emergency_contact.email }}</li>
+</ul>
+
+<h4>Requirements</h4>
+<ul class="list-group mb-3">
+  {% for req in requirements %}
+    <li class="list-group-item">
+      {{ req.requirement.body }} - {% if req.complete %}<span class="text-success">Complete{% else %}<span class="text-danger">Incomplete{% endif %}</span>
+      {% if req.deadline %} (Deadline: {{ req.deadline.strftime('%Y-%m-%d') }}){% endif %}
+    </li>
+  {% else %}
+    <li class="list-group-item">No requirements found.</li>
+  {% endfor %}
+</ul>
+{% endblock %}

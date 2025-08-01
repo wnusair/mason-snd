@@ -85,6 +85,7 @@ def edit_event(event_id):
 
     return render_template('events/edit_event.html', event=event)
 
+
 @events_bp.route('/manage_members/<int:event_id>', methods=['POST', 'GET'])
 def manage_members(event_id):
     # Check if the user is logged in
@@ -104,15 +105,47 @@ def manage_members(event_id):
         flash('You are not authorized to manage this event.', 'error')
         return redirect(url_for('events.index'))
 
+    # Get metrics settings for weighted points calculation
+    settings = MetricsSettings.query.first()
+    if not settings:
+        tournament_weight, effort_weight = 0.7, 0.3
+    else:
+        tournament_weight, effort_weight = settings.tournament_weight, settings.effort_weight
+
+    # Sorting logic
+    sort = request.args.get('sort', 'name')
+    direction = request.args.get('direction', 'asc')
+
     # Get all members of the event
     user_events = User_Event.query.filter_by(event_id=event_id).all()
-    members = [
-        {
-            "user": User.query.get(ue.user_id),
+    members = []
+    for ue in user_events:
+        user = User.query.get(ue.user_id)
+        tournament_points = user.tournament_points or 0
+        effort_points = user.effort_points or 0
+        total_points = tournament_points + effort_points
+        weighted_points = round(tournament_points * tournament_weight + effort_points * effort_weight, 2)
+        members.append({
+            "user": user,
             "effort_score": ue.effort_score,
-        }
-        for ue in user_events
-    ]
+            "tournament_points": tournament_points,
+            "effort_points": effort_points,
+            "total_points": total_points,
+            "weighted_points": weighted_points,
+        })
+
+    # Sorting map
+    sort_key_map = {
+        'name': lambda m: (m['user'].last_name.lower(), m['user'].first_name.lower()),
+        'effort_score': lambda m: m['effort_score'],
+        'tournament_points': lambda m: m['tournament_points'],
+        'effort_points': lambda m: m['effort_points'],
+        'total_points': lambda m: m['total_points'],
+        'weighted_points': lambda m: m['weighted_points'],
+    }
+    if sort in sort_key_map:
+        reverse = direction == 'desc'
+        members = sorted(members, key=sort_key_map[sort], reverse=reverse)
 
     if request.method == "POST":
         # Update effort scores for each member
@@ -140,9 +173,27 @@ def manage_members(event_id):
 
         db.session.commit()
         flash("Effort scores updated successfully.", "success")
-        return redirect(url_for("events.manage_members", event_id=event_id))
+        return redirect(url_for("events.manage_members", event_id=event_id, sort=sort, direction=direction))
 
-    return render_template('events/manage_members.html', members=members, event=event)
+    def next_direction(column):
+        if sort == column:
+            if direction == 'asc':
+                return 'desc'
+            elif direction == 'desc':
+                return 'asc'
+            else:
+                return 'asc'
+        else:
+            return 'asc'
+
+    return render_template(
+        'events/manage_members.html',
+        members=members,
+        event=event,
+        sort=sort,
+        direction=direction,
+        next_direction=next_direction
+    )
 
 @events_bp.route('/join_event/<int:event_id>', methods=['POST'])
 def join_event(event_id):

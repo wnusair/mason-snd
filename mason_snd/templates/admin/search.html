@@ -1,0 +1,36 @@
+{% extends "admin/index.html" %}
+{% block content %}
+<h2>Search for a User</h2>
+<form method="POST" class="mb-3">
+    <input type="text" name="name" placeholder="Enter name (first last)" value="{{ query }}" class="form-control" required>
+    <button type="submit" class="btn btn-primary mt-2">Search</button>
+</form>
+
+{% if results %}
+<h4>Closest Matches:</h4>
+<table class="table table-striped">
+    <thead>
+        <tr>
+            <th>User ID</th>
+            <th>Name</th>
+            <th>Select</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for user, name in results %}
+        <tr>
+            <td>{{ user.id }}</td>
+            <td>{{ user.first_name }} {{ user.last_name }}</td>
+            <td>
+                <form method="GET" action="{{ url_for('admin.user_detail', user_id=user.id) }}">
+                    <button type="submit" class="btn btn-success btn-sm">Select</button>
+                </form>
+            </td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% elif query %}
+<p>No matches found.</p>
+{% endif %}
+{% endblock %}
