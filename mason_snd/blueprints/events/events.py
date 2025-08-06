@@ -1,5 +1,6 @@
 from flask import Blueprint, render_template, request, redirect, url_for, flash, session, Response
 import csv
+import csv
 from io import StringIO
 
 from mason_snd.extensions import db
@@ -322,5 +323,50 @@ def download_event_members(event_id):
         mimetype='text/csv',
         headers={
             'Content-Disposition': f'attachment; filename=event_{event.event_name}_members.csv'
+        }
+    )
+@events_bp.route('/download_all_events_stats')
+def download_all_events_stats():
+    """Download CSV of all user-event stats, sorted by event name and user name"""
+    settings = MetricsSettings.query.first()
+    if not settings:
+        tournament_weight, effort_weight = 0.7, 0.3
+    else:
+        tournament_weight, effort_weight = settings.tournament_weight, settings.effort_weight
+
+    all_events = Event.query.order_by(Event.event_name.asc()).all()
+    si = StringIO()
+    writer = csv.writer(si)
+    writer.writerow([
+        'Name', 'Event', 'Total Points', 'Weighted Points', 'Effort Points', 'Tournament Points', 'Bids'
+    ])
+    for event in all_events:
+        user_events = User_Event.query.filter_by(event_id=event.id).all()
+        # Sort users by last, first name for each event
+        users = [User.query.get(ue.user_id) for ue in user_events]
+        user_event_pairs = sorted(zip(users, user_events), key=lambda pair: (pair[0].last_name.lower(), pair[0].first_name.lower()) if pair[0] else ('', ''))
+        for user, ue in user_event_pairs:
+            if not user:
+                continue
+            tournament_points = user.tournament_points or 0
+            effort_points = user.effort_points or 0
+            total_points = tournament_points + effort_points
+            weighted_points = round(tournament_points * tournament_weight + effort_points * effort_weight, 2)
+            writer.writerow([
+                f"{user.first_name} {user.last_name}",
+                event.event_name,
+                total_points,
+                weighted_points,
+                effort_points,
+                tournament_points,
+                user.bids or 0
+            ])
+    output = si.getvalue()
+    si.close()
+    return Response(
+        output,
+        mimetype='text/csv',
+        headers={
+            'Content-Disposition': 'attachment; filename=all_events_stats.csv'
         }
     )

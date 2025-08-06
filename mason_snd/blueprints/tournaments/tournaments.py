@@ -264,6 +264,45 @@ def delete_tournament(tournament_id):
 
     return redirect(url_for('tournaments.index'))
 
+@tournaments_bp.route('/judge_requests', methods=['POST', 'GET'])
+def judge_requests():
+    user_id = session.get('user_id')
+    user = User.query.filter_by(id=user_id).first()
+
+    if not user_id:
+        flash("Must Be Logged In")
+        return redirect(url_for('auth.login'))
+
+    if not user.is_parent:
+        flash("Must be a parent")
+        return redirect(url_for('main.index'))
+
+    judge_requests = Tournament_Judges.query.filter_by(judge_id=user_id).all()
+
+    # Prepare data for template
+    judge_requests_data = []
+    for req in judge_requests:
+        tournament = Tournament.query.get(req.tournament_id)
+        child = User.query.get(req.child_id)
+        judge_requests_data.append({
+            'id': req.id,
+            'tournament_name': tournament.name if tournament else '',
+            'address': tournament.address if tournament else '',
+            'date': tournament.date if tournament else None,
+            'child_name': f"{child.first_name} {child.last_name}" if child else '',
+            'accepted': req.accepted,
+        })
+
+    if request.method == 'POST':
+        for req in judge_requests:
+            decision = request.form.get(f"decision_{req.id}")
+            req.accepted = True if decision == 'yes' else False
+        db.session.commit()
+        flash("Decisions updated.", "success")
+        return redirect(url_for('tournaments.judge_requests'))
+
+    return render_template('tournaments/judge_requests.html', user=user, judge_requests=judge_requests_data)
+
 
 @tournaments_bp.route('/my_tournaments')
 def my_tournaments():

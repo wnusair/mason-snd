@@ -4,6 +4,9 @@
 
 {% block content %}
 
+<div class="mb-3">
+    <a href="{{ url_for('events.download_all_events_stats') }}" class="btn btn-success">Download All Events Stats (CSV)</a>
+</div>
 {% for event in events %}
 <h1>{{ event.event_name }}</h1>
 <p>{{ event.event_description }}</p>

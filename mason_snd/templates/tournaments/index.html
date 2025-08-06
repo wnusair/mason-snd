@@ -28,7 +28,11 @@
     </tbody>
 </table>
 
-<a href="{{ url_for('tournaments.signup') }}">Tournament Sign Up</a>
+{% if user.is_parent %}
+    <a href="{{ url_for('tournaments.judge_requests') }}">Tournament Judge Requests</a>
+{% else %}
+    <a href="{{ url_for('tournaments.signup') }}">Tournament Sign Up</a>
+{% endif %}
 
 {% if user.role >= 2 %}
 <a href="{{ url_for('tournaments.add_tournament') }}">Add Tournament</a>

@@ -1,0 +1,35 @@
+{% extends "tournaments/base.html" %}
+{% block title %}Judge Requests{% endblock %}
+{% block content %}
+<h2>Judge Requests</h2>
+<form method="POST">
+<table class="table table-striped">
+    <thead>
+        <tr>
+            <th>Tournament</th>
+            <th>Location</th>
+            <th>Date</th>
+            <th>Child</th>
+            <th>Decision</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for req in judge_requests %}
+        <tr>
+            <td>{{ req.tournament_name }}</td>
+            <td>{{ req.address }}</td>
+            <td>{{ req.date.strftime('%B %d, %Y %I:%M %p') if req.date else '' }}</td>
+            <td>{{ req.child_name }}</td>
+            <td>
+                <select name="decision_{{ req.id }}" class="form-select">
+                    <option value="no" {% if not req.accepted %}selected{% endif %}>No</option>
+                    <option value="yes" {% if req.accepted %}selected{% endif %}>Yes</option>
+                </select>
+            </td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+<button type="submit" class="btn btn-success">Submit Decisions</button>
+</form>
+{% endblock %}
