@@ -3,6 +3,7 @@ from flask import Blueprint, render_template, request, redirect, url_for, flash,
 from mason_snd.extensions import db
 from mason_snd.models.auth import User, Judges
 from mason_snd.models.tournaments import Tournament, Tournament_Performance, Tournaments_Attended, Form_Responses, Form_Fields, Tournament_Signups, Tournament_Judges
+from mason_snd.models.events import User_Event, Event
 
 from werkzeug.security import generate_password_hash, check_password_hash
 
@@ -138,6 +139,9 @@ def signup():
         flash("Please Log in", "error")
         return redirect(url_for('auth.login'))
 
+    # Get all events the user is signed up for
+    user_events = Event.query.join(User_Event, Event.id == User_Event.event_id).filter(User_Event.user_id == user_id).all()
+
     if request.method == 'POST':
         tournament_id = request.form.get('tournament_id')
         tournament = Tournament.query.get(tournament_id)
@@ -169,11 +173,25 @@ def signup():
                 submitted_at=datetime.now(EST)
             )
             db.session.add(new_response)
-        db.session.commit()
-        
+
+        # Get selected events from form
+        selected_event_ids = request.form.getlist('user_event')
+
+        # Only add Tournament_Judges rows for selected events
         if bringing_judge:
             return redirect(url_for('tournaments.bringing_judge', tournament_id=tournament_id))
-
+        else:
+            # Only add rows for the events the user selected
+            for event_id in selected_event_ids:
+                judge_acceptance = Tournament_Judges(
+                    accepted=False,
+                    judge_id=None,
+                    child_id=user_id,
+                    tournament_id=tournament_id,
+                    event_id=event_id
+                )
+                db.session.add(judge_acceptance)
+            db.session.commit()
         flash("Your responses have been submitted.", "success")
         return redirect(url_for('tournaments.index'))
     else:
@@ -193,7 +211,8 @@ def signup():
             tournaments=tournaments,
             selected_tournament=selected_tournament,
             fields=fields,
-            now=now  # Pass the current time to the template
+            now=now,  # Pass the current time to the template
+            user_events=user_events
         )
 
 @tournaments_bp.route('/bringing_judge/<int:tournament_id>', methods=['POST', 'GET'])
@@ -226,14 +245,19 @@ def bringing_judge(tournament_id):
             user_tournament_signup.bringing_judge = True
             user_tournament_signup.judge_id = selected_judge_id
 
-            judge_acceptance = Tournament_Judges(
-                accepted=False,
-                judge_id=selected_judge_id,
-                child_id=user_id,
-                tournament_id=tournament_id
-            )
-
-            db.session.add(judge_acceptance)
+            # Get all events the child is signed up for in this tournament
+            from mason_snd.models.events import User_Event
+            user_event_rows = User_Event.query.filter_by(user_id=user_id).all()
+            # For each event, create a Tournament_Judges row
+            for user_event in user_event_rows:
+                judge_acceptance = Tournament_Judges(
+                    accepted=False,
+                    judge_id=selected_judge_id,
+                    child_id=user_id,
+                    tournament_id=tournament_id,
+                    event_id=user_event.event_id
+                )
+                db.session.add(judge_acceptance)
             db.session.commit()
 
             return redirect(url_for('tournaments.index'))

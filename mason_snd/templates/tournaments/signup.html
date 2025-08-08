@@ -82,6 +82,19 @@
         {% endif %}
     </div>
     {% endfor %}
+    {% if user_events and user_events|length > 0 %}
+    <hr>
+    <div class="form-group">
+        <label><strong>Select the events you are signing up for:</strong></label><br>
+        {% for event in user_events %}
+            <label>
+                <input type="checkbox" name="user_event" value="{{ event.id }}">
+                {{ event.event_name }}
+                {% if event.event_emoji %} {{ event.event_emoji }}{% endif %}
+            </label><br>
+        {% endfor %}
+    </div>
+    {% endif %}
     <button type="submit">Submit Responses</button>
 </form>
 {% endif %}

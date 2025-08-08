@@ -25,15 +25,12 @@ def index():
     events = Event.query.all()
 
     user_events = []
-    event_relationships = User_Event.query.all()
-
-    for row in event_relationships:
-        if row.user_id == user_id:
-            event_id = row.event_id
-            user_event = Event.query.filter_by(id=event_id).first()
-            if user_event:
-                user_events.append(user_event.event_name)
-    
+    # Only consider events where the User_Event row is active
+    active_event_relationships = User_Event.query.filter_by(user_id=user_id, active=True).all()
+    for row in active_event_relationships:
+        event = Event.query.filter_by(id=row.event_id).first()
+        if event:
+            user_events.append(event.event_name)
     print(user_events)
 
     return render_template('events/index.html', events=events, user=user, user_events=user_events)
@@ -50,7 +47,8 @@ def leave_event(event_id):
         flash("You have not joined this event to leave it", "error")
         return redirect(url_for('events.index'))
 
-    db.session.delete(existing_entry)
+    user_event = User_Event.query.filter_by(user_id=user_id, event_id=event_id).first()
+    user_event.active = False
     db.session.commit()
 
     flash("You have successfully left the event", "success")

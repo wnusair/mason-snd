@@ -19,6 +19,8 @@ class User_Event(db.Model):
 
     effort_score = db.Column(db.Integer, nullable=True, default=0)
 
+    active = db.Column(db.Boolean, default=False)
+
     event_id = db.Column(db.Integer, db.ForeignKey('event.id'))
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'))
 

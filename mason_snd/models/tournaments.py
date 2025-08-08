@@ -12,7 +12,7 @@ class Tournament(db.Model):
     address = db.Column(db.String(255), nullable=False)
     signup_deadline = db.Column(db.DateTime, nullable=False)
     performance_deadline = db.Column(db.DateTime, nullable=False)
-    created_at = db.Column(db.DateTime, default=datetime.now(EST), nullable=False)
+    created_at = db.Column(db.DateTime, default=lambda: datetime.now(EST), nullable=False)
 
 class Form_Fields(db.Model):
     __tablename__ = 'form_fields'
@@ -28,7 +28,7 @@ class Form_Fields(db.Model):
 class Form_Responses(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     response = db.Column(db.Text, nullable=True)
-    submitted_at = db.Column(db.DateTime, default=datetime.now(EST), nullable=False)
+    submitted_at = db.Column(db.DateTime, default=lambda: datetime.now(EST), nullable=False)
 
     tournament_id = db.Column(db.Integer, db.ForeignKey('tournament.id'), nullable=False)
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
@@ -56,7 +56,7 @@ class Tournament_Signups(db.Model):
 
     user = db.relationship('User', foreign_keys=[user_id], backref='tournament_signups')
     tournament = db.relationship('Tournament', foreign_keys=[tournament_id], backref='tournament_signups')
-    judge = db.relationship('User', foreign_keys=[user_id], backref="judge_id_tournament_signup")
+    judge = db.relationship('User', foreign_keys=[judge_id], backref="judge_id_tournament_signup")
 
 class Tournaments_Attended(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -90,7 +90,9 @@ class Tournament_Judges(db.Model):
     judge_id = db.Column(db.Integer, db.ForeignKey('user.id'))
     child_id = db.Column(db.Integer, db.ForeignKey('user.id'))
     tournament_id = db.Column(db.Integer, db.ForeignKey('tournament.id'))
+    event_id = db.Column(db.Integer, db.ForeignKey('event.id', name='fk_tournament_judges_event_id'), nullable=True)
 
     judge = db.relationship('User', foreign_keys=[judge_id], backref='tournament_judges_judge')
     child = db.relationship('User', foreign_keys=[child_id], backref='tournament_judges_child')
     tournament = db.relationship('Tournament', foreign_keys=[tournament_id], backref='tournament_judges')
+    event = db.relationship('Event', foreign_keys=[event_id], backref='tournament_judges')
