@@ -24,6 +24,7 @@ def create_app():
     from mason_snd.blueprints.tournaments.tournaments import tournaments_bp
     from mason_snd.blueprints.metrics.metrics import metrics_bp
     from mason_snd.blueprints.admin.admin import admin_bp
+    from mason_snd.blueprints.rosters.rosters import rosters_bp
     from mason_snd.blueprints.main.main import main_bp
 
     app.register_blueprint(auth_bp, url_prefix='/auth')
@@ -32,6 +33,7 @@ def create_app():
     app.register_blueprint(tournaments_bp, url_prefix='/tournaments')
     app.register_blueprint(metrics_bp, url_prefix='/metrics')
     app.register_blueprint(admin_bp, url_prefix='/admin')
+    app.register_blueprint(rosters_bp, url_prefix='/rosters')
     app.register_blueprint(main_bp, url_prefix='/')
 
     with app.app_context():

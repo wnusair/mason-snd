@@ -1,0 +1,35 @@
+{% extends "tournaments/base.html" %}
+{% block title %}Rosters{% endblock %}
+{% block content %}
+<h2>Tournaments</h2>
+<table class="table table-striped">
+    <thead>
+        <tr>
+            <th>Name</th>
+            <th>Date</th>
+            <th>Location</th>
+            <th>Signup Deadline</th>
+            <th>Performance Deadline</th>
+            <th>Actions</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for tournament in tournaments %}
+        <tr>
+            <td>{{ tournament.name }}</td>
+            <td>{{ tournament.date.strftime('%Y-%m-%d') }}</td>
+            <td>{{ tournament.address }}</td>
+            <td>{{ tournament.signup_deadline.strftime('%Y-%m-%d') }}</td>
+            <td>{{ tournament.performance_deadline.strftime('%Y-%m-%d') }}</td>
+            <td>
+                <a href="{{ url_for('rosters.judge_view', tournament_id=tournament.id) }}" class="btn btn-primary btn-sm">Judge View</a>
+                <a href="{{ url_for('rosters.event_view', tournament_id=tournament.id) }}" class="btn btn-info btn-sm">Event View</a>
+                <a href="{{ url_for('rosters.rank_view', tournament_id=tournament.id) }}" class="btn btn-success btn-sm">Rank View</a>
+                <a href="{{ url_for('rosters.download_roster', tournament_id=tournament.id) }}" class="btn btn-secondary btn-sm">Download</a>
+            </td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+<a href="{{ url_for('rosters.upload_roster') }}" class="btn btn-warning">Upload Roster Spreadsheet</a>
+{% endblock %}

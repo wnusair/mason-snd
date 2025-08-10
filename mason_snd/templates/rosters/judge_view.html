@@ -1,0 +1,34 @@
+{% extends "tournaments/base.html" %}
+{% block title %}Judge View{% endblock %}
+{% block content %}
+<h2>Judge View - {{ tournament.name }}</h2>
+<table class="table table-bordered">
+    <thead>
+        <tr>
+            <th>Judge</th>
+            <th>Child</th>
+            <th>Members</th>
+            <th>Event</th>
+            <th>Info</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for judge in judges %}
+        <tr>
+            <td>{{ judge.judge_name }}</td>
+            <td style="color:red">{{ judge.child_name }}</td>
+            <td>
+                <ul>
+                {% for member in judge.members %}
+                    <li {% if member.is_drop %}style="background-color:black;color:white"{% endif %}>{{ member.name }}</li>
+                {% endfor %}
+                </ul>
+            </td>
+            <td>{{ judge.event_name }}</td>
+            <td>{{ judge.info }}</td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+<a href="{{ url_for('rosters.index') }}" class="btn btn-secondary">Back</a>
+{% endblock %}

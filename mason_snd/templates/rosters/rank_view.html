@@ -1,0 +1,30 @@
+{% extends "tournaments/base.html" %}
+{% block title %}Rank View{% endblock %}
+{% block content %}
+<h2>Rank View - {{ tournament.name }}</h2>
+<table class="table table-striped">
+    <thead>
+        <tr>
+            <th>Rank</th>
+            <th>Member</th>
+            <th>Event</th>
+            <th>Judge</th>
+            <th>Child</th>
+            <th>Info</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for row in rows %}
+        <tr {% if row.is_drop %}style="background-color:black;color:white"{% endif %}>
+            <td>{{ row.rank }}</td>
+            <td {% if row.is_child %}style="color:red"{% endif %}>{{ row.member_name }}</td>
+            <td>{{ row.event_name }}</td>
+            <td>{{ row.judge_name }}</td>
+            <td>{{ row.child_name }}</td>
+            <td>{{ row.info }}</td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+<a href="{{ url_for('rosters.index') }}" class="btn btn-secondary">Back</a>
+{% endblock %}

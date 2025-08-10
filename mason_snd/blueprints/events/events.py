@@ -43,12 +43,11 @@ def leave_event(event_id):
         return redirect(url_for('auth.login'))
     
     existing_entry = User_Event.query.filter_by(user_id=user_id, event_id=event_id).first()
-    if not existing_entry:
-        flash("You have not joined this event to leave it", "error")
+    if not existing_entry or not existing_entry.active:
+        flash("You are not currently part of this event", "error")
         return redirect(url_for('events.index'))
 
-    user_event = User_Event.query.filter_by(user_id=user_id, event_id=event_id).first()
-    user_event.active = False
+    existing_entry.active = False
     db.session.commit()
 
     flash("You have successfully left the event", "success")
@@ -201,16 +200,21 @@ def join_event(event_id):
         flash('You must be logged in to join an event', 'error')
         return redirect(url_for('auth.login'))
 
-    # Check if the user has already joined the event
     existing_entry = User_Event.query.filter_by(user_id=user_id, event_id=event_id).first()
     if existing_entry:
-        flash('You have already joined this event', 'info')
-        return redirect(url_for('events.index'))
+        if existing_entry.active:
+            flash('You have already joined this event', 'info')
+            return redirect(url_for('events.index'))
+        else:
+            existing_entry.active = True
+            db.session.commit()
+            flash('You have successfully re-joined the event', 'success')
+            return redirect(url_for('events.index'))
 
-    # Add the user to the event with a default effort_score of 0
     new_user_event = User_Event(
         user_id=user_id,
-        event_id=event_id
+        event_id=event_id,
+        active=True
     )
     db.session.add(new_user_event)
     db.session.commit()
