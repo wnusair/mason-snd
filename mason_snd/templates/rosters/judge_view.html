@@ -7,26 +7,26 @@
         <tr>
             <th>Judge</th>
             <th>Child</th>
-            <th>Members</th>
             <th>Event</th>
-            <th>Info</th>
+            <th>Members</th>
         </tr>
     </thead>
     <tbody>
         {% for judge in judges %}
+        {% for event in judge.events %}
         <tr>
             <td>{{ judge.judge_name }}</td>
-            <td style="color:red">{{ judge.child_name }}</td>
+            <td>{{ judge.child_name }}</td>
+            <td>{{ event.event_name }}</td>
             <td>
                 <ul>
-                {% for member in judge.members %}
-                    <li {% if member.is_drop %}style="background-color:black;color:white"{% endif %}>{{ member.name }}</li>
+                {% for member in event.members %}
+                    <li>{{ member }}</li>
                 {% endfor %}
                 </ul>
             </td>
-            <td>{{ judge.event_name }}</td>
-            <td>{{ judge.info }}</td>
         </tr>
+        {% endfor %}
         {% endfor %}
     </tbody>
 </table>

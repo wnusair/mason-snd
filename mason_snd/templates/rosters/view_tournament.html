@@ -1,0 +1,95 @@
+{% extends 'main/base.html' %}
+{% block content %}
+<h2>Judges</h2>
+<table class="table table-bordered">
+    <thead>
+        <tr>
+            <th>Judge Name</th>
+            <th>Child</th>
+            <th>Category</th>
+            <th>Number People Bringing</th>
+        </tr>
+    </thead>
+    <tbody>
+    {% for judge in judges %}
+        <tr>
+            <td>{{ judge_users[judge.judge_id].first_name if judge.judge_id in judge_users else 'Unknown' }} {{ judge_users[judge.judge_id].last_name if judge.judge_id in judge_users else '' }}</td>
+            <td>{{ judge.child.first_name if judge.child else '' }} {{ judge.child.last_name if judge.child else '' }}</td>
+            <td>
+                {% if judge.event and judge.event.event_type == 0 %}Speech
+                {% elif judge.event and judge.event.event_type == 1 %}LD
+                {% elif judge.event and judge.event.event_type == 2 %}PF
+                {% else %}Unknown{% endif %}
+            </td>
+            <td>
+                {% if judge.event and judge.event.event_type == 0 %}6
+                {% elif judge.event and judge.event.event_type == 1 %}2
+                {% elif judge.event and judge.event.event_type == 2 %}4
+                {% else %}0{% endif %}
+            </td>
+        </tr>
+    {% endfor %}
+    </tbody>
+</table>
+
+<h2>Rank View</h2>
+<table class="table table-bordered">
+    <thead>
+        <tr>
+            <th>Rank</th>
+            <th>Competitor Name</th>
+            <th>Weighted Points</th>
+            <th>Event</th>
+            <th>Category</th>
+        </tr>
+    </thead>
+    <tbody>
+    {% for row in rank_view %}
+        <tr>
+            <td>{{ row.rank }}</td>
+            <td>{{ users[row.user_id].first_name if row.user_id in users else 'Unknown' }} {{ users[row.user_id].last_name if row.user_id in users else '' }}</td>
+            <td>{{ users[row.user_id].points if row.user_id in users else 0 }}</td>
+            <td>{{ events[row.event_id].event_name if row.event_id in events else 'Unknown Event' }}</td>
+            <td>
+                {% if events[row.event_id] and events[row.event_id].event_type == 0 %}Speech
+                {% elif events[row.event_id] and events[row.event_id].event_type == 1 %}LD
+                {% elif events[row.event_id] and events[row.event_id].event_type == 2 %}PF
+                {% else %}Unknown{% endif %}
+            </td>
+        </tr>
+    {% endfor %}
+    </tbody>
+</table>
+
+<h2>Event View</h2>
+{% for event_id, competitors in event_competitors.items() %}
+    <h3>{{ events[event_id].name }}</h3>
+    <table class="table table-bordered">
+        <thead>
+            <tr>
+                <th>Event</th>
+                <th>Category</th>
+                <th>Rank</th>
+                <th>Competitor</th>
+                <th>Weighted Points</th>
+            </tr>
+        </thead>
+        <tbody>
+        {% for comp in competitors %}
+            <tr>
+                <td>{{ events[event_id].event_name if event_id in events else 'Unknown Event' }}</td>
+                <td>
+                    {% if events[event_id] and events[event_id].event_type == 0 %}Speech
+                    {% elif events[event_id] and events[event_id].event_type == 1 %}LD
+                    {% elif events[event_id] and events[event_id].event_type == 2 %}PF
+                    {% else %}Unknown{% endif %}
+                </td>
+                <td>{{ comp.rank if comp.rank else 'N/A' }}</td>
+                <td>{{ users[comp.user_id].first_name if comp.user_id in users else 'Unknown' }} {{ users[comp.user_id].last_name if comp.user_id in users else '' }}</td>
+                <td>{{ users[comp.user_id].points if comp.user_id in users else 0 }}</td>
+            </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+{% endfor %}
+{% endblock %}

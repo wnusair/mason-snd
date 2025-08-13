@@ -14,6 +14,8 @@ class Event(db.Model):
     owner_id = db.Column(db.Integer, db.ForeignKey('user.id'))
     owner = db.relationship('User', foreign_keys=[owner_id], backref='event')
 
+    event_type = db.Column(db.Integer) # 0 = speech, 1 = LD, 2 = PF
+
 class User_Event(db.Model):
     id = db.Column(db.Integer, primary_key=True)
 

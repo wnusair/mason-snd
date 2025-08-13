@@ -75,6 +75,7 @@ def edit_event(event_id):
         # Update event details
         event.event_name = request.form.get('event_name')
         event.event_description = request.form.get('event_description')
+        event.event_type = request.form.get('event_type')
         event.event_emoji = request.form.get('event_emoji')
 
         db.session.commit()
@@ -235,6 +236,7 @@ def add_event():
     if request.method == 'POST':
         event_name = request.form.get('event_name')
         event_description = request.form.get('event_description')
+        event_type = request.form.get('event_type')
         owner_first_name = request.form.get('owner_first_name')
         owner_last_name = request.form.get('owner_last_name')
         event_emoji = request.form.get('event_emoji')
@@ -249,6 +251,7 @@ def add_event():
             event_name=event_name,
             event_description=event_description,
             event_emoji=event_emoji,
+            event_type=int(event_type),
             owner_id=owner.id
         )
 

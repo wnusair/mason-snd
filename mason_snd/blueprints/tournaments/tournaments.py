@@ -71,15 +71,16 @@ def add_tournament():
 
         users = User.query.all()
         current_tournament = Tournament.query.filter_by(name=name).first()
-
+        events = Event.query.all()
         for user in users:
-            tournament_signup = Tournament_Signups(
-                user_id = user.id,
-                tournament_id = current_tournament.id
-            )
-
-            db.session.add(tournament_signup)
-            db.session.commit()
+            for event in events:
+                tournament_signup = Tournament_Signups(
+                    user_id = user.id,
+                    tournament_id = current_tournament.id,
+                    event_id = event.id
+                )
+                db.session.add(tournament_signup)
+        db.session.commit()
 
 
     return render_template("tournaments/add_tournament.html")
@@ -148,13 +149,32 @@ def signup():
         if not tournament:
             flash("Tournament not found.", "error")
             return redirect(url_for('tournaments.signup'))
-        
+
+        # Prevent signup if there are no form fields (no signup form)
+        if not tournament.form_fields or len(tournament.form_fields) == 0:
+            flash("Signup is not available for this tournament.", "error")
+            return redirect(url_for('tournaments.signup'))
+
         print("Tournament found")
 
-        my_tournament_signup = Tournament_Signups.query.filter_by(user_id=user_id, tournament_id=tournament_id).first()
         bringing_judge = False
 
-        my_tournament_signup.is_going = True
+        # Get selected events from form
+        selected_event_ids = request.form.getlist('user_event')
+
+        # Create or update Tournament_Signups for each selected event
+        for event_id in selected_event_ids:
+            signup = Tournament_Signups.query.filter_by(user_id=user_id, tournament_id=tournament_id, event_id=event_id).first()
+            if not signup:
+                signup = Tournament_Signups(
+                    user_id=user_id,
+                    tournament_id=tournament_id,
+                    event_id=event_id,
+                    is_going=True
+                )
+                db.session.add(signup)
+            else:
+                signup.is_going = True
 
         # For each field in the selected tournament, capture the user's response
         for field in tournament.form_fields:
@@ -167,31 +187,31 @@ def signup():
                     bringing_judge = True
             new_response = Form_Responses(
                 tournament_id=tournament.id,
-                user_id=session.get('user_id'),
+                user_id=user_id,
                 field_id=field.id,
                 response=response_value,
                 submitted_at=datetime.now(EST)
             )
             db.session.add(new_response)
 
-        # Get selected events from form
-        selected_event_ids = request.form.getlist('user_event')
+        # Add Tournament_Judges rows for selected events
+        for event_id in selected_event_ids:
+            judge_acceptance = Tournament_Judges(
+                accepted=False,
+                judge_id=None,
+                child_id=user_id,
+                tournament_id=tournament_id,
+                event_id=event_id
+            )
+            db.session.add(judge_acceptance)
 
-        # Only add Tournament_Judges rows for selected events
+        # Commit all changes (Tournament_Signups, Form_Responses, Tournament_Judges)
+        db.session.commit()
+
+        # Handle judge selection if needed
         if bringing_judge:
             return redirect(url_for('tournaments.bringing_judge', tournament_id=tournament_id))
-        else:
-            # Only add rows for the events the user selected
-            for event_id in selected_event_ids:
-                judge_acceptance = Tournament_Judges(
-                    accepted=False,
-                    judge_id=None,
-                    child_id=user_id,
-                    tournament_id=tournament_id,
-                    event_id=event_id
-                )
-                db.session.add(judge_acceptance)
-            db.session.commit()
+        
         flash("Your responses have been submitted.", "success")
         return redirect(url_for('tournaments.index'))
     else:
@@ -235,31 +255,24 @@ def bringing_judge(tournament_id):
 
     selected_judge_id = None
 
+
     if request.method == "POST":
         selected_judge_id = request.form.get("judge_id")
 
         user_tournament_signup = Tournament_Signups.query.filter_by(user_id=user_id, tournament_id=tournament_id).first()
 
         if user_tournament_signup:
-            print("found tournament signup")
             user_tournament_signup.bringing_judge = True
             user_tournament_signup.judge_id = selected_judge_id
 
-            # Get all events the child is signed up for in this tournament
-            from mason_snd.models.events import User_Event
-            user_event_rows = User_Event.query.filter_by(user_id=user_id).all()
-            # For each event, create a Tournament_Judges row
-            for user_event in user_event_rows:
-                judge_acceptance = Tournament_Judges(
-                    accepted=False,
-                    judge_id=selected_judge_id,
-                    child_id=user_id,
-                    tournament_id=tournament_id,
-                    event_id=user_event.event_id
-                )
-                db.session.add(judge_acceptance)
+            # Only add Tournament_Judges rows for events the user actually signed up for in this tournament
+            # Find events from Tournament_Judges where child_id=user_id and tournament_id=tournament_id and judge_id is None
+            judge_rows = Tournament_Judges.query.filter_by(child_id=user_id, tournament_id=tournament_id, judge_id=None).all()
+            for judge_row in judge_rows:
+                judge_row.judge_id = selected_judge_id
             db.session.commit()
 
+            flash("Judge selection saved.", "success")
             return redirect(url_for('tournaments.index'))
 
     return render_template(

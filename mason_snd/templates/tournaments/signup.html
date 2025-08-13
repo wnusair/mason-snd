@@ -26,11 +26,13 @@
             <td>
                 {% if tournament.signup_deadline and tournament.signup_deadline < now %}
                     <button class="btn btn-secondary" disabled>Signup Closed</button>
-                {% else %}
+                {% elif tournament.form_fields and tournament.form_fields|length > 0 %}
                     <form method="GET" style="display:inline;">
                         <input type="hidden" name="tournament_id" value="{{ tournament.id }}">
                         <button type="submit" class="btn btn-primary">Signup</button>
                     </form>
+                {% else %}
+                    <button class="btn btn-secondary" disabled>No Signup Form</button>
                 {% endif %}
             </td>
         </tr>

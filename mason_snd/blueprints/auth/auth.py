@@ -108,9 +108,10 @@ def req_checks(user):
     if user.is_parent == False:
         # check if perfomrance submited
         attended_tournament = Tournaments_Attended.query.filter_by(user_id=user.id).all()
+        print(attended_tournament)
 
         print("Checking if submitted performance")
-        if attended_tournament != None:
+        if attended_tournament != []:
             recent_tournament = attended_tournament[-1]
 
             performance_submitted = Tournament_Performance.query.filter_by(user_id=user.id, tournament_id=recent_tournament.tournament_id).first()
@@ -225,43 +226,62 @@ def register():
             new_user = User(
                 first_name=first_name.lower(),
                 last_name=last_name.lower(),
-                
                 email=email,
                 password=generate_password_hash(password),
                 phone_number=phone_number,
-
                 judging_reqs="test",
-
                 is_parent=is_parent,
                 child_first_name=child_first_name,
                 child_last_name=child_last_name,
-
                 account_claimed=True
             )
 
-            ghost_user = User(
-                first_name=child_first_name,
-                last_name=child_last_name,
-                is_parent=False,
-                account_claimed=False
-            )
-
+            # Check if the child already exists (real or ghost)
+            child_user = User.query.filter_by(
+                first_name=child_first_name.lower() if child_first_name else None,
+                last_name=child_last_name.lower() if child_last_name else None,
+                is_parent=False
+            ).first()
 
             existing_user = User.query.filter_by(first_name=first_name.lower(), last_name=last_name.lower()).first()
             print(existing_user)
 
             if existing_user:
                 existing_user.email = email
-                existing_user.password = password
-                existing_user.judging_reqs="test"
-                existing_user.child_first_name = child_first_name
-                existing_user.child_last_name = child_last_name
+                existing_user.password = generate_password_hash(password)
+                existing_user.judging_reqs = "test"
+                existing_user.child_first_name = child_first_name.lower() if child_first_name else None
+                existing_user.child_last_name = child_last_name.lower() if child_last_name else None
                 existing_user.account_claimed = True
                 db.session.commit()
+                parent_user = existing_user
+                # Only create ghost child if not found
+                if not child_user:
+                    ghost_user = User(
+                        first_name=child_first_name.lower() if child_first_name else None,
+                        last_name=child_last_name.lower() if child_last_name else None,
+                        is_parent=False,
+                        account_claimed=False
+                    )
+                    db.session.add(ghost_user)
+                    db.session.commit()
+                    child_user = ghost_user
             else:
                 db.session.add(new_user)
-                db.session.add(ghost_user)
-                db.session.commit()
+                if not child_user:
+                    ghost_user = User(
+                        first_name=child_first_name.lower() if child_first_name else None,
+                        last_name=child_last_name.lower() if child_last_name else None,
+                        is_parent=False,
+                        account_claimed=False
+                    )
+                    db.session.add(ghost_user)
+                    db.session.commit()
+                    child_user = ghost_user
+                else:
+                    db.session.commit()
+                parent_user = new_user
+                # If child_user existed, don't create a new one
         elif not is_parent:
             new_user = User(
                 first_name=first_name.lower(),
@@ -307,32 +327,24 @@ def register():
                 db.session.add(ghost_user)
                 db.session.commit()
         
+
         if is_parent:
-            parent_user = User.query.filter_by(first_name=first_name.lower(),last_name=last_name.lower()).first()
-            child_user = User.query.filter_by(first_name=child_first_name,last_name=child_last_name).first()
-
             judge = Judges(
-                judge_id = parent_user.id,
-                child_id = child_user.id
+                judge_id=parent_user.id,
+                child_id=child_user.id
             )
-
             db.session.add(judge)
             db.session.commit()
-        else:
-            parent_user = User.query.filter_by(first_name=emergency_first_name.lower(),last_name=emergency_last_name.lower()).first()
-            child_user = User.query.filter_by(first_name=first_name.lower(),last_name=last_name.lower()).first()
-
-            judge = Judges(
-                judge_id = parent_user.id,
-                child_id = child_user.id
-            )
-
-            db.session.add(judge)
-            db.session.commit()
-        
-        if is_parent:
             make_judge_reqs(parent_user)
         else:
+            parent_user = User.query.filter_by(first_name=emergency_first_name.lower(), last_name=emergency_last_name.lower()).first()
+            child_user = User.query.filter_by(first_name=first_name.lower(), last_name=last_name.lower()).first()
+            judge = Judges(
+                judge_id=parent_user.id,
+                child_id=child_user.id
+            )
+            db.session.add(judge)
+            db.session.commit()
             make_child_reqs(child_user)
 
         flash("Registration successful!", "success")

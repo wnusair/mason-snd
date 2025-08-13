@@ -1,6 +1,7 @@
 import csv
 from io import StringIO
 from math import ceil
+import random
 
 from flask import Blueprint, render_template, request, redirect, url_for, flash, session, Response
 
@@ -10,8 +11,12 @@ from mason_snd.models.admin import User_Requirements, Requirements
 from mason_snd.models.tournaments import Tournament, Tournament_Performance, Tournament_Judges, Tournament_Signups
 from mason_snd.models.events import Event, User_Event, Effort_Score
 from mason_snd.models.metrics import MetricsSettings
-from mason_snd.models.rosters import Roster_Tournament, Roster_Partner, Roster_Drops
+from mason_snd.models.rosters import Roster_Judge, Roster, Roster_Competitors
+
 from sqlalchemy import asc, desc, func
+
+from datetime import datetime
+
 
 try:
     import pandas as pd
@@ -21,170 +26,200 @@ except ImportError:
 
 rosters_bp = Blueprint('rosters', __name__, template_folder='templates')
 
-# Index: List tournaments and access roster views
 @rosters_bp.route('/')
 def index():
-    tournaments = Tournament.query.order_by(Tournament.date.desc()).all()
-    return render_template('rosters/index.html', tournaments=tournaments)
+    tournaments = Tournament.query.all()
+    rosters = Roster.query.all()
 
-# Judge View
-@rosters_bp.route('/<int:tournament_id>/judge')
-def judge_view(tournament_id):
-    tournament = Tournament.query.get_or_404(tournament_id)
-    judges = []
-    judge_entries = Tournament_Judges.query.filter_by(tournament_id=tournament_id).all()
-    for entry in judge_entries:
-        judge = entry.judge
-        child = entry.child
-        event = entry.event
-        # Members brought by judge
-        members = Tournament_Signups.query.filter_by(judge_id=judge.id, tournament_id=tournament_id, is_going=True).all()
-        member_list = []
-        for m in members:
-            user = m.user
-            is_drop = Roster_Drops.query.filter_by(user_id=user.id).first() is not None
-            member_list.append({
-                'name': f"{user.first_name} {user.last_name}",
-                'is_drop': is_drop
-            })
-        judges.append({
-            'judge_name': f"{judge.first_name} {judge.last_name}",
-            'child_name': f"{child.first_name} {child.last_name}" if child else '',
-            'members': member_list,
-            'event_name': event.event_name if event else '',
-            'info': f"Can bring: {judge.judging_reqs}"
-        })
-    return render_template('rosters/judge_view.html', tournament=tournament, judges=judges)
+    upcoming_tournaments = []
+    now = datetime.now()
+    for tournament in tournaments:
+        if tournament.signup_deadline and tournament.signup_deadline > now:
+            upcoming_tournaments.append(tournament)
 
-# Event View
-@rosters_bp.route('/<int:tournament_id>/event')
-def event_view(tournament_id):
-    tournament = Tournament.query.get_or_404(tournament_id)
-    events = Event.query.all()
-    event_tables = []
-    for event in events:
-        rows = []
-        # Get all signups for this event in this tournament
-        signups = Tournament_Signups.query.filter_by(tournament_id=tournament_id, is_going=True).all()
-        for signup in signups:
-            user = signup.user
-            judge = signup.judge
-            child = None
-            judge_obj = Tournament_Judges.query.filter_by(judge_id=judge.id, tournament_id=tournament_id, event_id=event.id).first() if judge else None
-            if judge_obj:
-                child = judge_obj.child
-            perf = Tournament_Performance.query.filter_by(user_id=user.id, tournament_id=tournament_id).first()
-            rank = perf.rank if perf else ''
-            is_child = judge_obj and child and user.id == child.id
-            is_drop = Roster_Drops.query.filter_by(user_id=user.id).first() is not None
-            rows.append({
-                'rank': rank,
-                'member_name': f"{user.first_name} {user.last_name}",
-                'judge_name': f"{judge.first_name} {judge.last_name}" if judge else '',
-                'child_name': f"{child.first_name} {child.last_name}" if child else '',
-                'info': '',
-                'is_child': is_child,
-                'is_drop': is_drop
-            })
-        event_tables.append({
-            'event_name': event.event_name,
-            'rows': rows
-        })
-    return render_template('rosters/event_view.html', tournament=tournament, events=event_tables)
+    return render_template('rosters/index.html', upcoming_tournaments=upcoming_tournaments, tournaments=tournaments, rosters=rosters)
 
-# Rank View
-@rosters_bp.route('/<int:tournament_id>/rank')
-def rank_view(tournament_id):
-    tournament = Tournament.query.get_or_404(tournament_id)
-    signups = Tournament_Signups.query.filter_by(tournament_id=tournament_id, is_going=True).all()
-    rows = []
+
+
+# BIG VIEW TOURNAMENT BLOCK!!!!
+
+def get_roster_count(tournament_id):
+    judges = Tournament_Judges.query.filter_by(tournament_id=tournament_id, accepted=True).all()
+
+    speech_competitors = 0
+    LD_competitors = 0
+    PF_competitors = 0
+
+    for judge in judges:
+        event_id = judge.event_id
+
+        event = Event.query.filter_by(id=event_id).first()
+
+        if event.event_type == 0:
+            speech_competitors += 6
+        elif event.event_type == 1:
+            LD_competitors += 2
+        else:
+            PF_competitors += 4
+
+    return speech_competitors, LD_competitors, PF_competitors
+
+# Helper: Get all signups for a tournament, grouped by event
+from mason_snd.models.tournaments import Tournament_Signups
+
+def get_signups_by_event(tournament_id):
+    signups = Tournament_Signups.query.filter_by(tournament_id=tournament_id).all()
+    event_dict = {}
     for signup in signups:
-        user = signup.user
-        judge = signup.judge
-        event = Event.query.filter(Event.id.in_([e.event_id for e in User_Event.query.filter_by(user_id=user.id).all()])).first()
-        child = None
-        judge_obj = Tournament_Judges.query.filter_by(judge_id=judge.id, tournament_id=tournament_id).first() if judge else None
-        if judge_obj:
-            child = judge_obj.child
-        perf = Tournament_Performance.query.filter_by(user_id=user.id, tournament_id=tournament_id).first()
-        rank = perf.rank if perf else ''
-        is_child = judge_obj and child and user.id == child.id
-        is_drop = Roster_Drops.query.filter_by(user_id=user.id).first() is not None
-        rows.append({
-            'rank': rank,
-            'member_name': f"{user.first_name} {user.last_name}",
-            'event_name': event.event_name if event else '',
-            'judge_name': f"{judge.first_name} {judge.last_name}" if judge else '',
-            'child_name': f"{child.first_name} {child.last_name}" if child else '',
-            'info': '',
-            'is_child': is_child,
-            'is_drop': is_drop
-        })
-    return render_template('rosters/rank_view.html', tournament=tournament, rows=rows)
+        if signup.event_id not in event_dict:
+            event_dict[signup.event_id] = []
+        event_dict[signup.event_id].append(signup)
+    return event_dict
 
-# Download Roster
-@rosters_bp.route('/<int:tournament_id>/download')
-def download_roster(tournament_id):
-    tournament = Tournament.query.get_or_404(tournament_id)
-    signups = Tournament_Signups.query.filter_by(tournament_id=tournament_id, is_going=True).all()
-    output = StringIO()
-    writer = csv.writer(output)
-    writer.writerow(['Rank', 'Member', 'Event', 'Judge', 'Child', 'Drop'])
-    for signup in signups:
-        user = signup.user
-        judge = signup.judge
-        event = Event.query.filter(Event.id.in_([e.event_id for e in User_Event.query.filter_by(user_id=user.id).all()])).first()
-        child = None
-        judge_obj = Tournament_Judges.query.filter_by(judge_id=judge.id, tournament_id=tournament_id).first() if judge else None
-        if judge_obj:
-            child = judge_obj.child
-        perf = Tournament_Performance.query.filter_by(user_id=user.id, tournament_id=tournament_id).first()
-        rank = perf.rank if perf else ''
-        is_drop = Roster_Drops.query.filter_by(user_id=user.id).first() is not None
-        writer.writerow([
-            rank,
-            f"{user.first_name} {user.last_name}",
-            event.event_name if event else '',
-            f"{judge.first_name} {judge.last_name}" if judge else '',
-            f"{child.first_name} {child.last_name}" if child else '',
-            'Drop' if is_drop else ''
-        ])
-    output.seek(0)
-    return Response(output, mimetype="text/csv", headers={"Content-Disposition":f"attachment;filename={tournament.name}_roster.csv"})
+# Helper: Rank signups in each event by weighted points
+def rank_signups(event_dict):
+    ranked = {}
+    for event_id, signups in event_dict.items():
+        # Get weighted points from user, fallback to user.points or 0
+        ranked[event_id] = sorted(signups, key=lambda s: getattr(s.user, 'weighted_points', getattr(s.user, 'points', 0)), reverse=True)
+    return ranked
 
-# Upload Roster
-@rosters_bp.route('/upload', methods=['GET', 'POST'])
-def upload_roster():
-    if request.method == 'POST':
-        file = request.files.get('file')
-        if not file:
-            flash('No file selected', 'danger')
-            return redirect(url_for('rosters.upload_roster'))
-        filename = file.filename
-        if not filename.endswith('.xlsx'):
-            flash('Invalid file type. Please upload an .xlsx file.', 'danger')
-            return redirect(url_for('rosters.upload_roster'))
-        df = pd.read_excel(file)
-        # Expect columns: name, event, tournament, judge, child, drop
-        for _, row in df.iterrows():
-            # Find user, event, tournament, judge, child by name
-            user = User.query.filter_by(first_name=row['Member'].split()[0], last_name=row['Member'].split()[-1]).first()
-            event = Event.query.filter_by(event_name=row['Event']).first()
-            tournament = Tournament.query.filter_by(name=row['Tournament']).first()
-            judge = User.query.filter_by(first_name=row['Judge'].split()[0], last_name=row['Judge'].split()[-1]).first() if pd.notna(row['Judge']) else None
-            child = User.query.filter_by(first_name=row['Child'].split()[0], last_name=row['Child'].split()[-1]).first() if pd.notna(row['Child']) else None
-            if user and event and tournament:
-                # Save to Roster_Tournament
-                rt = Roster_Tournament()
-                rt.user_id = user.id
-                rt.tournament_id = tournament.id
-                db.session.add(rt)
-                # Save drop if needed
-                if 'Drop' in row and row['Drop'] == 'Drop':
-                    rd = Roster_Drops()
-                    rd.user_id = user.id
-                    db.session.add(rd)
-        db.session.commit()
-        flash('Roster uploaded successfully!', 'success')
-        return redirect(url_for('rosters.index'))
-    return render_template('rosters/upload.html')
+# Helper: Select competitors for speech (rotation) and LD/PF (top N with randomness)
+def select_competitors_by_event_type(ranked, speech_spots, ld_spots, pf_spots, event_type_map, seed_randomness=True):
+    event_view = []
+    rank_view = []
+    # Speech events: rotation
+    speech_event_ids = [eid for eid, etype in event_type_map.items() if etype == 0]
+    speech_indices = {eid: 0 for eid in speech_event_ids}
+    speech_filled = 0
+    while speech_filled < speech_spots and speech_event_ids:
+        for eid in speech_event_ids:
+            competitors = ranked.get(eid, [])
+            if speech_indices[eid] < len(competitors):
+                if seed_randomness:
+                    mid = len(competitors) // 2
+                    idx = min(speech_indices[eid], mid)
+                else:
+                    idx = speech_indices[eid]
+                signup = competitors[idx]
+                event_view.append({'user_id': signup.user_id, 'event_id': eid})
+                rank_view.append({'user_id': signup.user_id, 'event_id': eid, 'rank': idx+1})
+                speech_indices[eid] += 1
+                speech_filled += 1
+                if speech_filled >= speech_spots:
+                    break
+        if all(speech_indices[eid] >= len(ranked.get(eid, [])) for eid in speech_event_ids):
+            break
+    # LD events: take top N with randomness
+    ld_event_ids = [eid for eid, etype in event_type_map.items() if etype == 1]
+    for eid in ld_event_ids:
+        competitors = ranked.get(eid, [])
+        for i in range(min(ld_spots, len(competitors))):
+            if seed_randomness:
+                mid = len(competitors) // 2
+                idx = min(i, mid)
+            else:
+                idx = i
+            signup = competitors[idx]
+            event_view.append({'user_id': signup.user_id, 'event_id': eid})
+            rank_view.append({'user_id': signup.user_id, 'event_id': eid, 'rank': idx+1})
+    # PF events: take top N with randomness
+    pf_event_ids = [eid for eid, etype in event_type_map.items() if etype == 2]
+    for eid in pf_event_ids:
+        competitors = ranked.get(eid, [])
+        for i in range(min(pf_spots, len(competitors))):
+            if seed_randomness:
+                mid = len(competitors) // 2
+                idx = min(i, mid)
+            else:
+                idx = i
+            signup = competitors[idx]
+            event_view.append({'user_id': signup.user_id, 'event_id': eid})
+            rank_view.append({'user_id': signup.user_id, 'event_id': eid, 'rank': idx+1})
+    return event_view, rank_view
+
+@rosters_bp.route('/view_tournament/<int:tournament_id>')
+def view_tournament(tournament_id):
+    """
+    
+    take all judges
+    take all accepted judging
+
+    show table of judges (judge name, child, category, number of people brought)
+    show table of event, show table of rank
+    
+    """
+
+    user_id = session.get('user_id')
+    user = User.query.filter_by(id=user_id).first()
+
+    if not user_id:
+        flash("Log In First")
+        return redirect(url_for('auth.login'))
+
+    if user.role < 2:
+        flash("You are not authorized to access this page")
+        return redirect(url_for('main.index'))
+    
+    speech_competitors, LD_competitors, PF_competitors = get_roster_count(tournament_id)
+
+    event_dict = get_signups_by_event(tournament_id)
+    ranked = rank_signups(event_dict)
+    # Build event_type_map: event_id -> event_type
+    event_type_map = {}
+    for eid in event_dict.keys():
+        event = Event.query.filter_by(id=eid).first()
+        if event:
+            event_type_map[eid] = event.event_type
+    event_view, rank_view = select_competitors_by_event_type(
+        ranked,
+        speech_spots=speech_competitors,
+        ld_spots=LD_competitors,
+        pf_spots=PF_competitors,
+        event_type_map=event_type_map,
+        seed_randomness=True
+    )
+
+    # Build event_competitors: {event_id: [comp, ...]} with rank info
+    event_competitors = {}
+    for comp in event_view:
+        eid = comp['event_id']
+        if eid not in event_competitors:
+            event_competitors[eid] = []
+        # Find the corresponding rank from rank_view
+        rank_info = next((r for r in rank_view if r['user_id'] == comp['user_id'] and r['event_id'] == comp['event_id']), None)
+        comp_with_rank = comp.copy()
+        comp_with_rank['rank'] = rank_info['rank'] if rank_info else 'N/A'
+        event_competitors[eid].append(comp_with_rank)
+
+    # Build users and events dicts for template lookup
+    user_ids = set([comp['user_id'] for comp in event_view] + [row['user_id'] for row in rank_view])
+    event_ids = set([comp['event_id'] for comp in event_view] + [row['event_id'] for row in rank_view])
+    users = {u.id: u for u in User.query.filter(User.id.in_(user_ids)).all()}
+    events = {e.id: e for e in Event.query.filter(Event.id.in_(event_ids)).all()}
+
+    # Judges for the tournament
+    judges = Tournament_Judges.query.filter_by(tournament_id=tournament_id, accepted=True).all()
+    judge_user_ids = [j.judge_id for j in judges if j.judge_id]
+    child_user_ids = [j.child_id for j in judges if j.child_id]
+    all_judge_user_ids = list(set(judge_user_ids + child_user_ids))
+    judge_users = {u.id: u for u in User.query.filter(User.id.in_(all_judge_user_ids)).all() if all_judge_user_ids}
+
+    # Debug output
+    print(f"Tournament {tournament_id}: {len(judges)} judges, {len(event_view)} competitors in event_view, {len(rank_view)} in rank_view")
+
+    return render_template('rosters/view_tournament.html',
+                          event_view=event_view,
+                          rank_view=rank_view,
+                          event_competitors=event_competitors,
+                          users=users,
+                          events=events,
+                          judges=judges,
+                          judge_users=judge_users,
+                          upcoming_tournaments=[],
+                          tournaments=[],
+                          rosters=[])
+
+@rosters_bp.route('/save_roster/<int:tournament_id>')
+def save_roster(tournament_id):
+    pass
