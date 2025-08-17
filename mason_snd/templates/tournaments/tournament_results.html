@@ -1,31 +1,45 @@
 {% extends "tournaments/base.html" %}
-{% block title %}Tournament Results{% endblock %}
+{% block title %}Submit Tournament Results{% endblock %}
 
 {% block content %}
-
-<form method="post">
-    <label for="bid">Did you get a bid?</label>
-    <select name="bid" id="bid">
-        <option value="yes">Yes</option>
-        <option value="no">No</option>
-    </select>
-    <br><br>
-
-    <label for="rank">What was your rank?</label>
-    <input type="number" name="rank" id="rank" required>
-    <br><br>
-
-    <label for="stage">What stage did you reach?</label>
-    <select name="stage" id="stage">
-        <option value="double_octafinals">Double Octafinals</option>
-        <option value="octafinals">Octafinals</option>
-        <option value="quarterfinals">Quarterfinals</option>
-        <option value="semifinals">Semifinals</option>
-        <option value="finals">Finals</option>
-    </select>
-    <br><br>
-
-    <button type="submit">Submit</button>
-</form>
-
+<div class="min-h-full flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
+    <div class="max-w-md w-full space-y-8">
+        <div>
+            <h2 class="mt-6 text-center text-3xl font-extrabold text-gray-900">
+                Submit Results
+            </h2>
+        </div>
+        <form class="mt-8 space-y-6" method="POST">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+            <div class="rounded-md shadow-sm bg-white p-6 space-y-4">
+                <div>
+                    <label for="bid" class="block text-sm font-medium text-gray-700">Did you get a bid?</label>
+                    <select id="bid" name="bid" class="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-[color:var(--color-primary-500)] focus:border-[color:var(--color-primary-500)] sm:text-sm rounded-md">
+                        <option value="no">No</option>
+                        <option value="yes">Yes</option>
+                    </select>
+                </div>
+                <div>
+                    <label for="rank" class="block text-sm font-medium text-gray-700">What was your rank?</label>
+                    <input type="number" name="rank" id="rank" required class="mt-1 w-full rounded-md border-gray-300 shadow-sm focus:border-[color:var(--color-primary-500)] focus:ring-[color:var(--color-primary-500)] sm:text-sm">
+                </div>
+                <div>
+                    <label for="stage" class="block text-sm font-medium text-gray-700">What stage did you reach?</label>
+                    <select id="stage" name="stage" class="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-[color:var(--color-primary-500)] focus:border-[color:var(--color-primary-500)] sm:text-sm rounded-md">
+                        <option value="double_octafinals">Double Octafinals</option>
+                        <option value="octafinals">Octafinals</option>
+                        <option value="quarterfinals">Quarterfinals</option>
+                        <option value="semifinals">Semifinals</option>
+                        <option value="finals">Finals</option>
+                    </select>
+                </div>
+            </div>
+            <div>
+                <button type="submit" class="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-[color:var(--color-primary-600)] hover:bg-[color:var(--color-primary-700)] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[color:var(--color-primary-500)]">
+                    Submit Results
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
 {% endblock %}

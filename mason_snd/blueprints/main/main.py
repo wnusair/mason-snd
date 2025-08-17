@@ -16,3 +16,7 @@ def index():
     user_id = session.get('user_id')
 
     return render_template('main/index.html', user_id=user_id)
+
+@main_bp.route('life')
+def life():
+    return render_template('main/life.html')

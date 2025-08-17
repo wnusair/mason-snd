@@ -1,0 +1,477 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Socio-Economic Conflict & Relocation Analysis</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Chosen Palette: Calm Neutrals & Subtle Accents -->
+    <!-- Application Structure Plan: The SPA is designed as a two-part narrative. The first section, "U.S. Risk Analysis," uses a dashboard layout with interactive charts to establish the core socio-economic pressures, creating a data-driven foundation for the problem. The second section, "Relocation Explorer," presents a solution-oriented view, allowing users to compare alternative countries through an interactive radar chart and detailed cards. This structure guides the user from understanding the complex domestic challenges to exploring viable international alternatives, making the report's dense information digestible and actionable. Navigation is handled by a simple, sticky header for seamless switching between these two interconnected narratives. -->
+    <!-- Visualization & Content Choices: 
+        - U.S. Wealth Distribution -> Goal: Compare -> Viz: Stacked Area Chart -> Interaction: Hover for details -> Justification: Best for showing share changes within a whole over time. -> Library: Chart.js.
+        - Productivity vs. Pay -> Goal: Compare -> Viz: Dual Line Chart -> Interaction: Hover for gap value -> Justification: Clearly illustrates the decoupling trend. -> Library: Chart.js.
+        - U.S. vs. OECD Metrics -> Goal: Compare -> Viz: Grouped Bar Chart -> Interaction: Buttons to switch metrics -> Justification: Allows direct, uncluttered comparison across multiple data points. -> Library: Chart.js.
+        - Trust in Government -> Goal: Change -> Viz: Line Chart -> Interaction: Hover for yearly data -> Justification: Effectively shows the long-term decline. -> Library: Chart.js.
+        - Conflict Scenarios -> Goal: Organize -> Viz: Tabbed Cards -> Interaction: Click to expand -> Justification: Manages text density and improves user focus. -> Library: Vanilla JS.
+        - Relocation Scorecard -> Goal: Compare -> Viz: Radar Chart -> Interaction: Checkboxes to add/remove countries -> Justification: Ideal for multi-variable comparison of different entities. -> Library: Chart.js.
+        - Country Details -> Goal: Inform -> Viz: Expandable Cards -> Interaction: Click to reveal details -> Justification: Keeps the main view clean while providing deep-dive information on demand. -> Library: Vanilla JS. -->
+    <!-- CONFIRMATION: NO SVG graphics used. NO Mermaid JS used. -->
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #F8F7F4;
+            color: #333333;
+        }
+        .chart-container {
+            position: relative;
+            width: 100%;
+            max-width: 800px;
+            margin-left: auto;
+            margin-right: auto;
+            height: 400px;
+            max-height: 50vh;
+        }
+        @media (max-width: 768px) {
+            .chart-container {
+                height: 300px;
+            }
+        }
+        .nav-link {
+            transition: all 0.3s ease;
+            border-bottom: 2px solid transparent;
+        }
+        .nav-link.active {
+            border-bottom-color: #C87E6A;
+            color: #C87E6A;
+        }
+        .nav-link:hover {
+            color: #A06556;
+        }
+        .scenario-tab.active {
+            background-color: #6A8A9B;
+            color: white;
+        }
+        .country-card {
+            transition: all 0.3s ease;
+        }
+        .country-card.active {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+        }
+    </style>
+</head>
+<body class="antialiased">
+
+    <header class="bg-white/80 backdrop-blur-md sticky top-0 z-50 shadow-sm">
+        <nav class="container mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex items-center justify-between h-16">
+                <div class="flex-shrink-0">
+                    <h1 class="text-xl font-bold text-gray-800">Socio-Economic Analysis</h1>
+                </div>
+                <div class="hidden md:block">
+                    <div class="ml-10 flex items-baseline space-x-4">
+                        <a href="#us-analysis" id="nav-us" class="nav-link active px-3 py-2 rounded-md text-sm font-medium text-gray-700">U.S. Risk Analysis</a>
+                        <a href="#relocation-explorer" id="nav-relocation" class="nav-link px-3 py-2 rounded-md text-sm font-medium text-gray-700">Relocation Explorer</a>
+                    </div>
+                </div>
+                <div class="md:hidden">
+                    <select id="mobile-nav" class="block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md">
+                        <option value="us-analysis">U.S. Risk Analysis</option>
+                        <option value="relocation-explorer">Relocation Explorer</option>
+                    </select>
+                </div>
+            </div>
+        </nav>
+    </header>
+
+    <main class="container mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        
+        <section id="us-analysis">
+            <div class="text-center mb-12">
+                <h2 class="text-3xl font-bold tracking-tight text-gray-900 sm:text-4xl">U.S. Socio-Economic Pressure Index</h2>
+                <p class="mt-4 max-w-3xl mx-auto text-lg text-gray-600">An interactive exploration of the key indicators driving social and political instability in the United States, based on four decades of data.</p>
+            </div>
+
+            <div class="space-y-16">
+                
+                <div>
+                    <h3 class="text-2xl font-semibold text-center mb-2">Pillar 1: The Widening Economic Chasm</h3>
+                    <p class="text-center text-gray-600 max-w-3xl mx-auto mb-8">This section visualizes the dramatic and sustained increase in economic inequality, a foundational stressor on the U.S. socio-political system.</p>
+                    
+                    <div class="bg-white p-6 rounded-xl shadow-lg mb-8">
+                        <h4 class="text-lg font-semibold mb-1">U.S. Wealth Distribution Over Time (1989-2024)</h4>
+                        <p class="text-sm text-gray-500 mb-4">This chart illustrates the share of total national net worth held by different segments of the population. Hover over the chart to see the precise distribution for any given year.</p>
+                        <div class="chart-container">
+                            <canvas id="wealthDistributionChart"></canvas>
+                        </div>
+                    </div>
+
+                    <div class="bg-white p-6 rounded-xl shadow-lg">
+                        <h4 class="text-lg font-semibold mb-1">The Productivity-Pay Gap (1979-2025)</h4>
+                        <p class="text-sm text-gray-500 mb-4">For decades, worker pay rose in line with productivity. This chart shows how that link has broken, with productivity gains far outpacing compensation for the typical worker.</p>
+                        <div class="chart-container">
+                            <canvas id="productivityPayChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+
+                <div>
+                    <h3 class="text-2xl font-semibold text-center mb-2">Pillar 2: The Fraying Social Safety Net</h3>
+                    <p class="text-center text-gray-600 max-w-3xl mx-auto mb-8">High costs for essential services like healthcare and childcare place immense pressure on American households. This section compares the U.S. against other developed nations.</p>
+                    <div class="bg-white p-6 rounded-xl shadow-lg">
+                        <h4 class="text-lg font-semibold mb-1">U.S. vs. OECD Average on Key Social Metrics</h4>
+                        <p class="text-sm text-gray-500 mb-4">Select a metric to see how the United States compares to the average of other large, wealthy OECD nations.</p>
+                        <div class="flex justify-center flex-wrap gap-2 mb-4">
+                            <button class="oecd-btn bg-gray-200 text-gray-800 px-4 py-2 rounded-full text-sm font-medium" data-metric="health">Health Spending</button>
+                            <button class="oecd-btn bg-gray-200 text-gray-800 px-4 py-2 rounded-full text-sm font-medium" data-metric="life">Life Expectancy</button>
+                            <button class="oecd-btn bg-gray-200 text-gray-800 px-4 py-2 rounded-full text-sm font-medium" data-metric="infant">Infant Mortality</button>
+                            <button class="oecd-btn bg-gray-200 text-gray-800 px-4 py-2 rounded-full text-sm font-medium" data-metric="leave">Paid Maternity Leave</button>
+                        </div>
+                        <div class="chart-container">
+                            <canvas id="oecdComparisonChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+
+                <div>
+                    <h3 class="text-2xl font-semibold text-center mb-2">Pillar 3: The Erosion of Political Trust</h3>
+                    <p class="text-center text-gray-600 max-w-3xl mx-auto mb-8">Collapsing trust in government and other major institutions, combined with intense polarization, creates a volatile environment where grievances can escalate into conflict.</p>
+                    <div class="bg-white p-6 rounded-xl shadow-lg mb-8">
+                        <h4 class="text-lg font-semibold mb-1">Public Trust in the Federal Government (1958-2024)</h4>
+                        <p class="text-sm text-gray-500 mb-4">This chart tracks the percentage of Americans who trust the federal government to do what is right "just about always" or "most of the time."</p>
+                        <div class="chart-container">
+                            <canvas id="trustChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+
+                <div>
+                    <h3 class="text-2xl font-semibold text-center mb-2">Geopolitical Forecast: Potential Conflict Scenarios</h3>
+                    <p class="text-center text-gray-600 max-w-3xl mx-auto mb-8">Based on the analysis, the risk of significant civil conflict is high. "Conflict" could manifest in several ways. Select a scenario below to learn more.</p>
+                    <div class="max-w-4xl mx-auto">
+                        <div class="flex flex-col md:flex-row border-b border-gray-300">
+                            <button class="scenario-tab flex-1 p-4 text-center font-semibold text-gray-700 hover:bg-gray-100 transition" data-scenario="a">Scenario A: Mass Economic Disruption</button>
+                            <button class="scenario-tab flex-1 p-4 text-center font-semibold text-gray-700 hover:bg-gray-100 transition" data-scenario="b">Scenario B: Chronic Civil Unrest</button>
+                            <button class="scenario-tab flex-1 p-4 text-center font-semibold text-gray-700 hover:bg-gray-100 transition" data-scenario="c">Scenario C: Political Disintegration</button>
+                        </div>
+                        <div class="bg-white p-6 rounded-b-lg shadow-inner">
+                            <div id="scenario-content-a" class="scenario-content"></div>
+                            <div id="scenario-content-b" class="scenario-content hidden"></div>
+                            <div id="scenario-content-c" class="scenario-content hidden"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section id="relocation-explorer" class="hidden">
+            <div class="text-center mb-12">
+                <h2 class="text-3xl font-bold tracking-tight text-gray-900 sm:text-4xl">Global Opportunity Explorer</h2>
+                <p class="mt-4 max-w-3xl mx-auto text-lg text-gray-600">For high-skilled professionals, strategic relocation can offer a path to greater stability and quality of life. This section analyzes the top destinations for an AI/ML Engineer.</p>
+            </div>
+
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                <div class="lg:col-span-2 bg-white p-6 rounded-xl shadow-lg">
+                    <h3 class="text-xl font-semibold mb-1">Relocation Scorecard Comparison</h3>
+                    <p class="text-sm text-gray-500 mb-4">This radar chart compares the top countries across three key categories. Use the checkboxes to add or remove countries from the comparison.</p>
+                    <div class="chart-container h-[450px] md:h-[500px]">
+                        <canvas id="relocationRadarChart"></canvas>
+                    </div>
+                     <div class="flex justify-center flex-wrap gap-4 mt-4">
+                        <div><input type="checkbox" id="toggle-canada" class="country-toggle" data-country="Canada" checked> <label for="toggle-canada">Canada</label></div>
+                        <div><input type="checkbox" id="toggle-germany" class="country-toggle" data-country="Germany" checked> <label for="toggle-germany">Germany</label></div>
+                        <div><input type="checkbox" id="toggle-switzerland" class="country-toggle" data-country="Switzerland" checked> <label for="toggle-switzerland">Switzerland</label></div>
+                        <div><input type="checkbox" id="toggle-netherlands" class="country-toggle" data-country="Netherlands" checked> <label for="toggle-netherlands">Netherlands</label></div>
+                    </div>
+                </div>
+
+                <div class="lg:col-span-1 space-y-4">
+                    <h3 class="text-xl font-semibold mb-1">Country Profiles</h3>
+                    <p class="text-sm text-gray-500 -mt-2">Click on a country to see a detailed breakdown of its pros and cons for an aspiring AI professional.</p>
+                    <div id="country-cards-container"></div>
+                </div>
+            </div>
+        </section>
+
+    </main>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            
+            const reportData = {
+                wealth: {
+                    labels: ['1989', '1994', '1999', '2004', '2009', '2014', '2019', '2024'],
+                    datasets: [
+                        { label: 'Bottom 50%', data: [3.5, 3.2, 2.8, 2.6, 2.3, 2.3, 2.6, 2.8], backgroundColor: '#C87E6A', borderColor: '#A06556', fill: true },
+                        { label: 'Top 1%', data: [22.8, 25.7, 27.5, 26.9, 28.1, 30.4, 30.4, 30.8], backgroundColor: '#6A8A9B', borderColor: '#4E6A7B', fill: true },
+                        { label: 'Top 0.1%', data: [9.7, 11.2, 12.3, 11.6, 12.3, 13.6, 13.5, 13.8], backgroundColor: '#8A9A5B', borderColor: '#6A7A3B', fill: true },
+                    ]
+                },
+                productivity: {
+                    labels: ['1979', '1989', '1999', '2009', '2019', '2025'],
+                    datasets: [
+                        { label: 'Net Productivity Growth Index', data: [100, 125, 155, 180, 210, 227], borderColor: '#6A8A9B', tension: 0.1, fill: false },
+                        { label: 'Typical Worker Compensation Index', data: [100, 105, 110, 112, 115, 118], borderColor: '#C87E6A', tension: 0.1, fill: false }
+                    ]
+                },
+                oecd: {
+                    health: { labels: ['U.S.', 'OECD Average'], data: [13432, 7393], title: 'Per-Capita Health Spending (USD)', unit: '$' },
+                    life: { labels: ['U.S.', 'OECD Average'], data: [76.4, 80.3], title: 'Life Expectancy at Birth (Years)', unit: ' yrs' },
+                    infant: { labels: ['U.S.', 'OECD Average'], data: [5.4, 4.0], title: 'Infant Mortality (per 1,000 births)', unit: '' },
+                    leave: { labels: ['U.S.', 'OECD Average'], data: [0, 18.5], title: 'Mandated Paid Maternity Leave (Weeks)', unit: ' wks' },
+                },
+                trust: {
+                    labels: ['1958', '1968', '1978', '1988', '1998', '2008', '2018', '2024'],
+                    datasets: [{
+                        label: '% Trust in Federal Government',
+                        data: [73, 61, 29, 40, 34, 22, 18, 22],
+                        borderColor: '#C87E6A',
+                        backgroundColor: 'rgba(200, 126, 106, 0.2)',
+                        fill: true,
+                        tension: 0.2
+                    }]
+                },
+                scenarios: {
+                    a: { title: 'Mass Non-Violent Economic Disruption', content: 'The primary axis of conflict is class-based, using economic tactics. Characterized by mass non-violent actions like a national general strike, coordinated rent strikes, and large-scale consumer boycotts to pressure elites for concessions on wages, healthcare, and union protections. Disruptive but largely non-violent, resembling early 20th-century labor conflicts.' },
+                    b: { title: 'Fragmented and Chronic Civil Unrest', content: 'An intensification of recent unrest patterns, driven by a mix of economic, racial, and political grievances. Manifests as frequent, geographically dispersed protests, riots, and clashes, often triggered by local incidents amplified by social media. Characterized by street battles between opposed groups and a general breakdown of public order, eroding public safety.' },
+                    c: { title: 'Severe Political Crisis and Insurgency', content: 'The most severe scenario, involving a fundamental crisis of state legitimacy. Could be triggered by a contested election. Characterized by a "dual power" situation where federal authority is rejected by some states, and the rise of armed non-state actors engaging in a low-level insurgency, including targeted violence against officials and infrastructure. Represents a significant step toward state failure.' }
+                },
+                relocation: {
+                    labels: ['Career & Tech', 'Quality of Life', 'Immigration'],
+                    countries: [
+                        { name: 'Canada', scores: [3.5, 4.5, 5.0], color: 'rgba(106, 138, 155, 0.7)', pros: ['Rapid immigration for tech workers', 'Universal healthcare system', 'Generous family leave', 'Growing AI sector'], cons: ['Salaries lower than top U.S. markets', 'Housing affordability challenges in major cities'] },
+                        { name: 'Germany', scores: [4.0, 4.5, 3.5], color: 'rgba(200, 126, 106, 0.7)', pros: ['World-leading industrial AI sector', 'Tuition-free higher education', 'Strong universal healthcare', 'Excellent work-life balance'], cons: ['Salaries lower than U.S./Switzerland', 'German language can be a barrier', 'Significant bureaucracy'] },
+                        { name: 'Switzerland', scores: [4.5, 4.0, 2.0], color: 'rgba(138, 154, 91, 0.7)', pros: ['Highest salaries and quality of life', 'World-class research institutions', 'Exceptional public safety'], cons: ['Extremely restrictive immigration for non-EU', 'Very high cost of living', 'Less generous family policies'] },
+                        { name: 'Netherlands', scores: [3.5, 3.5, 4.0], color: 'rgba(217, 155, 68, 0.7)', pros: ['Excellent work-life balance', 'Highly international & English-speaking', 'Clear skilled migrant visa process'], cons: ['Higher education is expensive for non-EU', 'Salaries lower than Switzerland/U.S.', 'Housing shortages'] }
+                    ]
+                }
+            };
+
+            const charts = {};
+
+            const createChart = (ctx, type, data, options) => {
+                return new Chart(ctx, { type, data, options });
+            };
+            
+            const defaultChartOptions = {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { position: 'top' },
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                let label = context.dataset.label || '';
+                                if (label) {
+                                    label += ': ';
+                                }
+                                if (context.parsed.y !== null) {
+                                    label += context.parsed.y + (context.chart.options.plugins.tooltip.unit || '');
+                                }
+                                return label;
+                            }
+                        }
+                    }
+                },
+                scales: {
+                    y: { beginAtZero: true }
+                }
+            };
+            
+            charts.wealth = createChart(document.getElementById('wealthDistributionChart').getContext('2d'), 'line', reportData.wealth, {
+                ...defaultChartOptions,
+                scales: { y: { stacked: true, title: { display: true, text: 'Share of Net Worth (%)' } } },
+                plugins: { ...defaultChartOptions.plugins, tooltip: { ...defaultChartOptions.plugins.tooltip, unit: '%' } }
+            });
+
+            charts.productivity = createChart(document.getElementById('productivityPayChart').getContext('2d'), 'line', reportData.productivity, {
+                ...defaultChartOptions,
+                scales: { y: { title: { display: true, text: 'Index (1979 = 100)' } } }
+            });
+
+            charts.trust = createChart(document.getElementById('trustChart').getContext('2d'), 'line', reportData.trust, {
+                ...defaultChartOptions,
+                scales: { y: { title: { display: true, text: 'Percentage (%)' } } },
+                plugins: { ...defaultChartOptions.plugins, tooltip: { ...defaultChartOptions.plugins.tooltip, unit: '%' } }
+            });
+
+            const oecdCtx = document.getElementById('oecdComparisonChart').getContext('2d');
+            charts.oecd = new Chart(oecdCtx, {
+                type: 'bar',
+                data: {
+                    labels: [],
+                    datasets: [{
+                        label: 'Value',
+                        data: [],
+                        backgroundColor: ['#6A8A9B', '#C87E6A'],
+                        borderColor: ['#4E6A7B', '#A06556'],
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    ...defaultChartOptions,
+                    plugins: { legend: { display: false } },
+                    scales: { y: { title: { display: true, text: '' } } }
+                }
+            });
+            
+            function updateOecdChart(metric) {
+                const metricData = reportData.oecd[metric];
+                charts.oecd.data.labels = metricData.labels;
+                charts.oecd.data.datasets[0].data = metricData.data;
+                charts.oecd.options.scales.y.title.text = metricData.title;
+                charts.oecd.options.plugins.tooltip.unit = metricData.unit;
+                charts.oecd.update();
+
+                document.querySelectorAll('.oecd-btn').forEach(b => {
+                    b.classList.remove('bg-blue-500', 'text-white');
+                    b.classList.add('bg-gray-200', 'text-gray-800');
+                });
+                const activeBtn = document.querySelector(`.oecd-btn[data-metric="${metric}"]`);
+                activeBtn.classList.add('bg-blue-500', 'text-white');
+                activeBtn.classList.remove('bg-gray-200', 'text-gray-800');
+            }
+            document.querySelectorAll('.oecd-btn').forEach(btn => {
+                btn.addEventListener('click', () => updateOecdChart(btn.dataset.metric));
+            });
+            updateOecdChart('health');
+
+            const radarCtx = document.getElementById('relocationRadarChart').getContext('2d');
+            charts.radar = new Chart(radarCtx, {
+                type: 'radar',
+                data: {
+                    labels: reportData.relocation.labels,
+                    datasets: []
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        r: {
+                            angleLines: { display: false },
+                            suggestedMin: 0,
+                            suggestedMax: 5,
+                            pointLabels: { font: { size: 14 } }
+                        }
+                    },
+                    plugins: {
+                        legend: { position: 'bottom' }
+                    }
+                }
+            });
+
+            function updateRadarChart() {
+                const selectedCountries = Array.from(document.querySelectorAll('.country-toggle:checked')).map(cb => cb.dataset.country);
+                charts.radar.data.datasets = reportData.relocation.countries
+                    .filter(c => selectedCountries.includes(c.name))
+                    .map(c => ({
+                        label: c.name,
+                        data: c.scores,
+                        backgroundColor: c.color.replace('0.7', '0.2'),
+                        borderColor: c.color,
+                        pointBackgroundColor: c.color,
+                        pointBorderColor: '#fff',
+                        pointHoverBackgroundColor: '#fff',
+                        pointHoverBorderColor: c.color
+                    }));
+                charts.radar.update();
+            }
+            document.querySelectorAll('.country-toggle').forEach(toggle => {
+                toggle.addEventListener('change', updateRadarChart);
+            });
+            updateRadarChart();
+
+
+            const scenarioTabs = document.querySelectorAll('.scenario-tab');
+            const scenarioContents = document.querySelectorAll('.scenario-content');
+            scenarioTabs.forEach(tab => {
+                const scenario = tab.dataset.scenario;
+                const data = reportData.scenarios[scenario];
+                document.getElementById(`scenario-content-${scenario}`).innerHTML = `
+                    <h5 class="font-bold text-lg mb-2">${data.title}</h5>
+                    <p class="text-gray-700">${data.content}</p>
+                `;
+                tab.addEventListener('click', () => {
+                    scenarioTabs.forEach(t => t.classList.remove('active'));
+                    tab.classList.add('active');
+                    scenarioContents.forEach(c => c.classList.add('hidden'));
+                    document.getElementById(`scenario-content-${scenario}`).classList.remove('hidden');
+                });
+            });
+            scenarioTabs[0].click();
+
+            const countryCardsContainer = document.getElementById('country-cards-container');
+            reportData.relocation.countries.forEach((country, index) => {
+                const card = document.createElement('div');
+                card.className = 'country-card bg-white rounded-xl shadow-lg overflow-hidden cursor-pointer';
+                card.innerHTML = `
+                    <div class="p-4">
+                        <h4 class="font-bold text-lg">${index + 1}. ${country.name}</h4>
+                    </div>
+                    <div class="country-details hidden bg-gray-50 p-4 border-t border-gray-200">
+                        <div class="mb-3">
+                            <h5 class="font-semibold text-sm text-green-700">Pros:</h5>
+                            <ul class="list-disc list-inside text-sm text-gray-600">${country.pros.map(p => `<li>${p}</li>`).join('')}</ul>
+                        </div>
+                        <div>
+                            <h5 class="font-semibold text-sm text-red-700">Cons:</h5>
+                            <ul class="list-disc list-inside text-sm text-gray-600">${country.cons.map(c => `<li>${c}</li>`).join('')}</ul>
+                        </div>
+                    </div>
+                `;
+                countryCardsContainer.appendChild(card);
+                card.addEventListener('click', () => {
+                    const details = card.querySelector('.country-details');
+                    const isActive = card.classList.contains('active');
+                    document.querySelectorAll('.country-card').forEach(c => {
+                        c.classList.remove('active');
+                        c.querySelector('.country-details').classList.add('hidden');
+                    });
+                    if (!isActive) {
+                        card.classList.add('active');
+                        details.classList.remove('hidden');
+                    }
+                });
+            });
+            
+            const navLinks = {
+                'us-analysis': document.getElementById('nav-us'),
+                'relocation-explorer': document.getElementById('nav-relocation')
+            };
+            const sections = {
+                'us-analysis': document.getElementById('us-analysis'),
+                'relocation-explorer': document.getElementById('relocation-explorer')
+            };
+
+            function switchView(view) {
+                Object.values(sections).forEach(s => s.classList.add('hidden'));
+                Object.values(navLinks).forEach(l => l.classList.remove('active'));
+                
+                sections[view].classList.remove('hidden');
+                navLinks[view].classList.add('active');
+                window.location.hash = view;
+            }
+
+            navLinks['us-analysis'].addEventListener('click', (e) => { e.preventDefault(); switchView('us-analysis'); });
+            navLinks['relocation-explorer'].addEventListener('click', (e) => { e.preventDefault(); switchView('relocation-explorer'); });
+            
+            document.getElementById('mobile-nav').addEventListener('change', (e) => {
+                switchView(e.target.value);
+            });
+
+            const initialView = window.location.hash.substring(1) || 'us-analysis';
+            if (sections[initialView]) {
+                switchView(initialView);
+                document.getElementById('mobile-nav').value = initialView;
+            } else {
+                switchView('us-analysis');
+            }
+        });
+    </script>
+
+</body>
+</html>

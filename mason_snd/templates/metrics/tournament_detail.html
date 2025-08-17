@@ -2,35 +2,19 @@
 {% block title %}Tournament Details{% endblock %}
 
 {% block content %}
-<h2>{{ tournament.name }}</h2>
-
-<div class="mb-3">
-    <a href="{{ url_for('metrics.download_user_metrics_for_tournament', tournament_id=tournament.id) }}" class="btn btn-success">Download User Metrics CSV</a>
+<div class="px-4 sm:px-6 lg:px-8">
+    <div class="sm:flex sm:items-center">
+        <div class="sm:flex-auto">
+            <h1 class="text-2xl font-bold text-gray-900">{{ tournament.name }}</h1>
+            <p class="mt-1 text-sm text-gray-500">Average event performance (compared to tournament points): <span class="font-medium text-gray-800">{{ event_performance_avg }}</span></p>
+        </div>
+        <div class="mt-4 sm:mt-0 sm:ml-16 sm:flex-none">
+            <a href="{{ url_for('metrics.download_user_metrics_for_tournament', tournament_id=tournament.id) }}" class="inline-flex items-center justify-center rounded-md border border-transparent bg-gray-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-gray-700">Download Metrics</a>
+        </div>
+    </div>
+    <div class="mt-8 flex flex-col">
+        <h3 class="text-lg font-medium text-gray-900">Top Performers</h3>
+        <!-- Table for top performers -->
+    </div>
 </div>
-
-<h4>Top Performers</h4>
-<table class="table table-striped">
-    <thead>
-        <tr>
-            <th>User</th>
-            <th>Total Points</th>
-            <th>Tournament Points</th>
-            <th>Weighted Points</th>
-        </tr>
-    </thead>
-    <tbody>
-        {% for performer in top_performers %}
-        <tr>
-            <td><a href="{{ url_for('metrics.user_detail', user_id=performer.user.id) }}">{{ performer.user.first_name }} {{ performer.user.last_name }}</a></td>
-            <td>{{ performer.total_points }}</td>
-            <td>{{ performer.tournament_points }}</td>
-            <td>{{ performer.weighted_points | round(2) }}</td>
-        </tr>
-        {% endfor %}
-    </tbody>
-</table>
-
-<h4>Event Performance</h4>
-<p>Average event performance (compared to tournament points): {{ event_performance_avg }}</p>
-
 {% endblock %}

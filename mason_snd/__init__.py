@@ -3,7 +3,7 @@ from flask import Flask
 from flask_migrate import Migrate
 from dotenv import load_dotenv
 
-from .extensions import db
+from .extensions import db, csrf
 from .models.auth import User, Judges
 
 load_dotenv()  # This will load variables from .env into the environment
@@ -16,6 +16,7 @@ def create_app():
     app.config['SECRET_KEY'] = os.getenv('FLASK_SECRET_KEY', 'default-secret')
 
     db.init_app(app)
+    csrf.init_app(app)
     Migrate(app, db)
 
     from mason_snd.blueprints.auth.auth import auth_bp

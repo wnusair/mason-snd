@@ -3,17 +3,36 @@
 {% block title %}Edit Event{% endblock %}
 
 {% block content %}
-<h1>Edit Event</h1>
-<form action="{{ url_for('events.edit_event', event_id=event.id) }}" method="POST">
-    <label for="event_name">Event Name:</label>
-    <input type="text" id="event_name" name="event_name" value="{{ event.event_name }}" required>
+<div class="min-h-full flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
+    <div class="max-w-md w-full space-y-8">
+        <div>
+            <h2 class="mt-6 text-center text-3xl font-extrabold text-gray-900">
+                Edit {{ event.event_name }}
+            </h2>
+        </div>
+        <form class="mt-8 space-y-6" action="{{ url_for('events.edit_event', event_id=event.id) }}" method="POST">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+            <div class="rounded-md shadow-sm space-y-4">
+                <div>
+                    <label for="event_name" class="block text-sm font-medium text-gray-700">Event Name</label>
+                    <input id="event_name" name="event_name" type="text" required value="{{ event.event_name }}" class="mt-1 appearance-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-md focus:outline-none focus:ring-[color:var(--color-primary-500)] focus:border-[color:var(--color-primary-500)] sm:text-sm">
+                </div>
+                <div>
+                    <label for="event_description" class="block text-sm font-medium text-gray-700">Event Description</label>
+                    <textarea id="event_description" name="event_description" rows="3" required class="mt-1 appearance-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-md focus:outline-none focus:ring-[color:var(--color-primary-500)] focus:border-[color:var(--color-primary-500)] sm:text-sm">{{ event.event_description }}</textarea>
+                </div>
+                <div>
+                    <label for="event_emoji" class="block text-sm font-medium text-gray-700">Event Emoji</label>
+                    <input id="event_emoji" name="event_emoji" type="text" required value="{{ event.event_emoji }}" class="mt-1 appearance-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-md focus:outline-none focus:ring-[color:var(--color-primary-500)] focus:border-[color:var(--color-primary-500)] sm:text-sm">
+                </div>
+            </div>
 
-    <label for="event_description">Event Description:</label>
-    <textarea id="event_description" name="event_description" required>{{ event.event_description }}</textarea>
-
-    <label for="event_emoji">Event Emoji:</label>
-    <input type="text" id="event_emoji" name="event_emoji" value="{{ event.event_emoji }}" required>
-
-    <button type="submit">Save Changes</button>
-</form>
+            <div>
+                <button type="submit" class="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-[color:var(--color-primary-600)] hover:bg-[color:var(--color-primary-700)] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[color:var(--color-primary-500)]">
+                    Save Changes
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
 {% endblock %}

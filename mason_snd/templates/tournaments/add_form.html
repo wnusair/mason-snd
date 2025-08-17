@@ -2,55 +2,77 @@
 {% block title %}Add Form Fields{% endblock %}
 
 {% block content %}
-<h2>Add Form Fields</h2>
-<form method="POST">
-    <label for="tournament_id">Tournament:</label>
-    <select name="tournament_id" id="tournament_id" required>
-        {% for tournament in tournaments %}
-        <option value="{{ tournament.id }}">{{ tournament.name }}</option>
-        {% endfor %}
-    </select>
-
-    <div id="fields">
-        <div class="field-row">
-            <input type="text" name="label" placeholder="Field Label" required>
-            <select name="type" required>
-                <option value="text">Text</option>
-                <option value="radio">Radio</option>
-                <option value="dropdown">Dropdown</option>
-                <option value="checkbox">Checkbox</option>
-            </select>
-            <input type="text" name="options" placeholder="Options (comma-separated)">
-            <label>
-                Required:
-                <input type="checkbox" name="required">
-            </label>
+<div class="min-h-full flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
+    <div class="max-w-xl w-full space-y-8">
+        <div>
+            <h2 class="mt-6 text-center text-3xl font-extrabold text-gray-900">
+                Add Custom Form Fields
+            </h2>
         </div>
+        <form method="POST">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+            <div class="rounded-md shadow-sm bg-white p-6 space-y-4">
+                 <div>
+                    <label for="tournament_id" class="block text-sm font-medium text-gray-700">Tournament</label>
+                    <select name="tournament_id" id="tournament_id" required class="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-[color:var(--color-primary-500)] focus:border-[color:var(--color-primary-500)] sm:text-sm rounded-md">
+                        {% for tournament in tournaments %}
+                        <option value="{{ tournament.id }}">{{ tournament.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div id="fields-container" class="space-y-4 border-t border-gray-200 pt-4">
+                    <!-- Fields will be added here by JS -->
+                </div>
+            </div>
+            <div class="mt-4 flex items-center justify-between">
+                <button type="button" onclick="addField()" class="inline-flex items-center justify-center rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50">
+                    Add Field
+                </button>
+                <button type="submit" class="group relative flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-[color:var(--color-primary-600)] hover:bg-[color:var(--color-primary-700)]">
+                    Save Form
+                </button>
+            </div>
+        </form>
     </div>
-    <button type="button" onclick="addField()">Add Another Field</button>
-    <button type="submit">Save Form</button>
-</form>
+</div>
 
 <script>
 function addField() {
-    var container = document.getElementById("fields");
-    var fieldRow = document.createElement("div");
-    fieldRow.className = "field-row";
+    const container = document.getElementById("fields-container");
+    const fieldRow = document.createElement("div");
+    fieldRow.className = "p-4 border border-gray-200 rounded-md space-y-3";
     fieldRow.innerHTML = `
-        <input type="text" name="label" placeholder="Field Label" required>
-        <select name="type" required>
-            <option value="text">Text</option>
-            <option value="radio">Radio</option>
-            <option value="dropdown">Dropdown</option>
-            <option value="checkbox">Checkbox</option>
-        </select>
-        <input type="text" name="options" placeholder="Options (comma-separated)">
-        <label>
-            Required:
-            <input type="checkbox" name="required">
-        </label>
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+                <label class="block text-sm font-medium text-gray-700">Field Label</label>
+                <input type="text" name="label" placeholder="e.g., T-Shirt Size" required class="mt-1 w-full rounded-md border-gray-300 shadow-sm sm:text-sm">
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700">Field Type</label>
+                <select name="type" required class="mt-1 w-full rounded-md border-gray-300 shadow-sm sm:text-sm">
+                    <option value="text">Text</option>
+                    <option value="radio">Radio</option>
+                    <option value="dropdown">Dropdown</option>
+                    <option value="checkbox">Checkbox</option>
+                </select>
+            </div>
+        </div>
+        <div>
+            <label class="block text-sm font-medium text-gray-700">Options (comma-separated)</label>
+            <input type="text" name="options" placeholder="e.g., Small, Medium, Large" class="mt-1 w-full rounded-md border-gray-300 shadow-sm sm:text-sm">
+        </div>
+        <div class="flex items-start">
+            <div class="flex h-5 items-center">
+                <input name="required" type="checkbox" class="h-4 w-4 rounded border-gray-300 text-[color:var(--color-primary-600)] focus:ring-[color:var(--color-primary-500)]">
+            </div>
+            <div class="ml-3 text-sm">
+                <label class="font-medium text-gray-700">Required</label>
+            </div>
+        </div>
     `;
     container.appendChild(fieldRow);
 }
+// Add the first field by default
+document.addEventListener('DOMContentLoaded', addField);
 </script>
 {% endblock %}

@@ -1,36 +1,46 @@
-{% extends "admin/index.html" %}
-{% block content %}
-<h2>Search for a User</h2>
-<form method="POST" class="mb-3">
-    <input type="text" name="name" placeholder="Enter name (first last)" value="{{ query }}" class="form-control" required>
-    <button type="submit" class="btn btn-primary mt-2">Search</button>
-</form>
+{% extends "admin/base.html" %}
+{% block title %}User Search{% endblock %}
 
-{% if results %}
-<h4>Closest Matches:</h4>
-<table class="table table-striped">
-    <thead>
-        <tr>
-            <th>User ID</th>
-            <th>Name</th>
-            <th>Select</th>
-        </tr>
-    </thead>
-    <tbody>
-        {% for user, name in results %}
-        <tr>
-            <td>{{ user.id }}</td>
-            <td>{{ user.first_name }} {{ user.last_name }}</td>
-            <td>
-                <form method="GET" action="{{ url_for('admin.user_detail', user_id=user.id) }}">
-                    <button type="submit" class="btn btn-success btn-sm">Select</button>
-                </form>
-            </td>
-        </tr>
-        {% endfor %}
-    </tbody>
-</table>
-{% elif query %}
-<p>No matches found.</p>
-{% endif %}
+{% block content %}
+<div class="px-4 sm:px-6 lg:px-8">
+    <div class="max-w-2xl mx-auto">
+        <h2 class="text-center text-3xl font-extrabold text-gray-900">Search for a User</h2>
+        <form method="POST" class="mt-8 sm:flex">
+             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+            <label for="name" class="sr-only">User name</label>
+            <input type="text" name="name" id="name" value="{{ query }}" class="w-full rounded-md border-gray-300 shadow-sm focus:border-[color:var(--color-primary-500)] focus:ring-[color:var(--color-primary-500)] sm:text-sm" placeholder="Enter name (first last)" required>
+            <button type="submit" class="mt-3 sm:mt-0 sm:ml-3 w-full sm:w-auto inline-flex items-center justify-center rounded-md border border-transparent bg-[color:var(--color-primary-600)] px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-[color:var(--color-primary-700)]">Search</button>
+        </form>
+
+        {% if results %}
+        <div class="mt-10">
+            <h3 class="text-lg font-medium text-gray-900">Closest Matches:</h3>
+            <div class="mt-4 overflow-hidden shadow ring-1 ring-black ring-opacity-5 md:rounded-lg">
+                <table class="min-w-full divide-y divide-gray-300">
+                    <thead class="bg-gray-50">
+                        <tr>
+                            <th scope="col" class="py-3.5 pl-4 pr-3 text-left text-sm font-semibold text-gray-900 sm:pl-6">Name</th>
+                            <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">User ID</th>
+                            <th scope="col" class="relative py-3.5 pl-3 pr-4 sm:pr-6"><span class="sr-only">Select</span></th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-gray-200 bg-white">
+                        {% for user, name in results %}
+                        <tr>
+                            <td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-6 capitalize">{{ user.first_name }} {{ user.last_name }}</td>
+                            <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500">{{ user.id }}</td>
+                            <td class="relative whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium sm:pr-6">
+                                <a href="{{ url_for('admin.user_detail', user_id=user.id) }}" class="text-[color:var(--color-primary-600)] hover:text-[color:var(--color-primary-700)]">Select</a>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        {% elif query %}
+        <p class="mt-6 text-center text-sm text-gray-500">No matches found for "{{ query }}".</p>
+        {% endif %}
+    </div>
+</div>
 {% endblock %}

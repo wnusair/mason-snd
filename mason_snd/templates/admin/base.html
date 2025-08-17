@@ -3,22 +3,11 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Home - {% block title %}{% endblock %}</title>
+    <title>Admin - {% block title %}{% endblock %}</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js" defer></script>
     <link rel="stylesheet" href="https://rsms.me/inter/inter.css">
     <style>
-        /* --- Standardized Theme Colors --- */
-        :root {
-            --color-primary-50: #eef2ff;
-            --color-primary-100: #e0e7ff;
-            --color-primary-500: #6366f1;
-            --color-primary-600: #4f46e5;
-            --color-primary-700: #4338ca;
-        }
-        /* --- End Theme Colors --- */
-
         body {
             font-family: 'Inter', sans-serif;
         }
@@ -33,6 +22,7 @@
 </head>
 <body class="h-full">
     {% include 'partials/navbar.html' %}
+
 
     <main class="py-10">
         <div class="max-w-7xl mx-auto sm:px-6 lg:px-8">
@@ -53,6 +43,5 @@
         </div>
     </main>
 
-    <!-- Alpine.js handles dropdowns; no extra JS needed here -->
 </body>
 </html>

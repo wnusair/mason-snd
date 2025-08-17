@@ -1,103 +1,81 @@
-
 {% extends "tournaments/base.html" %}
 {% block title %}Tournament Signup{% endblock %}
 
 {% block content %}
-<h2>Tournament Signup</h2>
-<table class="table table-striped">
-    <thead>
-        <tr>
-            <th>Name</th>
-            <th>Date</th>
-            <th>Location</th>
-            <th>Signup Deadline</th>
-            <th>Signup</th>
-        </tr>
-    </thead>
-    <tbody>
-        {% for tournament in tournaments %}
-        <tr>
-            <td>{{ tournament.name }}</td>
-            <td>{{ tournament.date.strftime('%B %d, %Y %I:%M %p') if tournament.date else '' }}</td>
-            <td>{{ tournament.address }}</td>
-            <td>{{ tournament.signup_deadline.strftime('%B %d, %Y %I:%M %p') if tournament.signup_deadline else '' }}
-                {% if tournament.signup_deadline and tournament.signup_deadline < now %}<span class="text-danger"> (Closed)</span>{% endif %}
-            </td>
-            <td>
-                {% if tournament.signup_deadline and tournament.signup_deadline < now %}
-                    <button class="btn btn-secondary" disabled>Signup Closed</button>
-                {% elif tournament.form_fields and tournament.form_fields|length > 0 %}
-                    <form method="GET" style="display:inline;">
-                        <input type="hidden" name="tournament_id" value="{{ tournament.id }}">
-                        <button type="submit" class="btn btn-primary">Signup</button>
-                    </form>
-                {% else %}
-                    <button class="btn btn-secondary" disabled>No Signup Form</button>
-                {% endif %}
-            </td>
-        </tr>
-        {% endfor %}
-    </tbody>
-</table>
-
-{% if selected_tournament %}
-<h3>Signup for {{ selected_tournament.name }}</h3>
-<form method="POST">
-    <input type="hidden" name="tournament_id" value="{{ selected_tournament.id }}">
-    {% for field in fields %}
-    <div class="form-group">
-        <label>{{ field.label }} {% if field.required %}*{% endif %}</label>
-        {% if field.type == 'text' %}
-            <input type="text" name="field_{{ field.id }}" {% if field.required %}required{% endif %}>
-        {% elif field.type == 'radio' %}
-            {% if field.options %}
-                {% for opt in field.options.split(',') %}
-                <label>
-                    <input type="radio" name="field_{{ field.id }}" value="{{ opt.strip() }}" {% if loop.first and field.required %}required{% endif %}>
-                    {{ opt.strip() }}
-                </label>
-                {% endfor %}
-            {% else %}
-                <p class="error">No options available for this field.</p>
-            {% endif %}
-        {% elif field.type == 'dropdown' %}
-            {% if field.options %}
-                <select name="field_{{ field.id }}" {% if field.required %}required{% endif %}>
-                    {% for opt in field.options.split(',') %}
-                    <option value="{{ opt.strip() }}">{{ opt.strip() }}</option>
-                    {% endfor %}
-                </select>
-            {% else %}
-                <p class="error">No options available for this field.</p>
-            {% endif %}
-        {% elif field.type == 'checkbox' %}
-            {% if field.options %}
-                {% for opt in field.options.split(',') %}
-                <label>
-                    <input type="checkbox" name="field_{{ field.id }}" value="{{ opt.strip() }}">
-                    {{ opt.strip() }}
-                </label>
-                {% endfor %}
-            {% else %}
-                <p class="error">No options available for this field.</p>
-            {% endif %}
-        {% endif %}
+<div class="px-4 sm:px-6 lg:px-8">
+    <div class="sm:flex sm:items-center">
+        <div class="sm:flex-auto">
+            <h1 class="text-xl font-semibold text-gray-900">Tournament Signup</h1>
+            <p class="mt-2 text-sm text-gray-700">Sign up for an upcoming tournament.</p>
+        </div>
     </div>
-    {% endfor %}
-    {% if user_events and user_events|length > 0 %}
-    <hr>
-    <div class="form-group">
-        <label><strong>Select the events you are signing up for:</strong></label><br>
-        {% for event in user_events %}
-            <label>
-                <input type="checkbox" name="user_event" value="{{ event.id }}">
-                {{ event.event_name }}
-                {% if event.event_emoji %} {{ event.event_emoji }}{% endif %}
-            </label><br>
-        {% endfor %}
+    <div class="mt-8 flex flex-col">
+        <!-- Tournaments Table -->
+    </div>
+
+    {% if selected_tournament %}
+    <div class="mt-10">
+        <div class="max-w-xl mx-auto">
+            <h3 class="text-2xl font-bold text-center text-gray-900">Signup for {{ selected_tournament.name }}</h3>
+            <form class="mt-8 space-y-6" method="POST">
+                <input type="hidden" name="tournament_id" value="{{ selected_tournament.id }}">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                <div class="rounded-md shadow-sm bg-white p-6 space-y-5">
+                    {% for field in fields %}
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">{{ field.label }} {% if field.required %}*{% endif %}</label>
+                        <div class="mt-1">
+                        {% if field.type == 'text' %}
+                            <input type="text" name="field_{{ field.id }}" {% if field.required %}required{% endif %} class="w-full rounded-md border-gray-300 shadow-sm focus:border-[color:var(--color-primary-500)] focus:ring-[color:var(--color-primary-500)] sm:text-sm">
+                        {% elif field.type == 'radio' %}
+                            <fieldset class="mt-2">
+                                <legend class="sr-only">{{ field.label }}</legend>
+                                <div class="space-y-2">
+                                {% for opt in field.options.split(',') %}
+                                    <div class="flex items-center">
+                                        <input id="field_{{ field.id }}_{{ loop.index }}" name="field_{{ field.id }}" type="radio" value="{{ opt.strip() }}" class="h-4 w-4 border-gray-300 text-[color:var(--color-primary-600)] focus:ring-[color:var(--color-primary-500)]">
+                                        <label for="field_{{ field.id }}_{{ loop.index }}" class="ml-3 block text-sm font-medium text-gray-700">{{ opt.strip() }}</label>
+                                    </div>
+                                {% endfor %}
+                                </div>
+                            </fieldset>
+                        {% elif field.type == 'dropdown' %}
+                             <select name="field_{{ field.id }}" {% if field.required %}required{% endif %} class="w-full rounded-md border-gray-300 shadow-sm focus:border-[color:var(--color-primary-500)] focus:ring-[color:var(--color-primary-500)] sm:text-sm">
+                                {% for opt in field.options.split(',') %}<option value="{{ opt.strip() }}">{{ opt.strip() }}</option>{% endfor %}
+                            </select>
+                        {% endif %}
+                        </div>
+                    </div>
+                    {% endfor %}
+
+                    {% if user_events and user_events|length > 0 %}
+                    <div class="border-t border-gray-200 pt-5">
+                        <label class="text-base font-medium text-gray-900">Select your event(s)</label>
+                        <fieldset class="mt-4">
+                            <div class="space-y-4">
+                            {% for event in user_events %}
+                                <div class="flex items-start">
+                                    <div class="flex h-5 items-center">
+                                        <input id="event_{{ event.id }}" name="user_event" type="checkbox" value="{{ event.id }}" class="h-4 w-4 rounded border-gray-300 text-[color:var(--color-primary-600)] focus:ring-[color:var(--color-primary-500)]">
+                                    </div>
+                                    <div class="ml-3 text-sm">
+                                        <label for="event_{{ event.id }}" class="font-medium text-gray-700">{{ event.event_name }} {{ event.event_emoji }}</label>
+                                    </div>
+                                </div>
+                            {% endfor %}
+                            </div>
+                        </fieldset>
+                    </div>
+                    {% endif %}
+                </div>
+                <div>
+                    <button type="submit" class="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-[color:var(--color-primary-600)] hover:bg-[color:var(--color-primary-700)] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[color:var(--color-primary-500)]">
+                        Submit Signup
+                    </button>
+                </div>
+            </form>
+        </div>
     </div>
     {% endif %}
-    <button type="submit">Submit Responses</button>
-</form>
-{% endif %}
+</div>
 {% endblock %}

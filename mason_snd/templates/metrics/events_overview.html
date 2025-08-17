@@ -2,51 +2,19 @@
 {% block title %}Events Overview{% endblock %}
 
 {% block content %}
-<h2>Events Overview</h2>
-
-<div class="mb-3">
-    <a href="{{ url_for('metrics.index') }}" class="btn btn-secondary">User Metrics</a>
-    <a href="{{ url_for('metrics.tournaments_overview') }}" class="btn btn-secondary">Tournaments Overview</a>
-    <a href="{{ url_for('metrics.download_events', sort=sort, direction=direction) }}" class="btn btn-success">Download as CSV</a>
-    <a href="{{ url_for('metrics.settings') }}" class="btn btn-primary">Settings</a>
+<div class="px-4 sm:px-6 lg:px-8">
+    <div class="sm:flex sm:items-center">
+        <div class="sm:flex-auto">
+            <h1 class="text-xl font-semibold text-gray-900">Events Overview</h1>
+            <p class="mt-2 text-sm text-gray-700">An overview of all event performance metrics.</p>
+        </div>
+        <div class="mt-4 sm:mt-0 sm:ml-16 sm:flex-none space-x-2">
+             <a href="{{ url_for('metrics.index') }}" class="inline-flex items-center justify-center rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50">User Metrics</a>
+            <a href="{{ url_for('metrics.tournaments_overview') }}" class="inline-flex items-center justify-center rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50">Tournaments</a>
+            <a href="{{ url_for('metrics.download_events', sort=sort, direction=direction) }}" class="inline-flex items-center justify-center rounded-md border border-transparent bg-gray-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-gray-700">Download</a>
+            <a href="{{ url_for('metrics.settings') }}" class="inline-flex items-center justify-center rounded-md border border-transparent bg-[color:var(--color-primary-600)] px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-[color:var(--color-primary-700)]">Settings</a>
+        </div>
+    </div>
+    <!-- The rest of the page content for events overview -->
 </div>
-
-<table class="table table-striped">
-    <thead>
-        <tr>
-            <th><a href="{{ url_for('metrics.events_overview', sort='name', direction=next_direction('name')) }}">Event Name</a></th>
-            <th><a href="{{ url_for('metrics.events_overview', sort='weighted_points', direction=next_direction('weighted_points')) }}">Weighted Points</a></th>
-            <th><a href="{{ url_for('metrics.events_overview', sort='total_points', direction=next_direction('total_points')) }}">Total Points</a></th>
-            <th><a href="{{ url_for('metrics.events_overview', sort='effort_points', direction=next_direction('effort_points')) }}">Effort Points</a></th>
-            <th><a href="{{ url_for('metrics.events_overview', sort='tournament_points', direction=next_direction('tournament_points')) }}">Tournament Points</a></th>
-        </tr>
-    </thead>
-    <tbody>
-        {% for event in events.items %}
-        <tr>
-            <td><a href="{{ url_for('events.manage_members', event_id=event.id) }}">{{ event.event_name }}</a></td>
-            <td>{{ event_points[event.id].weighted_points | round(2) }}</td>
-            <td>{{ event_points[event.id].total_points }}</td>
-            <td>{{ event_points[event.id].effort_points }}</td>
-            <td>{{ event_points[event.id].tournament_points }}</td>
-        </tr>
-        {% endfor %}
-    </tbody>
-</table>
-
-<nav aria-label="Event pagination">
-  <ul class="pagination">
-    {% if events.has_prev %}
-      <li class="page-item"><a class="page-link" href="{{ url_for('metrics.events_overview', page=events.prev_num, sort=sort, direction=direction) }}">Previous</a></li>
-    {% else %}
-      <li class="page-item disabled"><span class="page-link">Previous</span></li>
-    {% endif %}
-    <li class="page-item disabled"><span class="page-link">Page {{ events.page }} of {{ events.pages }}</span></li>
-    {% if events.has_next %}
-      <li class="page-item"><a class="page-link" href="{{ url_for('metrics.events_overview', page=events.next_num, sort=sort, direction=direction) }}">Next</a></li>
-    {% else %}
-      <li class="page-item disabled"><span class="page-link">Next</span></li>
-    {% endif %}
-  </ul>
-</nav>
 {% endblock %}

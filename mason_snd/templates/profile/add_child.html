@@ -3,34 +3,42 @@
 {% block title %}Add Child{% endblock %}
 
 {% block content %}
-{% for message in get_flashed_messages() %}
-<div class="alert alert-info" role="alert">
-    {{ message }}
+<div class="min-h-full flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
+    <div class="max-w-md w-full space-y-8">
+        <div>
+            <h2 class="mt-6 text-center text-3xl font-extrabold text-gray-900">
+                Add a Child
+            </h2>
+             <p class="mt-2 text-center text-sm text-gray-600">
+                Enter the details of the child you wish to link to your account.
+            </p>
+        </div>
+        <form class="mt-8 space-y-6" method="POST">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+            <div class="rounded-md shadow-sm bg-white p-6 space-y-4">
+                <div>
+                    <label for="child_first_name" class="block text-sm font-medium text-gray-700">First Name</label>
+                    <input type="text" name="child_first_name" id="child_first_name" required placeholder="First Name" class="mt-1 w-full rounded-md border-gray-300 shadow-sm focus:border-[color:var(--color-primary-500)] focus:ring-[color:var(--color-primary-500)] sm:text-sm">
+                </div>
+                 <div>
+                    <label for="child_last_name" class="block text-sm font-medium text-gray-700">Last Name</label>
+                    <input type="text" name="child_last_name" id="child_last_name" required placeholder="Last Name" class="mt-1 w-full rounded-md border-gray-300 shadow-sm focus:border-[color:var(--color-primary-500)] focus:ring-[color:var(--color-primary-500)] sm:text-sm">
+                </div>
+                <div>
+                    <label for="child_email" class="block text-sm font-medium text-gray-700">Email</label>
+                    <input type="email" name="child_email" id="child_email" placeholder="example@gmail.com" class="mt-1 w-full rounded-md border-gray-300 shadow-sm focus:border-[color:var(--color-primary-500)] focus:ring-[color:var(--color-primary-500)] sm:text-sm">
+                </div>
+                <div>
+                    <label for="child_phone" class="block text-sm font-medium text-gray-700">Phone</label>
+                    <input type="tel" name="child_phone" id="child_phone" placeholder="(xxx) xxx-xxxx" class="mt-1 w-full rounded-md border-gray-300 shadow-sm focus:border-[color:var(--color-primary-500)] focus:ring-[color:var(--color-primary-500)] sm:text-sm">
+                </div>
+            </div>
+            <div>
+                <button type="submit" class="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-[color:var(--color-primary-600)] hover:bg-[color:var(--color-primary-700)] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[color:var(--color-primary-500)]">
+                    Add Child
+                </button>
+            </div>
+        </form>
+    </div>
 </div>
-{% endfor %}
-
-<form method="post">
-    <label for="child_first_name">Child First Name</label>
-    <input type="text" name="child_first_name" placeholder="First Name">
-
-    <br>
-
-    <label for="child_last_name">Child Last Name</label>
-    <input type="text" name="child_last_name" placeholder="Last Name">
-
-    <br>
-
-    <label for="child_email">Child Email</label>
-    <input type="email" name="child_email" placeholder="example@gmail.com">
-
-    <br>
-
-    <label for="child_phone">Child Phone</label>
-    <input type="tel" name="child_phone" placeholder="(xxx) xxx-xxxx">
- 
-    <br>
-
-    <button type="submit">Add Child</button>
-</form>
-
 {% endblock %}

@@ -2,114 +2,82 @@
 {% block title %}User Metrics Overview{% endblock %}
 
 {% block content %}
-
 {% macro next_direction(column) -%}
   {%- if sort == column -%}
-    {%- if direction == 'asc' -%}
-      desc
-    {%- elif direction == 'desc' -%}
-      default
-    {%- else -%}
-      asc
-    {%- endif -%}
-  {%- else -%}
-    asc
-  {%- endif -%}
+    {%- if direction == 'asc' -%}desc{%- elif direction == 'desc' -%}default{%- else -%}asc{%- endif -%}
+  {%- else -%}asc{%- endif -%}
 {%- endmacro %}
 
-<h2>User Metrics Overview</h2>
-
-<div class="mb-3">
-  <a href="{{ url_for('metrics.tournaments_overview') }}" class="btn btn-secondary">Tournaments Overview</a>
-  <a href="{{ url_for('metrics.events_overview') }}" class="btn btn-secondary">Events Overview</a>
-  <a href="{{ url_for('metrics.download_user_metrics', sort=sort, direction=direction) }}" class="btn btn-success">Download as CSV</a>
-  <a href="{{ url_for('metrics.settings') }}" class="btn btn-primary">Settings</a>
+<div class="px-4 sm:px-6 lg:px-8">
+    <div class="sm:flex sm:items-center">
+        <div class="sm:flex-auto">
+            <h1 class="text-xl font-semibold text-gray-900">User Metrics</h1>
+            <p class="mt-2 text-sm text-gray-700">An overview of all user performance metrics.</p>
+        </div>
+        <div class="mt-4 sm:mt-0 sm:ml-16 sm:flex-none space-x-2">
+            <a href="{{ url_for('metrics.tournaments_overview') }}" class="inline-flex items-center justify-center rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50">Tournaments</a>
+            <a href="{{ url_for('metrics.events_overview') }}" class="inline-flex items-center justify-center rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50">Events</a>
+            <a href="{{ url_for('metrics.download_user_metrics', sort=sort, direction=direction) }}" class="inline-flex items-center justify-center rounded-md border border-transparent bg-gray-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-gray-700">Download</a>
+            <a href="{{ url_for('metrics.settings') }}" class="inline-flex items-center justify-center rounded-md border border-transparent bg-[color:var(--color-primary-600)] px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-[color:var(--color-primary-700)]">Settings</a>
+        </div>
+    </div>
+    <div class="mt-8 flex flex-col">
+        <div class="-my-2 -mx-4 overflow-x-auto sm:-mx-6 lg:-mx-8">
+            <div class="inline-block min-w-full py-2 align-middle md:px-6 lg:px-8">
+                <div class="overflow-hidden shadow ring-1 ring-black ring-opacity-5 md:rounded-lg">
+                    <table class="min-w-full divide-y divide-gray-300">
+                        <thead class="bg-gray-50">
+                            <tr>
+                                {% set columns = [
+                                    ('name', 'Name'), ('bids', 'Bids'), ('tournament_points', 'Tournament Pts'),
+                                    ('effort_points', 'Effort Pts'), ('total_points', 'Total Pts'), ('weighted_points', 'Weighted Pts')
+                                ] %}
+                                {% for col_key, col_name in columns %}
+                                <th scope="col" class="py-3.5 pl-4 pr-3 text-left text-sm font-semibold text-gray-900 sm:pl-6">
+                                    <a href="{{ url_for('metrics.index', sort=col_key, direction=next_direction(col_key), page=users.page) }}" class="group inline-flex">
+                                        {{ col_name }}
+                                        {% if sort == col_key %}<span class="ml-2 flex-none rounded bg-gray-200 text-gray-900 group-hover:bg-gray-300">{% if direction == 'asc' %}▲{% else %}▼{% endif %}</span>{% endif %}
+                                    </a>
+                                </th>
+                                {% endfor %}
+                                <th scope="col" class="relative py-3.5 pl-3 pr-4 sm:pr-6"><span class="sr-only">View</span></th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-gray-200 bg-white">
+                            {% for user in users.items %}
+                            <tr>
+                                <td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-6">{{ user.first_name }} {{ user.last_name }}</td>
+                                <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500">{{ user.bids or 0 }}</td>
+                                <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500">{{ user.tournament_points or 0 }}</td>
+                                <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500">{{ user.effort_points or 0 }}</td>
+                                <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500">{{ (user.tournament_points or 0) + (user.effort_points or 0) }}</td>
+                                <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500">{{ ((user.tournament_points or 0) * settings.tournament_weight + (user.effort_points or 0) * settings.effort_weight) | round(2) }}</td>
+                                <td class="relative whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium sm:pr-6">
+                                    <a href="{{ url_for('metrics.user_detail', user_id=user.id) }}" class="text-[color:var(--color-primary-600)] hover:text-[color:var(--color-primary-700)]">View Details</a>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                 <!-- Pagination -->
+                <nav class="bg-white px-4 py-3 flex items-center justify-between border-t border-gray-200 sm:px-6 mt-4 rounded-md" aria-label="Pagination">
+                    <div class="hidden sm:block">
+                        <p class="text-sm text-gray-700">
+                            Showing page <span class="font-medium">{{ users.page }}</span> of <span class="font-medium">{{ users.pages }}</span>
+                        </p>
+                    </div>
+                    <div class="flex-1 flex justify-between sm:justify-end">
+                        {% if users.has_prev %}
+                        <a href="{{ url_for('metrics.index', page=users.prev_num, sort=sort, direction=direction) }}" class="relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50">Previous</a>
+                        {% endif %}
+                        {% if users.has_next %}
+                        <a href="{{ url_for('metrics.index', page=users.next_num, sort=sort, direction=direction) }}" class="ml-3 relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50">Next</a>
+                        {% endif %}
+                    </div>
+                </nav>
+            </div>
+        </div>
+    </div>
 </div>
-
-<table class="table table-striped">
-    <thead>
-        <tr>
-            <th>
-              <a href="{{ url_for('metrics.index', sort='name', direction=next_direction('name'), page=users.page) }}">
-                Name
-                {% if sort == 'name' %}
-                  {% if direction == 'asc' %}▲{% elif direction == 'desc' %}▼{% endif %}
-                {% endif %}
-              </a>
-            </th>
-            <th>
-              <a href="{{ url_for('metrics.index', sort='bids', direction=next_direction('bids'), page=users.page) }}">
-                Bids
-                {% if sort == 'bids' %}
-                  {% if direction == 'asc' %}▲{% elif direction == 'desc' %}▼{% endif %}
-                {% endif %}
-              </a>
-            </th>
-            <th>
-              <a href="{{ url_for('metrics.index', sort='tournament_points', direction=next_direction('tournament_points'), page=users.page) }}">
-                Points (Tournaments)
-                {% if sort == 'tournament_points' %}
-                  {% if direction == 'asc' %}▲{% elif direction == 'desc' %}▼{% endif %}
-                {% endif %}
-              </a>
-            </th>
-            <th>
-              <a href="{{ url_for('metrics.index', sort='effort_points', direction=next_direction('effort_points'), page=users.page) }}">
-                Points (Effort)
-                {% if sort == 'effort_points' %}
-                  {% if direction == 'asc' %}▲{% elif direction == 'desc' %}▼{% endif %}
-                {% endif %}
-              </a>
-            </th>
-            <th>
-              <a href="{{ url_for('metrics.index', sort='total_points', direction=next_direction('total_points'), page=users.page) }}">
-                Total Points
-                {% if sort == 'total_points' %}
-                  {% if direction == 'asc' %}▲{% elif direction == 'desc' %}▼{% endif %}
-                {% endif %}
-              </a>
-            </th>
-            <th>
-              <a href="{{ url_for('metrics.index', sort='weighted_points', direction=next_direction('weighted_points'), page=users.page) }}">
-                Weighted Points
-                {% if sort == 'weighted_points' %}
-                  {% if direction == 'asc' %}▲{% elif direction == 'desc' %}▼{% endif %}
-                {% endif %}
-              </a>
-            </th>
-            <th>Actions</th>
-        </tr>
-    </thead>
-    <tbody>
-        {% for user in users.items %}
-        <tr>
-            <td>{{ user.first_name }} {{ user.last_name }}</td>
-            <td>{{ user.bids or 0 }}</td>
-            <td>{{ user.tournament_points or 0 }}</td>
-            <td>{{ user.effort_points or 0 }}</td>
-            <td>{{ (user.tournament_points or 0) + (user.effort_points or 0) }}</td>
-            <td>{{ ((user.tournament_points or 0) * 0.7 + (user.effort_points or 0) * 0.3) | round(2) }}</td>
-            <td><a href="{{ url_for('metrics.user_detail', user_id=user.id) }}" class="btn btn-sm btn-info">View Details</a></td>
-        </tr>
-        {% endfor %}
-    </tbody>
-</table>
-
-
-<nav aria-label="User pagination">
-  <ul class="pagination">
-    {% if users.has_prev %}
-      <li class="page-item"><a class="page-link" href="{{ url_for('metrics.index', page=users.prev_num, sort=sort, direction=direction) }}">Previous</a></li>
-    {% else %}
-      <li class="page-item disabled"><span class="page-link">Previous</span></li>
-    {% endif %}
-    <li class="page-item disabled"><span class="page-link">Page {{ users.page }} of {{ users.pages }}</span></li>
-    {% if users.has_next %}
-      <li class="page-item"><a class="page-link" href="{{ url_for('metrics.index', page=users.next_num, sort=sort, direction=direction) }}">Next</a></li>
-    {% else %}
-      <li class="page-item disabled"><span class="page-link">Next</span></li>
-    {% endif %}
-  </ul>
-</nav>
-
 {% endblock %}

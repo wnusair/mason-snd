@@ -1,67 +1,99 @@
 {% extends "profile/base.html" %}
 
-{% block title %}Home{% endblock %}
+{% block title %}My Profile{% endblock %}
 
 {% block content %}
-
-<h1>{{ user.first_name + ' ' + user.last_name }} - {{ user.id }}</h1>
-
-<br>
-
-<p>{{ user.email }}</p>
-<p>Points: {{ user.points }}</p>
-<br>
-{% if user.is_parent %}
-    <div>
-        is parent
-        <p>{{ user.child_first_name }} {{ user.child_last_name }}</p>
-    </div>
-    <br>
-    <br>
-    <br>
-
-    <div>
-        {% for user_requirement in user_requirements %}
-            <h3>{{ requirements[user_requirement.requirement_id].body }}</h3>
-        {% endfor %}
+<div class="px-4 sm:px-6 lg:px-8">
+    <!-- Header -->
+    <div class="sm:flex sm:items-center">
+        <div class="sm:flex-auto">
+            <h1 class="text-2xl font-bold text-gray-900 capitalize">{{ user.first_name }} {{ user.last_name }}</h1>
+            <p class="mt-1 text-sm text-gray-500">{{ user.email }}</p>
+        </div>
+        <div class="mt-4 sm:mt-0 sm:ml-16 sm:flex-none space-x-2">
+            <a href="{{ url_for('profile.update') }}" class="inline-flex items-center justify-center rounded-md border border-transparent bg-[color:var(--color-primary-600)] px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-[color:var(--color-primary-700)] focus:outline-none focus:ring-2 focus:ring-[color:var(--color-primary-500)] focus:ring-offset-2 sm:w-auto">
+                Edit Profile
+            </a>
+        </div>
     </div>
 
-    <br>
-    <br>
-    <br>
-    {% if judge_link %}
-        <a href="{{ url_for('profile.index', user_id=judge_link) }}">View Child</a>
-    {% endif %}
-{% else %}
-    <div>
-        is child
-        <p>{{ user.emergency_contact_first_name }} {{ user.emergency_contact_last_name }}</p>
-        <p>{{ user.emergency_contact_phone }}</p>
-        <p>{{ user.emergency_contact_email }}</p>
+    <div class="mt-8 grid grid-cols-1 lg:grid-cols-3 gap-8">
+        <!-- Left Column: User Info -->
+        <div class="lg:col-span-1 space-y-6">
+            <div class="bg-white shadow rounded-lg p-6">
+                <h3 class="text-lg font-medium text-gray-900">Details</h3>
+                <dl class="mt-4 space-y-2 text-sm">
+                    <div class="flex justify-between">
+                        <dt class="text-gray-500">Role</dt>
+                        <dd class="text-gray-900 font-medium">{% if user.is_parent %}Parent/Judge{% else %}Student{% endif %}</dd>
+                    </div>
+                    <div class="flex justify-between">
+                        <dt class="text-gray-500">Points</dt>
+                        <dd class="text-gray-900 font-medium">{{ user.points or 0 }}</dd>
+                    </div>
+                </dl>
+            </div>
+
+            {% if user.is_parent %}
+            <div class="bg-white shadow rounded-lg p-6">
+                <h3 class="text-lg font-medium text-gray-900">Linked Child</h3>
+                <p class="mt-2 text-sm text-gray-600 capitalize">{{ user.child_first_name }} {{ user.child_last_name }}</p>
+                {% if judge_link %}
+                <a href="{{ url_for('profile.index', user_id=judge_link) }}" class="mt-3 inline-block text-sm font-medium text-[color:var(--color-primary-600)] hover:text-[color:var(--color-primary-700)]">View Child's Profile →</a>
+                {% endif %}
+            </div>
+            {% else %}
+            <div class="bg-white shadow rounded-lg p-6">
+                <h3 class="text-lg font-medium text-gray-900">Emergency Contact</h3>
+                <p class="mt-2 text-sm text-gray-600 capitalize">{{ user.emergency_contact_first_name }} {{ user.emergency_contact_last_name }}</p>
+                <p class="mt-1 text-sm text-gray-500">{{ user.emergency_contact_email }}</p>
+                <p class="mt-1 text-sm text-gray-500">{{ user.emergency_contact_number }}</p>
+                 {% if judge_link %}
+                <a href="{{ url_for('profile.index', user_id=judge_link) }}" class="mt-3 inline-block text-sm font-medium text-[color:var(--color-primary-600)] hover:text-[color:var(--color-primary-700)]">View Parent's Profile →</a>
+                {% endif %}
+            </div>
+            {% endif %}
+            
+            {% if not user.is_parent %}
+             <div class="bg-white shadow rounded-lg p-6">
+                <h3 class="text-lg font-medium text-gray-900">Manage Judges</h3>
+                <p class="mt-2 text-sm text-gray-500">Add a parent or guardian to be a judge for tournaments.</p>
+                <a href="{{ url_for('profile.add_judge') }}" class="mt-3 inline-flex items-center justify-center rounded-md border border-transparent bg-gray-100 px-4 py-2 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-200 w-full">
+                    Add Judge
+                </a>
+             </div>
+            {% endif %}
+        </div>
+
+        <!-- Right Column: Requirements -->
+        <div class="lg:col-span-2">
+            <div class="bg-white shadow rounded-lg p-6">
+                <h3 class="text-lg font-medium text-gray-900">Requirements Checklist</h3>
+                <ul role="list" class="mt-4 divide-y divide-gray-200">
+                    {% for user_requirement in user_requirements %}
+                    <li class="py-3 flex items-center">
+                        {% if user_requirement.complete %}
+                        <span class="h-8 w-8 rounded-full bg-green-100 flex items-center justify-center">
+                            <svg class="h-5 w-5 text-green-600" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                                <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd" />
+                            </svg>
+                        </span>
+                        <p class="ml-4 text-sm font-medium text-gray-500 line-through">{{ requirements[user_requirement.requirement_id].body }}</p>
+                        {% else %}
+                        <span class="h-8 w-8 rounded-full bg-yellow-100 flex items-center justify-center">
+                             <svg class="h-5 w-5 text-yellow-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            </svg>
+                        </span>
+                        <p class="ml-4 text-sm font-medium text-gray-900">{{ requirements[user_requirement.requirement_id].body }}</p>
+                        {% endif %}
+                    </li>
+                    {% else %}
+                     <li class="py-3 text-sm text-gray-500">No requirements assigned yet.</li>
+                    {% endfor %}
+                </ul>
+            </div>
+        </div>
     </div>
-        <br>
-    <br>
-    <br>
-
-    <div>
-        {% for user_requirement in user_requirements %}
-            <h3>{{ requirements[user_requirement.requirement_id].body }}</h3>
-        {% endfor %}
-    </div>
-
-    <br>
-    <br>
-    <br>
-
-    
-
-    {% if judge_link %}
-        <a href="{{ url_for('profile.index', user_id=judge_link) }}">View Parent</a>
-    {% endif %}
-    <a href="{{ url_for('profile.add_judge') }}">Add Judge</a>
-
-{% endif %}
-
-<a href="{{ url_for('profile.update') }}">Edit Profile</a>
-
+</div>
 {% endblock %}

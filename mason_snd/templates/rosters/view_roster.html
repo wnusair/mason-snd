@@ -1,15 +1,16 @@
 {% extends "rosters/base.html" %}
-{% block title %}View Tournament Roster{% endblock %}
+{% block title %}View Roster{% endblock %}
 {% block content %}
 <div class="px-4 sm:px-6 lg:px-8">
     <div class="sm:flex sm:items-center">
         <div class="sm:flex-auto">
-            <h1 class="text-2xl font-bold text-gray-900">Tournament Roster: {{ tournament.name }}</h1>
-            <p class="mt-1 text-sm text-gray-500">Viewing the generated roster for this tournament.</p>
+            <h1 class="text-2xl font-bold text-gray-900">Roster: {{ roster.name }}</h1>
+            <p class="mt-1 text-sm text-gray-500">Viewing the saved roster details.</p>
         </div>
         <div class="mt-4 sm:mt-0 sm:ml-16 sm:flex-none space-x-2">
-            <a href="{{ url_for('rosters.download_tournament', tournament_id=tournament.id) }}" class="inline-flex items-center justify-center rounded-md border border-transparent bg-green-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-green-700">Download</a>
-            <a href="{{ url_for('rosters.save_tournament', tournament_id=tournament.id) }}" class="inline-flex items-center justify-center rounded-md border border-transparent bg-[color:var(--color-primary-600)] px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-[color:var(--color-primary-700)]">Save Roster</a>
+            <a href="{{ url_for('rosters.download_roster', roster_id=roster.id) }}" class="inline-flex items-center justify-center rounded-md border border-transparent bg-green-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-green-700">Download</a>
+            <a href="{{ url_for('rosters.rename_roster', roster_id=roster.id) }}" class="inline-flex items-center justify-center rounded-md border border-transparent bg-yellow-500 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-yellow-600">Rename</a>
+            <a href="{{ url_for('rosters.delete_roster', roster_id=roster.id) }}" onclick="return confirm('Are you sure?')" class="inline-flex items-center justify-center rounded-md border border-transparent bg-red-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-red-700">Delete</a>
         </div>
     </div>
 
@@ -29,7 +30,7 @@
             <tbody class="bg-white divide-y divide-gray-200">
             {% for judge in judges %}
                 <tr>
-                    <td class="px-4 py-2">{{ judge_users[judge.judge_id].first_name if judge.judge_id in judge_users else 'Unknown' }} {{ judge_users[judge.judge_id].last_name if judge.judge_id in judge_users else '' }}</td>
+                    <td class="px-4 py-2">{{ judge_users[judge.user_id].first_name if judge.user_id in judge_users else 'Unknown' }} {{ judge_users[judge.user_id].last_name if judge.user_id in judge_users else '' }}</td>
                     <td class="px-4 py-2">{{ judge.child.first_name if judge.child else '' }} {{ judge.child.last_name if judge.child else '' }}</td>
                     <td class="px-4 py-2">
                         {% if judge.event and judge.event.event_type == 0 %}Speech
@@ -37,12 +38,7 @@
                         {% elif judge.event and judge.event.event_type == 2 %}PF
                         {% else %}Unknown{% endif %}
                     </td>
-                    <td class="px-4 py-2">
-                        {% if judge.event and judge.event.event_type == 0 %}6
-                        {% elif judge.event and judge.event.event_type == 1 %}2
-                        {% elif judge.event and judge.event.event_type == 2 %}4
-                        {% else %}0{% endif %}
-                    </td>
+                    <td class="px-4 py-2">{{ judge.people_bringing or 0 }}</td>
                 </tr>
             {% endfor %}
             </tbody>

@@ -1,0 +1,117 @@
+<!-- Dropdown menu partial for navigation, using Alpine.js for better interactivity -->
+<script src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js" defer></script>
+<nav class="bg-white shadow-sm">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div class="flex justify-between h-16 items-center">
+            <!-- Home Link -->
+            <div class="flex items-center space-x-4">
+                <a href="{{ url_for('main.index') }}" class="text-2xl font-bold text-[color:var(--color-primary-600)]">Home</a>
+            </div>
+            <!-- Dropdown Menus for each main route -->
+            <div class="hidden md:flex items-center space-x-6">
+                <!-- Metrics Dropdown -->
+                <div x-data="{ open: false }" class="relative">
+                    <button @click="open = !open" @keydown.escape="open = false" class="inline-flex items-center px-3 py-2 text-sm font-medium text-gray-700 hover:text-[color:var(--color-primary-600)] focus:outline-none">
+                        Metrics
+                        <svg class="ml-1 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+                    </button>
+                    <div x-show="open" @click.away="open = false" class="absolute left-0 mt-2 w-40 rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5 z-10" x-transition>
+                        <a href="{{ url_for('metrics.index') }}" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">Dashboard</a>
+                        <!-- Add more metrics links here -->
+                    </div>
+                </div>
+                <!-- Events Dropdown -->
+                <div x-data="{ open: false }" class="relative">
+                    <button @click="open = !open" @keydown.escape="open = false" class="inline-flex items-center px-3 py-2 text-sm font-medium text-gray-700 hover:text-[color:var(--color-primary-600)] focus:outline-none">
+                        Events
+                        <svg class="ml-1 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+                    </button>
+                    <div x-show="open" @click.away="open = false" class="absolute left-0 mt-2 w-40 rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5 z-10" x-transition>
+                        <a href="{{ url_for('events.index') }}" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">All Events</a>
+                        <a href="{{ url_for('events.add_event') }}" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">Add Event</a>
+                    </div>
+                </div>
+                <!-- Tournaments Dropdown -->
+                <div x-data="{ open: false }" class="relative">
+                    <button @click="open = !open" @keydown.escape="open = false" class="inline-flex items-center px-3 py-2 text-sm font-medium text-gray-700 hover:text-[color:var(--color-primary-600)] focus:outline-none">
+                        Tournaments
+                        <svg class="ml-1 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+                    </button>
+                    <div x-show="open" @click.away="open = false" class="absolute left-0 mt-2 w-40 rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5 z-10" x-transition>
+                        <a href="{{ url_for('tournaments.index') }}" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">All Tournaments</a>
+                        <a href="{{ url_for('tournaments.add_tournament') }}" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">Add Tournament</a>
+                        <a href="{{ url_for('tournaments.add_form') }}" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">Add Form</a>
+                    </div>
+                </div>
+                <!-- Rosters Dropdown -->
+                <div x-data="{ open: false }" class="relative">
+                    <button @click="open = !open" @keydown.escape="open = false" class="inline-flex items-center px-3 py-2 text-sm font-medium text-gray-700 hover:text-[color:var(--color-primary-600)] focus:outline-none">
+                        Rosters
+                        <svg class="ml-1 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+                    </button>
+                    <div x-show="open" @click.away="open = false" class="absolute left-0 mt-2 w-40 rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5 z-10" x-transition>
+                        <a href="{{ url_for('rosters.index') }}" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">All Rosters</a>
+                        <a href="{{ url_for('rosters.upload_roster') }}" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">Add Roster</a>
+                    </div>
+                </div>
+                <!-- Profile Dropdown -->
+                {% if session.get('user_id') %}
+                <div x-data="{ open: false }" class="relative">
+                    <button @click="open = !open" @keydown.escape="open = false" class="inline-flex items-center px-3 py-2 text-sm font-medium text-gray-700 hover:text-[color:var(--color-primary-600)] focus:outline-none">
+                        Profile
+                        <svg class="ml-1 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+                    </button>
+                    <div x-show="open" @click.away="open = false" class="absolute left-0 mt-2 w-40 rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5 z-10" x-transition>
+                        <a href="{{ url_for('profile.index', user_id=session.get('user_id')) }}" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">My Profile</a>
+                    </div>
+                </div>
+                {% endif %}
+                {# My Profile link before auth links #}
+                {% if session.get('user_id') %}
+                    <a href="{{ url_for('profile.index', user_id=session.get('user_id')) }}" class="px-3 py-2 text-sm font-medium text-gray-700 hover:text-[color:var(--color-primary-600)]">My Profile</a>
+                    <a href="{{ url_for('auth.logout') }}" class="px-3 py-2 text-sm font-medium text-gray-700 hover:text-[color:var(--color-primary-600)]">Logout</a>
+                {% else %}
+                    <a href="{{ url_for('auth.login') }}" class="px-3 py-2 text-sm font-medium text-gray-700 hover:text-[color:var(--color-primary-600)]">Login</a>
+                    <a href="{{ url_for('auth.register') }}" class="px-3 py-2 text-sm font-medium text-gray-700 hover:text-[color:var(--color-primary-600)]">Register</a>
+                {% endif %}
+            </div>
+            <!-- Hamburger for mobile -->
+            <div class="md:hidden flex items-center">
+                <button id="mobile-menu-button" class="inline-flex items-center justify-center p-2 rounded-md text-gray-400 hover:text-gray-500 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-[color:var(--color-primary-500)]">
+                    <span class="sr-only">Open main menu</span>
+                    <svg class="h-6 w-6" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
+                    </svg>
+                </button>
+            </div>
+        </div>
+        <!-- Mobile menu, hidden by default -->
+        <div id="mobile-menu" class="md:hidden hidden mt-2">
+            <div class="space-y-1 bg-white rounded-md shadow-lg p-2">
+                <a href="{{ url_for('main.index') }}" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 font-bold">Home</a>
+                <div class="border-t border-gray-100"></div>
+                <a href="{{ url_for('metrics.index') }}" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">Metrics</a>
+                <a href="{{ url_for('events.index') }}" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">Events</a>
+                <a href="{{ url_for('tournaments.index') }}" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">Tournaments</a>
+                <a href="{{ url_for('rosters.index') }}" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">Rosters</a>
+                {% if session.get('user_id') %}
+                    <a href="{{ url_for('profile.index', user_id=session.get('user_id')) }}" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">My Profile</a>
+                    <a href="{{ url_for('auth.logout') }}" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">Logout</a>
+                {% else %}
+                    <a href="{{ url_for('auth.login') }}" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">Login</a>
+                    <a href="{{ url_for('auth.register') }}" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">Register</a>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</nav>
+<script>
+    // Mobile menu toggle
+    const mobileMenuButton = document.getElementById('mobile-menu-button');
+    const mobileMenu = document.getElementById('mobile-menu');
+    if (mobileMenuButton && mobileMenu) {
+        mobileMenuButton.addEventListener('click', () => {
+            mobileMenu.classList.toggle('hidden');
+        });
+    }
+</script>

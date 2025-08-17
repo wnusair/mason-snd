@@ -84,7 +84,8 @@ def index(user_id):
         judge_link=judge_link,
         user=target_user,
         user_requirements=user_requirements,
-        requirements={r.id: r for r in Requirements.query.all()}
+        requirements={r.id: r for r in Requirements.query.all()},
+        current_user=target_user
     )
 
 @profile_bp.route('/update', methods=['GET', 'POST'])
@@ -118,7 +119,7 @@ def update():
         flash('Profile updated successfully', 'success')
         return redirect(url_for('profile.index', user_id=user.id))
 
-    return render_template('profile/update.html', user=user)
+    return render_template('profile/update.html', user=user, current_user=user)
 
 @profile_bp.route('/add_judge', methods=['POST', 'GET'])
 def add_judge():
@@ -175,7 +176,7 @@ def add_judge():
             db.session.commit()
 
         return redirect(url_for('profile.index', user_id=user_id))
-    return render_template('profile/add_judge.html')
+    return render_template('profile/add_judge.html', current_user=user)
 
 
 @profile_bp.route('/add_child', methods=['POST', 'GET'])
@@ -234,4 +235,4 @@ def add_child():
             db.session.commit()
 
         return redirect(url_for('profile.index', user_id=user_id))
-    return render_template('profile/add_child.html')
+    return render_template('profile/add_child.html', current_user=user)

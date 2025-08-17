@@ -3,54 +3,86 @@
 {% block title %}Edit Profile{% endblock %}
 
 {% block content %}
+<div class="min-h-full flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
+    <div class="max-w-lg w-full space-y-8">
+        <div>
+            <h2 class="mt-6 text-center text-3xl font-extrabold text-gray-900">
+                Edit Your Profile
+            </h2>
+        </div>
+        <form class="mt-8 space-y-6" method="POST">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+            <div class="rounded-md shadow-sm bg-white p-6 space-y-4">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <label for="first_name" class="block text-sm font-medium text-gray-700">First Name</label>
+                        <input type="text" name="first_name" id="first_name" value="{{ user.first_name }}" required class="mt-1 w-full rounded-md border-gray-300 shadow-sm focus:border-[color:var(--color-primary-500)] focus:ring-[color:var(--color-primary-500)] sm:text-sm">
+                    </div>
+                    <div>
+                        <label for="last_name" class="block text-sm font-medium text-gray-700">Last Name</label>
+                        <input type="text" name="last_name" id="last_name" value="{{ user.last_name }}" required class="mt-1 w-full rounded-md border-gray-300 shadow-sm focus:border-[color:var(--color-primary-500)] focus:ring-[color:var(--color-primary-500)] sm:text-sm">
+                    </div>
+                </div>
+                <div>
+                    <label for="email" class="block text-sm font-medium text-gray-700">Email</label>
+                    <input type="email" name="email" id="email" value="{{ user.email }}" required class="mt-1 w-full rounded-md border-gray-300 shadow-sm focus:border-[color:var(--color-primary-500)] focus:ring-[color:var(--color-primary-500)] sm:text-sm">
+                </div>
+                <div>
+                    <label for="phone_number" class="block text-sm font-medium text-gray-700">Phone Number</label>
+                    <input type="text" name="phone_number" id="phone_number" value="{{ user.phone_number }}" class="mt-1 w-full rounded-md border-gray-300 shadow-sm focus:border-[color:var(--color-primary-500)] focus:ring-[color:var(--color-primary-500)] sm:text-sm">
+                </div>
+                 <div>
+                    <label for="password" class="block text-sm font-medium text-gray-700">New Password</label>
+                    <input type="password" name="password" id="password" placeholder="Leave blank to keep current" class="mt-1 w-full rounded-md border-gray-300 shadow-sm focus:border-[color:var(--color-primary-500)] focus:ring-[color:var(--color-primary-500)] sm:text-sm">
+                </div>
 
-{% for message in get_flashed_messages() %}
-<div class="alert alert-info" role="alert">
-    {{ message }}
+                <div class="border-t border-gray-200 pt-4 mt-4">
+                {% if user.is_parent %}
+                    <h3 class="text-base font-medium text-gray-800">Child's Information</h3>
+                    <div class="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <label for="child_first_name" class="block text-sm font-medium text-gray-700">Child First Name</label>
+                            <input type="text" name="child_first_name" id="child_first_name" value="{{ user.child_first_name }}" class="mt-1 w-full rounded-md border-gray-300 shadow-sm focus:border-[color:var(--color-primary-500)] focus:ring-[color:var(--color-primary-500)] sm:text-sm">
+                        </div>
+                        <div>
+                            <label for="child_last_name" class="block text-sm font-medium text-gray-700">Child Last Name</label>
+                            <input type="text" name="child_last_name" id="child_last_name" value="{{ user.child_last_name }}" class="mt-1 w-full rounded-md border-gray-300 shadow-sm focus:border-[color:var(--color-primary-500)] focus:ring-[color:var(--color-primary-500)] sm:text-sm">
+                        </div>
+                    </div>
+                {% else %}
+                    <h3 class="text-base font-medium text-gray-800">Emergency Contact</h3>
+                    <div class="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <label for="emergency_first_name" class="block text-sm font-medium text-gray-700">First Name</label>
+                            <input type="text" name="emergency_first_name" id="emergency_first_name" value="{{ user.emergency_contact_first_name }}" class="mt-1 w-full rounded-md border-gray-300 shadow-sm focus:border-[color:var(--color-primary-500)] focus:ring-[color:var(--color-primary-500)] sm:text-sm">
+                        </div>
+                        <div>
+                            <label for="emergency_last_name" class="block text-sm font-medium text-gray-700">Last Name</label>
+                            <input type="text" name="emergency_last_name" id="emergency_last_name" value="{{ user.emergency_contact_last_name }}" class="mt-1 w-full rounded-md border-gray-300 shadow-sm focus:border-[color:var(--color-primary-500)] focus:ring-[color:var(--color-primary-500)] sm:text-sm">
+                        </div>
+                        <div class="md:col-span-2">
+                            <label for="emergency_contact_email" class="block text-sm font-medium text-gray-700">Email</label>
+                            <input type="email" name="emergency_contact_email" id="emergency_contact_email" value="{{ user.emergency_contact_email }}" class="mt-1 w-full rounded-md border-gray-300 shadow-sm focus:border-[color:var(--color-primary-500)] focus:ring-[color:var(--color-primary-500)] sm:text-sm">
+                        </div>
+                        <div class="md:col-span-2">
+                            <label for="emergency_contact_phone" class="block text-sm font-medium text-gray-700">Phone</label>
+                            <input type="text" name="emergency_contact_phone" id="emergency_contact_phone" value="{{ user.emergency_contact_number }}" class="mt-1 w-full rounded-md border-gray-300 shadow-sm focus:border-[color:var(--color-primary-500)] focus:ring-[color:var(--color-primary-500)] sm:text-sm">
+                        </div>
+                         <div class="md:col-span-2">
+                            <label for="emergency_contact_relationship" class="block text-sm font-medium text-gray-700">Relationship</label>
+                            <input type="text" name="emergency_contact_relationship" id="emergency_contact_relationship" value="{{ user.emergency_contact_relationship }}" class="mt-1 w-full rounded-md border-gray-300 shadow-sm focus:border-[color:var(--color-primary-500)] focus:ring-[color:var(--color-primary-500)] sm:text-sm">
+                        </div>
+                    </div>
+                {% endif %}
+                </div>
+            </div>
+
+            <div>
+                <button type="submit" class="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-[color:var(--color-primary-600)] hover:bg-[color:var(--color-primary-700)] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[color:var(--color-primary-500)]">
+                    Save Changes
+                </button>
+            </div>
+        </form>
+    </div>
 </div>
-{% endfor %}
-
-
-<h1>Edit Profile</h1>
-<form method="POST">
-    <label>First Name</label>
-    <input type="text" name="first_name" value="{{ user.first_name }}" required><br>
-
-    <label>Last Name</label>
-    <input type="text" name="last_name" value="{{ user.last_name }}" required><br>
-
-    <label>Email</label>
-    <input type="email" name="email" value="{{ user.email }}" required><br>
-
-    <label>Phone Number</label>
-    <input type="text" name="phone_number" value="{{ user.phone_number }}"><br>
-
-    <label>New Password (leave blank to keep current)</label>
-    <input type="password" name="password"><br>
-
-    {% if user.is_parent %}
-        <label>Child First Name</label>
-        <input type="text" name="child_first_name" value="{{ user.child_first_name }}"><br>
-
-        <label>Child Last Name</label>
-        <input type="text" name="child_last_name" value="{{ user.child_last_name }}"><br>
-    {% else %}
-        <label>Emergency Contact First Name</label>
-        <input type="text" name="emergency_first_name" value="{{ user.emergency_contact_first_name }}"><br>
-
-        <label>Emergency Contact Last Name</label>
-        <input type="text" name="emergency_last_name" value="{{ user.emergency_contact_last_name }}"><br>
-
-        <label>Emergency Contact Phone</label>
-        <input type="text" name="emergency_contact_phone" value="{{ user.emergency_contact_number }}"><br>
-
-        <label>Emergency Contact Email</label>
-        <input type="email" name="emergency_contact_email" value="{{ user.emergency_contact_email }}"><br>
-
-        <label>Emergency Contact Relationship</label>
-        <input type="text" name="emergency_contact_relationship" value="{{ user.emergency_contact_relationship }}"><br>
-    {% endif %}
-
-    <button type="submit">Save Changes</button>
-</form>
 {% endblock %}

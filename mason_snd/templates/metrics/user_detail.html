@@ -2,38 +2,72 @@
 {% block title %}User Details{% endblock %}
 
 {% block content %}
-<h2>{{ user.first_name }} {{ user.last_name }}</h2>
+<div class="px-4 sm:px-6 lg:px-8">
+    <div>
+        <h1 class="text-2xl font-bold text-gray-900">{{ user.first_name }} {{ user.last_name }}</h1>
+        <p class="mt-1 text-sm text-gray-500">Detailed performance metrics.</p>
+    </div>
 
-<div class="card">
-    <div class="card-body">
-        <h5 class="card-title">Performance Overview</h5>
-        <p>Bids: {{ user.bids }}</p>
-        <p>Total Points: {{ total_points }}</p>
-        <p>Tournament Points: {{ user.tournament_points }}</p>
-        <p>Effort Points: {{ user.effort_points }}</p>
-        <p>Weighted Points: {{ weighted_points | round(2) }}</p>
+    <!-- Stats Cards -->
+    <div class="mt-5 grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
+        <div class="bg-white overflow-hidden shadow rounded-lg">
+            <div class="p-5">
+                <div class="flex items-center">
+                    <div class="ml-5 w-0 flex-1">
+                        <dl>
+                            <dt class="text-sm font-medium text-gray-500 truncate">Weighted Pts</dt>
+                            <dd class="text-3xl font-bold text-[color:var(--color-primary-600)]">{{ weighted_points | round(2) }}</dd>
+                        </dl>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="bg-white overflow-hidden shadow rounded-lg">
+            <div class="p-5">
+                <div class="flex items-center">
+                    <div class="ml-5 w-0 flex-1">
+                        <dl>
+                            <dt class="text-sm font-medium text-gray-500 truncate">Total Points</dt>
+                            <dd class="text-3xl font-bold text-gray-900">{{ total_points }}</dd>
+                        </dl>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="bg-white overflow-hidden shadow rounded-lg">
+            <div class="p-5">
+                <div class="flex items-center">
+                    <div class="ml-5 w-0 flex-1">
+                        <dl>
+                            <dt class="text-sm font-medium text-gray-500 truncate">Bids</dt>
+                            <dd class="text-3xl font-bold text-gray-900">{{ user.bids }}</dd>
+                        </dl>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="mt-8 grid grid-cols-1 lg:grid-cols-2 gap-8">
+        <div class="bg-white p-6 rounded-lg shadow">
+            <h3 class="text-lg font-medium text-gray-900">Performance Over Time</h3>
+            <canvas id="performanceChart" class="mt-4"></canvas>
+        </div>
+        <div class="bg-white p-6 rounded-lg shadow">
+            <h3 class="text-lg font-medium text-gray-900">Tournaments Attended</h3>
+            <ul role="list" class="divide-y divide-gray-200 mt-4">
+                {% for performance in performances %}
+                <li class="py-4 flex items-center justify-between">
+                    <a href="{{ url_for('tournaments.tournament_results', tournament_id=performance.tournament.id) }}" class="text-sm font-medium text-[color:var(--color-primary-600)] hover:text-[color:var(--color-primary-700)]">{{ performance.tournament.name }}</a>
+                    <span class="text-sm font-semibold text-gray-800">{{ performance.points }} points</span>
+                </li>
+                {% else %}
+                <li class="py-4 text-sm text-gray-500">No tournaments attended yet.</li>
+                {% endfor %}
+            </ul>
+        </div>
     </div>
 </div>
-
-<div class="mt-4">
-    <h4>Tournament Performance Over Time</h4>
-    <canvas id="performanceChart"></canvas>
-</div>
-
-<div class="mt-4">
-    <h4>Tournaments Attended</h4>
-    <ul class="list-group">
-        {% for performance in performances %}
-        <li class="list-group-item">
-            <a href="{{ url_for('tournaments.tournament_results', tournament_id=performance.tournament.id) }}">
-                {{ performance.tournament.name }}
-            </a>: {{ performance.points }} points
-        </li>
-        {% endfor %}
-    </ul>
-</div>
-
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script>
     const ctx = document.getElementById('performanceChart').getContext('2d');
     const performanceChart = new Chart(ctx, {
@@ -43,24 +77,20 @@
             datasets: [{
                 label: 'Tournament Points',
                 data: {{ data | tojson }},
-                borderColor: 'rgba(75, 192, 192, 1)',
-                tension: 0.1
+                borderColor: 'rgba(79, 70, 229, 1)',
+                backgroundColor: 'rgba(79, 70, 229, 0.1)',
+                tension: 0.2
             },
             {
                 label: 'Predicted',
                 data: {{ prediction | tojson }},
-                borderColor: 'rgba(255, 99, 132, 1)',
+                borderColor: 'rgba(220, 38, 38, 1)',
+                backgroundColor: 'rgba(220, 38, 38, 0.1)',
                 borderDash: [5, 5],
-                tension: 0.1
+                tension: 0.2
             }]
         },
-        options: {
-            scales: {
-                y: {
-                    beginAtZero: true
-                }
-            }
-        }
+        options: { responsive: true, scales: { y: { beginAtZero: true } } }
     });
 </script>
 {% endblock %}

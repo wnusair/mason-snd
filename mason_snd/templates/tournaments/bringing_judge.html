@@ -2,14 +2,31 @@
 {% block title %}Select Judge{% endblock %}
 
 {% block content %}
-<h2>Select a Judge to Bring</h2>
-<form method="post">
-    <label for="judge_id">Judges:</label>
-    <select name="judge_id" id="judge_id" required>
-        {% for judge_id, judge_name in judge_options %}
-            <option value="{{ judge_id }}" {% if selected_judge_id == judge_id %}selected{% endif %}>{{ judge_name }}</option>
-        {% endfor %}
-    </select>
-    <button type="submit">Submit</button>
-</form>
+<div class="min-h-full flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
+    <div class="max-w-md w-full space-y-8">
+        <div>
+            <h2 class="mt-6 text-center text-3xl font-extrabold text-gray-900">
+                Select a Judge to Bring
+            </h2>
+        </div>
+        <form class="mt-8 space-y-6" method="POST">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+            <div class="rounded-md shadow-sm bg-white p-6 space-y-4">
+                <div>
+                    <label for="judge_id" class="block text-sm font-medium text-gray-700">Available Judges</label>
+                    <select id="judge_id" name="judge_id" required class="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-[color:var(--color-primary-500)] focus:border-[color:var(--color-primary-500)] sm:text-sm rounded-md">
+                        {% for judge_id, judge_name in judge_options %}
+                            <option value="{{ judge_id }}" {% if selected_judge_id == judge_id %}selected{% endif %}>{{ judge_name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+            </div>
+            <div>
+                <button type="submit" class="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-[color:var(--color-primary-600)] hover:bg-[color:var(--color-primary-700)] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[color:var(--color-primary-500)]">
+                    Submit
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
 {% endblock %}

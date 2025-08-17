@@ -1,35 +1,57 @@
 {% extends "tournaments/base.html" %}
 {% block title %}Judge Requests{% endblock %}
 {% block content %}
-<h2>Judge Requests</h2>
-<form method="POST">
-<table class="table table-striped">
-    <thead>
-        <tr>
-            <th>Tournament</th>
-            <th>Location</th>
-            <th>Date</th>
-            <th>Child</th>
-            <th>Decision</th>
-        </tr>
-    </thead>
-    <tbody>
-        {% for req in judge_requests %}
-        <tr>
-            <td>{{ req.tournament_name }}</td>
-            <td>{{ req.address }}</td>
-            <td>{{ req.date.strftime('%B %d, %Y %I:%M %p') if req.date else '' }}</td>
-            <td>{{ req.child_name }}</td>
-            <td>
-                <select name="decision_{{ req.id }}" class="form-select">
-                    <option value="no" {% if not req.accepted %}selected{% endif %}>No</option>
-                    <option value="yes" {% if req.accepted %}selected{% endif %}>Yes</option>
-                </select>
-            </td>
-        </tr>
-        {% endfor %}
-    </tbody>
-</table>
-<button type="submit" class="btn btn-success">Submit Decisions</button>
-</form>
+<div class="px-4 sm:px-6 lg:px-8">
+    <div class="sm:flex sm:items-center">
+        <div class="sm:flex-auto">
+            <h1 class="text-xl font-semibold text-gray-900">Judge Requests</h1>
+            <p class="mt-2 text-sm text-gray-700">Accept or decline requests to judge at upcoming tournaments.</p>
+        </div>
+    </div>
+    <form method="POST">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+        <div class="mt-8 flex flex-col">
+            <div class="-my-2 -mx-4 overflow-x-auto sm:-mx-6 lg:-mx-8">
+                <div class="inline-block min-w-full py-2 align-middle md:px-6 lg:px-8">
+                    <div class="overflow-hidden shadow ring-1 ring-black ring-opacity-5 md:rounded-lg">
+                        <table class="min-w-full divide-y divide-gray-300">
+                            <thead class="bg-gray-50">
+                                <tr>
+                                    <th scope="col" class="py-3.5 pl-4 pr-3 text-left text-sm font-semibold text-gray-900 sm:pl-6">Tournament</th>
+                                    <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Date</th>
+                                    <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Child</th>
+                                    <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Decision</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-gray-200 bg-white">
+                                {% for req in judge_requests %}
+                                <tr>
+                                    <td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-6">{{ req.tournament_name }}</td>
+                                    <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500">{{ req.date.strftime('%b %d, %Y') }}</td>
+                                    <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500">{{ req.child_name }}</td>
+                                    <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
+                                        <select name="decision_{{ req.id }}" class="rounded-md border-gray-300 shadow-sm focus:border-[color:var(--color-primary-500)] focus:ring-[color:var(--color-primary-500)] sm:text-sm">
+                                            <option value="no" {% if not req.accepted %}selected{% endif %}>Decline</option>
+                                            <option value="yes" {% if req.accepted %}selected{% endif %}>Accept</option>
+                                        </select>
+                                    </td>
+                                </tr>
+                                {% else %}
+                                <tr>
+                                    <td colspan="4" class="whitespace-nowrap text-center py-4 text-sm text-gray-500">No pending judge requests.</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="mt-6 flex justify-end">
+            <button type="submit" class="inline-flex items-center justify-center rounded-md border border-transparent bg-[color:var(--color-primary-600)] px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-[color:var(--color-primary-700)]">
+                Submit Decisions
+            </button>
+        </div>
+    </form>
+</div>
 {% endblock %}

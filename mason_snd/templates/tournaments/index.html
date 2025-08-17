@@ -1,41 +1,59 @@
 {% extends "tournaments/base.html" %}
-{% block title %}Home{% endblock %}
+{% block title %}Tournaments{% endblock %}
 
 {% block content %}
-
-<table>
-    <thead>
-        <tr>
-            <th>Name</th>
-            <th>Date</th>
-            <th>Location</th>
-            <th>Signup Deadline</th>
-            <th>Performance Deadline</th>
-            <th>Action</th>
-        </tr>
-    </thead>
-    <tbody>
-        {% for tournament in tournaments %}
-        <tr>
-            <td>{{ tournament.name }}</td>
-            <td>{{ tournament.date }}</td>
-            <td>{{ tournament.address }}</td>
-            <td>{{ tournament.signup_deadline }}</td>
-            <td>{{ tournament.performance_deadline }}</td>
-            <td><a href="{{ url_for('tournaments.delete_tournament', tournament_id=tournament.id) }}">Delete Tournament</a></td>
-        </tr>
-        {% endfor %}
-    </tbody>
-</table>
-
-{% if user.is_parent %}
-    <a href="{{ url_for('tournaments.judge_requests') }}">Tournament Judge Requests</a>
-{% else %}
-    <a href="{{ url_for('tournaments.signup') }}">Tournament Sign Up</a>
-{% endif %}
-
-{% if user.role >= 2 %}
-<a href="{{ url_for('tournaments.add_tournament') }}">Add Tournament</a>
-{% endif %}
-
+<div class="px-4 sm:px-6 lg:px-8">
+    <div class="sm:flex sm:items-center">
+        <div class="sm:flex-auto">
+            <h1 class="text-xl font-semibold text-gray-900">Tournaments</h1>
+            <p class="mt-2 text-sm text-gray-700">A list of all upcoming tournaments.</p>
+        </div>
+        <div class="mt-4 sm:mt-0 sm:ml-16 sm:flex-none space-x-2">
+            {% if user.is_parent %}
+                <a href="{{ url_for('tournaments.judge_requests') }}" class="inline-flex items-center justify-center rounded-md border border-transparent bg-yellow-500 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-yellow-600">Judge Requests</a>
+            {% else %}
+                <a href="{{ url_for('tournaments.signup') }}" class="inline-flex items-center justify-center rounded-md border border-transparent bg-green-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-green-700">Sign Up</a>
+            {% endif %}
+            {% if user.role >= 2 %}
+            <a href="{{ url_for('tournaments.add_tournament') }}" class="inline-flex items-center justify-center rounded-md border border-transparent bg-[color:var(--color-primary-600)] px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-[color:var(--color-primary-700)]">Add Tournament</a>
+            {% endif %}
+        </div>
+    </div>
+    <div class="mt-8 flex flex-col">
+        <div class="-my-2 -mx-4 overflow-x-auto sm:-mx-6 lg:-mx-8">
+            <div class="inline-block min-w-full py-2 align-middle md:px-6 lg:px-8">
+                <div class="overflow-hidden shadow ring-1 ring-black ring-opacity-5 md:rounded-lg">
+                    <table class="min-w-full divide-y divide-gray-300">
+                        <thead class="bg-gray-50">
+                            <tr>
+                                <th scope="col" class="py-3.5 pl-4 pr-3 text-left text-sm font-semibold text-gray-900 sm:pl-6">Name</th>
+                                <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Date</th>
+                                <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Location</th>
+                                <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Signup Deadline</th>
+                                <th scope="col" class="relative py-3.5 pl-3 pr-4 sm:pr-6"><span class="sr-only">Delete</span></th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-gray-200 bg-white">
+                            {% for tournament in tournaments %}
+                            <tr>
+                                <td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-6">{{ tournament.name }}</td>
+                                <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500">{{ tournament.date.strftime('%b %d, %Y') }}</td>
+                                <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500">{{ tournament.address }}</td>
+                                <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500">{{ tournament.signup_deadline.strftime('%b %d, %Y') }}</td>
+                                <td class="relative whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium sm:pr-6">
+                                    <a href="{{ url_for('tournaments.delete_tournament', tournament_id=tournament.id) }}" class="text-red-600 hover:text-red-900">Delete</a>
+                                </td>
+                            </tr>
+                            {% else %}
+                            <tr>
+                                <td colspan="5" class="whitespace-nowrap text-center py-4 text-sm text-gray-500">No tournaments scheduled.</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
 {% endblock %}

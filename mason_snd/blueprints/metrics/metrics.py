@@ -111,9 +111,11 @@ def index():
             query = query.order_by(User.last_name, User.first_name)
         users_pagination = query.paginate(page=page, per_page=per_page, error_out=False)
 
+    settings = MetricsSettings.query.first()
     return render_template(
         'metrics/user_metrics_overview.html',
         users=users_pagination,
+        settings=settings,
         sort=sort,
         direction=direction,
         next_direction=lambda col: next_direction(col, sort, direction)

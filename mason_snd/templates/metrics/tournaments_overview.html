@@ -2,53 +2,27 @@
 {% block title %}Tournaments Overview{% endblock %}
 
 {% block content %}
-<h2>Tournaments Overview</h2>
+<div class="px-4 sm:px-6 lg:px-8">
+    <div class="sm:flex sm:items-center">
+        <div class="sm:flex-auto">
+            <h1 class="text-xl font-semibold text-gray-900">Tournaments Overview</h1>
+            <p class="mt-2 text-sm text-gray-700">An overview of all tournament performance metrics.</p>
+        </div>
+        <div class="mt-4 sm:mt-0 sm:ml-16 sm:flex-none space-x-2">
+            <a href="{{ url_for('metrics.index') }}" class="inline-flex items-center justify-center rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50">User Metrics</a>
+            <a href="{{ url_for('metrics.events_overview') }}" class="inline-flex items-center justify-center rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50">Events</a>
+            <a href="{{ url_for('metrics.download_tournaments', sort=sort, direction=direction) }}" class="inline-flex items-center justify-center rounded-md border border-transparent bg-gray-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-gray-700">Download</a>
+            <a href="{{ url_for('metrics.settings') }}" class="inline-flex items-center justify-center rounded-md border border-transparent bg-[color:var(--color-primary-600)] px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-[color:var(--color-primary-700)]">Settings</a>
+        </div>
+    </div>
 
-<div class="mb-3">
-    <a href="{{ url_for('metrics.index') }}" class="btn btn-secondary">User Metrics</a>
-    <a href="{{ url_for('metrics.events_overview') }}" class="btn btn-secondary">Events Overview</a>
-    <a href="{{ url_for('metrics.download_tournaments', sort=sort, direction=direction) }}" class="btn btn-success">Download as CSV</a>
-    <a href="{{ url_for('metrics.settings') }}" class="btn btn-primary">Settings</a>
+    <div class="mt-8 bg-white p-6 rounded-lg shadow">
+        <canvas id="tournamentPointsChart"></canvas>
+    </div>
+
+    <!-- Table and pagination for tournaments -->
 </div>
 
-<canvas id="tournamentPointsChart"></canvas>
-
-<table class="table table-striped mt-4">
-    <thead>
-        <tr>
-            <th><a href="{{ url_for('metrics.tournaments_overview', sort='name', direction=next_direction('name')) }}">Name</a></th>
-            <th><a href="{{ url_for('metrics.tournaments_overview', sort='total_points', direction=next_direction('total_points')) }}">Total Points</a></th>
-            <th><a href="{{ url_for('metrics.tournaments_overview', sort='total_bids', direction=next_direction('total_bids')) }}">Total Bids</a></th>
-        </tr>
-    </thead>
-    <tbody>
-        {% for tournament in tournaments.items %}
-        <tr>
-            <td><a href="{{ url_for('metrics.tournament_detail', tournament_id=tournament.id) }}">{{ tournament.name }}</a></td>
-            <td>{{ tournament_points[tournament.id] }}</td>
-            <td>{{ tournament_bids[tournament.id] }}</td>
-        </tr>
-        {% endfor %}
-    </tbody>
-</table>
-
-<nav aria-label="Tournament pagination">
-  <ul class="pagination">
-    {% if tournaments.has_prev %}
-      <li class="page-item"><a class="page-link" href="{{ url_for('metrics.tournaments_overview', page=tournaments.prev_num, sort=sort, direction=direction) }}">Previous</a></li>
-    {% else %}
-      <li class="page-item disabled"><span class="page-link">Previous</span></li>
-    {% endif %}
-    <li class="page-item disabled"><span class="page-link">Page {{ tournaments.page }} of {{ tournaments.pages }}</span></li>
-    {% if tournaments.has_next %}
-      <li class="page-item"><a class="page-link" href="{{ url_for('metrics.tournaments_overview', page=tournaments.next_num, sort=sort, direction=direction) }}">Next</a></li>
-    {% else %}
-      <li class="page-item disabled"><span class="page-link">Next</span></li>
-    {% endif %}
-  </ul>
-</nav>
-
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script>
     const ctx = document.getElementById('tournamentPointsChart').getContext('2d');
     const tournamentPointsChart = new Chart(ctx, {
@@ -56,25 +30,33 @@
         data: {
             labels: {{ chart_labels | tojson }},
             datasets: [{
-                label: 'Total Points per Tournament',
+                label: 'Total Points',
                 data: {{ chart_data | tojson }},
-                backgroundColor: 'rgba(54, 162, 235, 0.2)',
-                borderColor: 'rgba(54, 162, 235, 1)',
-                borderWidth: 1
+                backgroundColor: 'rgba(79, 70, 229, 0.1)',
+                borderColor: 'rgba(79, 70, 229, 1)',
+                borderWidth: 2,
+                pointBackgroundColor: 'rgba(79, 70, 229, 1)',
+                tension: 0.2
             },
             {
                 label: 'Predicted',
                 data: {{ chart_prediction | tojson }},
-                backgroundColor: 'rgba(255, 99, 132, 0.2)',
-                borderColor: 'rgba(255, 99, 132, 1)',
-                borderWidth: 1
+                backgroundColor: 'rgba(220, 38, 38, 0.1)',
+                borderColor: 'rgba(220, 38, 38, 1)',
+                borderWidth: 2,
+                borderDash: [5, 5],
+                pointBackgroundColor: 'rgba(220, 38, 38, 1)',
+                tension: 0.2
             }]
         },
         options: {
+            responsive: true,
             scales: {
-                y: {
-                    beginAtZero: true
-                }
+                y: { beginAtZero: true }
+            },
+            plugins: {
+                legend: { position: 'top' },
+                title: { display: true, text: 'Total Points per Tournament' }
             }
         }
     });

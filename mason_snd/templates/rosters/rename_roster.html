@@ -1,0 +1,28 @@
+{% extends "rosters/base.html" %}
+{% block title %}Rename Roster{% endblock %}
+{% block content %}
+<div class="min-h-full flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
+    <div class="max-w-md w-full space-y-8">
+        <div>
+            <h2 class="mt-6 text-center text-3xl font-extrabold text-gray-900">
+                Rename Roster
+            </h2>
+        </div>
+        <form class="mt-8 space-y-6" method="POST">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+            <div class="rounded-md shadow-sm bg-white p-6 space-y-4">
+                <div>
+                    <label for="new_name" class="block text-sm font-medium text-gray-700">Roster Name</label>
+                    <input type="text" name="new_name" id="new_name" value="{{ roster.name }}" required class="mt-1 w-full rounded-md border-gray-300 shadow-sm focus:border-[color:var(--color-primary-500)] focus:ring-[color:var(--color-primary-500)] sm:text-sm">
+                </div>
+            </div>
+            <div class="flex items-center justify-end space-x-3">
+                 <a href="{{ url_for('rosters.view_roster', roster_id=roster.id) }}" class="inline-flex items-center justify-center rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50">Cancel</a>
+                <button type="submit" class="group relative flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-[color:var(--color-primary-600)] hover:bg-[color:var(--color-primary-700)] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[color:var(--color-primary-500)]">
+                    Rename
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}

@@ -1,43 +1,75 @@
 {% extends "events/base.html" %}
 
-{% block title %}Home{% endblock %}
+{% block title %}Events{% endblock %}
 
 {% block content %}
+<div class="px-4 sm:px-6 lg:px-8">
+    <div class="sm:flex sm:items-center">
+        <div class="sm:flex-auto">
+            <h1 class="text-xl font-semibold text-gray-900">Events</h1>
+            <p class="mt-2 text-sm text-gray-700">A list of all the events you can join or manage.</p>
+        </div>
+        <div class="mt-4 sm:mt-0 sm:ml-16 sm:flex-none space-x-2">
+            <a href="{{ url_for('events.download_all_events_stats') }}" class="inline-flex items-center justify-center rounded-md border border-transparent bg-gray-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 sm:w-auto">
+                Download Stats
+            </a>
+            {% if user.role < 2 %}
+            <a href="{{ url_for('events.add_event') }}" class="inline-flex items-center justify-center rounded-md border border-transparent bg-[color:var(--color-primary-600)] px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-[color:var(--color-primary-700)] focus:outline-none focus:ring-2 focus:ring-[color:var(--color-primary-500)] focus:ring-offset-2 sm:w-auto">
+                Add Event
+            </a>
+            {% endif %}
+        </div>
+    </div>
 
-<div class="mb-3">
-    <a href="{{ url_for('events.download_all_events_stats') }}" class="btn btn-success">Download All Events Stats (CSV)</a>
+    <div class="mt-8 grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+        {% for event in events %}
+        <div class="bg-white overflow-hidden shadow rounded-lg divide-y divide-gray-200">
+            <div class="px-4 py-5 sm:px-6">
+                <div class="flex items-center justify-between">
+                    <h2 class="text-lg font-medium text-gray-900">
+                        <span class="text-2xl mr-2">{{ event.event_emoji }}</span>
+                        {{ event.event_name }}
+                    </h2>
+                    <!-- Join/Leave Button -->
+                    <div>
+                        {% if event.event_name not in user_events %}
+                        <form action="{{ url_for('events.join_event', event_id=event.id) }}" method="post">
+                             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                            <button type="submit" class="text-sm font-medium text-[color:var(--color-primary-600)] hover:text-[color:var(--color-primary-500)]">Join</button>
+                        </form>
+                        {% else %}
+                        <form action="{{ url_for('events.leave_event', event_id=event.id) }}" method="post">
+                             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                            <button type="submit" class="text-sm font-medium text-red-600 hover:text-red-500">Leave</button>
+                        </form>
+                        {% endif %}
+                    </div>
+                </div>
+                 <p class="mt-1 text-sm text-gray-500">Led by: {{ event.owner.first_name }} {{ event.owner.last_name }}</p>
+            </div>
+            <div class="px-4 py-5 sm:p-6">
+                <p class="text-sm text-gray-700">{{ event.event_description }}</p>
+            </div>
+            {% if event.owner_id == user.id or user.role >= 2 %}
+            <div class="px-4 py-4 sm:px-6 bg-gray-50">
+                <div class="flex items-center justify-end space-x-3">
+                    {% if event.owner_id == user.id %}
+                    <a href="{{ url_for('events.edit_event', event_id=event.id) }}" class="text-sm font-medium text-gray-600 hover:text-gray-900">Edit</a>
+                    <a href="{{ url_for('events.manage_members', event_id=event.id) }}" class="text-sm font-medium text-gray-600 hover:text-gray-900">Manage Members</a>
+                    {% endif %}
+                    {% if user.role >= 2 %}
+                    <a href="{{ url_for('events.delete_event', event_id=event.id) }}" class="text-sm font-medium text-red-600 hover:text-red-800">Delete</a>
+                    {% endif %}
+                </div>
+            </div>
+            {% endif %}
+        </div>
+        {% else %}
+        <div class="text-center py-12 col-span-full">
+            <h3 class="mt-2 text-sm font-medium text-gray-900">No events</h3>
+            <p class="mt-1 text-sm text-gray-500">Get started by creating a new event.</p>
+        </div>
+        {% endfor %}
+    </div>
 </div>
-{% for event in events %}
-<h1>{{ event.event_name }}</h1>
-<p>{{ event.event_description }}</p>
-<p>{{ event.event_emoji }}</p>
-<p>Event leader: {{ event.owner.first_name }} {{ event.owner.last_name }}</p>
-
-
-{% if event.event_name not in user_events %}
-<form action="{{ url_for('events.join_event', event_id=event.id) }}" method="post">
-    <button type="submit">Join {{ event.event_name }}</button>
-</form>
-{% else %}
-<form action="{{ url_for('events.leave_event', event_id=event.id) }}" method="post">
-    <button type="submit">Leave {{ event.event_name }}</button>
-</form>
-{% endif %}
-
-{% if event.owner_id == user.id %}
-<a href="{{ url_for('events.edit_event', event_id=event.id) }}">Edit Event</a>
-<a href="{{ url_for('events.manage_members', event_id=event.id) }}">Manage Members</a>
-{% endif %}
-{% if user.role >= 2 %}
-<a href="{{ url_for('events.delete_event', event_id=event.id) }}">Delete Event</a>
-
-{% endif %}
-
-{% endfor %}
-
-{% if user.role < 2 %}
-<a href="{{ url_for('events.add_event') }}">Add Event</a>
-{% endif %}
-
-
 {% endblock %}
