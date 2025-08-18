@@ -570,12 +570,17 @@ def tournament_results(tournament_id):
         points = 0
         user = User.query.filter_by(id=user_id).first()
 
-        user_bids = user.bids if user.bids is not None else 0
-
-        if user_bids == 0 and bid:
-            points += 15
-        elif user_bids > 0 and bid:
-            points += 5
+        # Check if user has any previous bids in their tournament performance history
+        from mason_snd.models.tournaments import Tournament_Performance
+        previous_bids = Tournament_Performance.query.filter_by(user_id=user_id, bid=True).first()
+        
+        if bid:
+            if previous_bids is None:
+                # User has never received a bid before - award 15 points
+                points += 15
+            else:
+                # User has received bid(s) before - award 5 points
+                points += 5
         if stage != 0:
             points += (stage + 1)
 
@@ -599,6 +604,10 @@ def tournament_results(tournament_id):
         )
 
         user.points += points
+        # Update user's bid count if they received a bid
+        if bid:
+            user.bids = (user.bids or 0) + 1
+        
         db.session.add(tournament_performance)
         db.session.commit()
 

@@ -1,0 +1,171 @@
+{% extends "admin/base.html" %}
+{% block title %}Delete Users{% endblock %}
+{% block content %}
+<div class="py-8 px-4 sm:px-6 lg:px-8">
+    <div class="flex items-center justify-between mb-6">
+        <h1 class="text-3xl font-bold text-red-900">Delete Users</h1>
+        <a href="{{ url_for('admin.delete_management') }}" 
+           class="bg-gray-500 hover:bg-gray-600 text-white px-4 py-2 rounded-md text-sm font-medium">
+            ← Back to Deletion Management
+        </a>
+    </div>
+    
+    <div class="bg-red-50 border-l-4 border-red-400 p-4 mb-6">
+        <div class="flex">
+            <div class="flex-shrink-0">
+                <svg class="h-5 w-5 text-red-400" viewBox="0 0 20 20" fill="currentColor">
+                    <path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd" />
+                </svg>
+            </div>
+            <div class="ml-3">
+                <p class="text-sm text-red-700">
+                    <strong>Warning:</strong> This will permanently delete users and ALL their related data. This action cannot be undone.
+                </p>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Search Form -->
+    <div class="bg-white shadow rounded-lg p-6 mb-6">
+        <h2 class="text-lg font-medium text-gray-900 mb-4">Search Users</h2>
+        <form method="GET" class="flex gap-4">
+            <div class="flex-1">
+                <input type="text" 
+                       name="search" 
+                       value="{{ search_query }}"
+                       placeholder="Search by name or email..."
+                       class="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">
+            </div>
+            <button type="submit" 
+                    class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md text-sm font-medium">
+                Search
+            </button>
+        </form>
+    </div>
+    
+    {% if users %}
+    <!-- User Selection Form -->
+    <form method="POST" id="userSelectionForm">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <input type="hidden" name="action" value="preview">
+        
+        <div class="bg-white shadow rounded-lg overflow-hidden">
+            <div class="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
+                <h2 class="text-lg font-medium text-gray-900">Select Users to Delete</h2>
+                <div class="flex items-center gap-4">
+                    <label class="flex items-center">
+                        <input type="checkbox" id="selectAll" class="rounded border-gray-300 mr-2">
+                        <span class="text-sm text-gray-600">Select All</span>
+                    </label>
+                    <span id="selectedCount" class="text-sm text-gray-500">0 selected</span>
+                </div>
+            </div>
+            
+            <div class="divide-y divide-gray-200">
+                {% for user in users %}
+                <div class="p-4 hover:bg-gray-50">
+                    <label class="flex items-center cursor-pointer">
+                        <input type="checkbox" 
+                               name="selected_users" 
+                               value="{{ user.id }}"
+                               class="user-checkbox rounded border-gray-300 mr-4">
+                        <div class="flex-1">
+                            <div class="flex items-center justify-between">
+                                <div>
+                                    <h3 class="text-sm font-medium text-gray-900">
+                                        {{ user.first_name }} {{ user.last_name }}
+                                    </h3>
+                                    <p class="text-sm text-gray-500">{{ user.email or 'No email' }}</p>
+                                </div>
+                                <div class="text-right">
+                                    <p class="text-sm text-gray-500">ID: {{ user.id }}</p>
+                                    <p class="text-sm text-gray-500">
+                                        Role: 
+                                        {% if user.role == 0 %}Member
+                                        {% elif user.role == 1 %}Event Leader
+                                        {% else %}Chair+
+                                        {% endif %}
+                                    </p>
+                                </div>
+                            </div>
+                            {% if user.is_parent %}
+                            <p class="text-xs text-blue-600 mt-1">Parent Account</p>
+                            {% endif %}
+                        </div>
+                    </label>
+                </div>
+                {% endfor %}
+            </div>
+            
+            <div class="px-6 py-4 bg-gray-50 border-t border-gray-200">
+                <button type="submit" 
+                        id="previewBtn"
+                        disabled
+                        class="bg-orange-600 hover:bg-orange-700 disabled:bg-gray-400 disabled:cursor-not-allowed text-white px-4 py-2 rounded-md text-sm font-medium">
+                    Preview Deletion Impact
+                </button>
+            </div>
+        </div>
+    </form>
+    {% elif search_query %}
+    <div class="bg-white shadow rounded-lg p-6 text-center">
+        <p class="text-gray-500">No users found matching "{{ search_query }}"</p>
+    </div>
+    {% else %}
+    <div class="bg-white shadow rounded-lg p-6 text-center">
+        <p class="text-gray-500">Enter a search term to find users</p>
+    </div>
+    {% endif %}
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const selectAll = document.getElementById('selectAll');
+    const userCheckboxes = document.querySelectorAll('.user-checkbox');
+    const selectedCount = document.getElementById('selectedCount');
+    const previewBtn = document.getElementById('previewBtn');
+    
+    function updateSelection() {
+        const checked = document.querySelectorAll('.user-checkbox:checked');
+        selectedCount.textContent = `${checked.length} selected`;
+        previewBtn.disabled = checked.length === 0;
+        
+        // Update select all checkbox
+        if (checked.length === 0) {
+            selectAll.indeterminate = false;
+            selectAll.checked = false;
+        } else if (checked.length === userCheckboxes.length) {
+            selectAll.indeterminate = false;
+            selectAll.checked = true;
+        } else {
+            selectAll.indeterminate = true;
+        }
+    }
+    
+    selectAll.addEventListener('change', function() {
+        userCheckboxes.forEach(checkbox => {
+            checkbox.checked = selectAll.checked;
+        });
+        updateSelection();
+    });
+    
+    userCheckboxes.forEach(checkbox => {
+        checkbox.addEventListener('change', updateSelection);
+    });
+    
+    // Confirmation for preview
+    document.getElementById('userSelectionForm').addEventListener('submit', function(e) {
+        const checked = document.querySelectorAll('.user-checkbox:checked');
+        if (checked.length === 0) {
+            e.preventDefault();
+            alert('Please select at least one user.');
+            return;
+        }
+        
+        if (!confirm(`Are you sure you want to preview deletion for ${checked.length} user(s)? This will show what data would be permanently deleted.`)) {
+            e.preventDefault();
+        }
+    });
+});
+</script>
+{% endblock %}

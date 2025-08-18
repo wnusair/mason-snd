@@ -46,6 +46,19 @@
                         <button type="submit" name="action" value="add_drop" class="w-full py-1 px-2 bg-red-600 text-white rounded hover:bg-red-700" onclick="return confirm('Are you sure you want to add a drop penalty to this user? This will increase their drops count by 1.')">Add Drop Penalty</button>
                     </div>
                 </form>
+                
+                <!-- Danger Zone -->
+                <div class="mt-6 pt-6 border-t border-red-200">
+                    <h4 class="text-sm font-medium text-red-900 mb-2">⚠️ Danger Zone</h4>
+                    <form method="POST" action="{{ url_for('admin.delete_single_user', user_id=user.id) }}" 
+                          onsubmit="return confirm('⚠️ WARNING ⚠️\n\nThis will permanently delete {{ user.first_name }} {{ user.last_name }} and ALL their related data including:\n- Tournament signups and performances\n- Judge assignments and partnerships\n- Roster entries and form responses\n- ALL related records\n\nThis action CANNOT be undone.\n\nType the user\'s full name to confirm: {{ user.first_name }} {{ user.last_name }}') && prompt('Type the user\'s full name to confirm:') === '{{ user.first_name }} {{ user.last_name }}'">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        <button type="submit" 
+                                class="w-full py-2 px-4 bg-red-700 hover:bg-red-800 text-white text-sm rounded font-medium">
+                            🗑️ Delete User & All Data
+                        </button>
+                    </form>
+                </div>
             </div>
             <div class="bg-white shadow rounded-lg p-6">
                 <h3 class="text-lg font-medium text-gray-900">Contact Information</h3>

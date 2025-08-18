@@ -1,0 +1,155 @@
+{% extends "admin/base.html" %}
+{% block title %}Preview User Deletion{% endblock %}
+{% block content %}
+<div class="py-8 px-4 sm:px-6 lg:px-8">
+    <div class="flex items-center justify-between mb-6">
+        <h1 class="text-3xl font-bold text-red-900">Preview User Deletion</h1>
+        <a href="{{ url_for('admin.delete_users') }}" 
+           class="bg-gray-500 hover:bg-gray-600 text-white px-4 py-2 rounded-md text-sm font-medium">
+            ← Back to User Selection
+        </a>
+    </div>
+    
+    <div class="bg-red-50 border-l-4 border-red-400 p-4 mb-6">
+        <div class="flex">
+            <div class="flex-shrink-0">
+                <svg class="h-5 w-5 text-red-400" viewBox="0 0 20 20" fill="currentColor">
+                    <path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd" />
+                </svg>
+            </div>
+            <div class="ml-3">
+                <p class="text-sm text-red-700">
+                    <strong>FINAL WARNING:</strong> This preview shows ALL data that will be permanently deleted. This action cannot be undone.
+                </p>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Summary Statistics -->
+    <div class="bg-white shadow rounded-lg p-6 mb-6">
+        <h2 class="text-lg font-medium text-gray-900 mb-4">Deletion Summary</h2>
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div class="bg-red-50 p-4 rounded-lg">
+                <div class="text-2xl font-bold text-red-600">{{ previews|length }}</div>
+                <div class="text-sm text-red-800">Users to Delete</div>
+            </div>
+            <div class="bg-orange-50 p-4 rounded-lg">
+                <div class="text-2xl font-bold text-orange-600">
+                    {{ previews|sum(attribute='total_related') }}
+                </div>
+                <div class="text-sm text-orange-800">Related Records</div>
+            </div>
+            <div class="bg-gray-50 p-4 rounded-lg">
+                <div class="text-2xl font-bold text-gray-600">
+                    {{ previews|length + previews|sum(attribute='total_related') }}
+                </div>
+                <div class="text-sm text-gray-800">Total Deletions</div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Individual User Details -->
+    <div class="space-y-6 mb-6">
+        {% for preview in previews %}
+        <div class="bg-white shadow rounded-lg overflow-hidden">
+            <div class="px-6 py-4 bg-red-50 border-b border-red-200">
+                <h3 class="text-lg font-medium text-red-900">
+                    {{ preview.user_name }}
+                    <span class="text-sm text-red-600">({{ preview.user_email or 'No email' }})</span>
+                </h3>
+                <p class="text-sm text-red-700 mt-1">
+                    Will delete {{ preview.total_related }} related records
+                </p>
+            </div>
+            
+            <div class="p-6">
+                <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                    {% for category, count in preview.counts.items() %}
+                    {% if count > 0 %}
+                    <div class="bg-gray-50 p-3 rounded">
+                        <div class="text-lg font-semibold text-gray-900">{{ count }}</div>
+                        <div class="text-xs text-gray-600">{{ category.replace('_', ' ').title() }}</div>
+                    </div>
+                    {% endif %}
+                    {% endfor %}
+                </div>
+                
+                {% if preview.total_related == 0 %}
+                <p class="text-green-600 text-sm mt-4">✓ This user has no related data to delete</p>
+                {% endif %}
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    
+    <!-- Confirmation Form -->
+    <div class="bg-white shadow rounded-lg p-6">
+        <h2 class="text-lg font-medium text-red-900 mb-4">Confirm Deletion</h2>
+        <p class="text-gray-700 mb-6">
+            Type <strong>DELETE</strong> in the box below and click the confirmation button to permanently delete 
+            {{ previews|length }} user(s) and {{ previews|sum(attribute='total_related') }} related records.
+        </p>
+        
+        <form method="POST" id="confirmationForm">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <input type="hidden" name="action" value="confirm_delete">
+            {% for preview in previews %}
+            <input type="hidden" name="confirmed_user_ids" value="{{ loop.index0 }}">
+            {% endfor %}
+            
+            <!-- Hidden inputs for user IDs -->
+            {% for user_id in selected_user_ids %}
+            <input type="hidden" name="confirmed_user_ids" value="{{ user_id }}">
+            {% endfor %}
+            
+            <div class="mb-4">
+                <label for="confirmation" class="block text-sm font-medium text-gray-700 mb-2">
+                    Type "DELETE" to confirm:
+                </label>
+                <input type="text" 
+                       id="confirmation" 
+                       name="confirmation"
+                       placeholder="Type DELETE here..."
+                       class="block w-full max-w-xs rounded-md border-gray-300 shadow-sm focus:border-red-500 focus:ring-red-500">
+            </div>
+            
+            <div class="flex gap-4">
+                <button type="submit" 
+                        id="deleteBtn"
+                        disabled
+                        class="bg-red-600 hover:bg-red-700 disabled:bg-gray-400 disabled:cursor-not-allowed text-white px-6 py-2 rounded-md font-medium">
+                    🗑️ PERMANENTLY DELETE {{ previews|length }} USER(S)
+                </button>
+                <a href="{{ url_for('admin.delete_users') }}" 
+                   class="bg-gray-500 hover:bg-gray-600 text-white px-6 py-2 rounded-md font-medium">
+                    Cancel
+                </a>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const confirmationInput = document.getElementById('confirmation');
+    const deleteBtn = document.getElementById('deleteBtn');
+    const form = document.getElementById('confirmationForm');
+    
+    confirmationInput.addEventListener('input', function() {
+        deleteBtn.disabled = confirmationInput.value !== 'DELETE';
+    });
+    
+    form.addEventListener('submit', function(e) {
+        if (confirmationInput.value !== 'DELETE') {
+            e.preventDefault();
+            alert('Please type "DELETE" to confirm.');
+            return;
+        }
+        
+        if (!confirm(`⚠️ FINAL CONFIRMATION ⚠️\n\nYou are about to permanently delete {{ previews|length }} user(s) and {{ previews|sum(attribute='total_related') }} related records.\n\nThis action CANNOT be undone.\n\nClick OK to proceed with deletion.`)) {
+            e.preventDefault();
+        }
+    });
+});
+</script>
+{% endblock %}

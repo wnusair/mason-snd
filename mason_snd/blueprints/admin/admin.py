@@ -10,6 +10,11 @@ from mason_snd.models.admin import User_Requirements, Requirements, Popups
 from mason_snd.models.events import User_Event, Event
 from mason_snd.models.tournaments import Tournament_Performance, Tournament, Tournament_Signups
 from mason_snd.models.metrics import MetricsSettings
+from mason_snd.models.deletion_utils import (
+    delete_user_safely, delete_tournament_safely, delete_multiple_users,
+    get_user_deletion_preview, get_tournament_deletion_preview,
+    delete_event_safely, delete_multiple_events, get_event_deletion_preview
+)
 
 from werkzeug.security import generate_password_hash, check_password_hash
 
@@ -571,3 +576,226 @@ def test_data():
     }
     
     return render_template('admin/test_data.html', stats=stats)
+
+
+# User and Tournament Deletion Routes
+
+@admin_bp.route('/delete_management')
+def delete_management():
+    """Main page for deletion management"""
+    user_id = session.get('user_id')
+    if not user_id:
+        flash('Please log in to access this page.', 'error')
+        return redirect(url_for('auth.login'))
+        
+    user = User.query.filter_by(id=user_id).first()
+    if not user or user.role <= 1:
+        flash('Restricted Access!!!!!')
+        return redirect(url_for('profile.index', user_id=user_id))
+    
+    return render_template('admin/delete_management.html')
+
+@admin_bp.route('/delete_users', methods=['GET', 'POST'])
+def delete_users():
+    """User deletion interface with search and bulk selection"""
+    user_id = session.get('user_id')
+    if not user_id:
+        flash('Please log in to access this page.', 'error')
+        return redirect(url_for('auth.login'))
+        
+    user = User.query.filter_by(id=user_id).first()
+    if not user or user.role <= 1:
+        flash('Restricted Access!!!!!')
+        return redirect(url_for('profile.index', user_id=user_id))
+    
+    if request.method == 'POST':
+        action = request.form.get('action')
+        
+        if action == 'preview':
+            # Get preview for selected users
+            selected_user_ids = request.form.getlist('selected_users')
+            if not selected_user_ids:
+                flash('Please select at least one user.', 'error')
+                return redirect(url_for('admin.delete_users'))
+            
+            previews = []
+            for uid in selected_user_ids:
+                preview = get_user_deletion_preview(int(uid))
+                if preview:
+                    previews.append(preview)
+            
+            return render_template('admin/delete_users_preview.html', 
+                                 previews=previews, 
+                                 selected_user_ids=selected_user_ids)
+        
+        elif action == 'confirm_delete':
+            # Perform actual deletion
+            selected_user_ids = request.form.getlist('confirmed_user_ids')
+            if not selected_user_ids:
+                flash('No users selected for deletion.', 'error')
+                return redirect(url_for('admin.delete_users'))
+            
+            # Convert to integers
+            user_ids = [int(uid) for uid in selected_user_ids]
+            
+            # Perform deletion
+            result = delete_multiple_users(user_ids)
+            
+            if result.success:
+                flash(f'Successfully deleted {len(user_ids)} users and all related data. {result.get_summary()}', 'success')
+            else:
+                flash(f'Deletion completed with errors: {"; ".join(result.errors)}', 'error')
+            
+            return redirect(url_for('admin.delete_users'))
+    
+    # GET request - show user search/selection interface
+    search_query = request.args.get('search', '')
+    users = []
+    
+    if search_query:
+        users = User.query.filter(
+            db.or_(
+                User.first_name.contains(search_query),
+                User.last_name.contains(search_query),
+                User.email.contains(search_query)
+            )
+        ).limit(50).all()
+    
+    return render_template('admin/delete_users.html', users=users, search_query=search_query)
+
+@admin_bp.route('/delete_tournaments', methods=['GET', 'POST'])
+def delete_tournaments():
+    """Tournament deletion interface"""
+    user_id = session.get('user_id')
+    if not user_id:
+        flash('Please log in to access this page.', 'error')
+        return redirect(url_for('auth.login'))
+        
+    user = User.query.filter_by(id=user_id).first()
+    if not user or user.role <= 1:
+        flash('Restricted Access!!!!!')
+        return redirect(url_for('profile.index', user_id=user_id))
+    
+    if request.method == 'POST':
+        action = request.form.get('action')
+        
+        if action == 'preview':
+            # Get preview for selected tournament
+            tournament_id = request.form.get('tournament_id')
+            if not tournament_id:
+                flash('Please select a tournament.', 'error')
+                return redirect(url_for('admin.delete_tournaments'))
+            
+            preview = get_tournament_deletion_preview(int(tournament_id))
+            if not preview:
+                flash('Tournament not found.', 'error')
+                return redirect(url_for('admin.delete_tournaments'))
+            
+            return render_template('admin/delete_tournament_preview.html', 
+                                 preview=preview, 
+                                 tournament_id=tournament_id)
+        
+        elif action == 'confirm_delete':
+            # Perform actual deletion
+            tournament_id = request.form.get('confirmed_tournament_id')
+            if not tournament_id:
+                flash('No tournament selected for deletion.', 'error')
+                return redirect(url_for('admin.delete_tournaments'))
+            
+            # Perform deletion
+            result = delete_tournament_safely(int(tournament_id))
+            
+            if result.success:
+                flash(f'Successfully deleted tournament and all related data. {result.get_summary()}', 'success')
+            else:
+                flash(f'Deletion failed: {"; ".join(result.errors)}', 'error')
+            
+            return redirect(url_for('admin.delete_tournaments'))
+    
+    # GET request - show tournament selection interface
+    tournaments = Tournament.query.order_by(Tournament.date.desc()).all()
+    return render_template('admin/delete_tournaments.html', tournaments=tournaments)
+
+@admin_bp.route('/delete_user/<int:user_id>', methods=['POST'])
+def delete_single_user(user_id):
+    """Quick delete for a single user (from user detail page)"""
+    current_user_id = session.get('user_id')
+    if not current_user_id:
+        flash('Please log in to access this page.', 'error')
+        return redirect(url_for('auth.login'))
+        
+    current_user = User.query.filter_by(id=current_user_id).first()
+    if not current_user or current_user.role <= 1:
+        flash('Restricted Access!!!!!')
+        return redirect(url_for('profile.index', user_id=current_user_id))
+    
+    # Don't allow deleting yourself
+    if user_id == current_user_id:
+        flash('You cannot delete your own account.', 'error')
+        return redirect(url_for('admin.user_detail', user_id=user_id))
+    
+    result = delete_user_safely(user_id)
+    
+    if result.success:
+        flash(f'User successfully deleted. {result.get_summary()}', 'success')
+        return redirect(url_for('admin.delete_users'))
+    else:
+        flash(f'Failed to delete user: {"; ".join(result.errors)}', 'error')
+        return redirect(url_for('admin.user_detail', user_id=user_id))
+
+@admin_bp.route('/delete_events', methods=['GET', 'POST'])
+def delete_events():
+    """Event deletion interface"""
+    user_id = session.get('user_id')
+    if not user_id:
+        flash('Please log in to access this page.', 'error')
+        return redirect(url_for('auth.login'))
+        
+    user = User.query.filter_by(id=user_id).first()
+    if not user or user.role <= 1:
+        flash('Restricted Access!!!!!')
+        return redirect(url_for('profile.index', user_id=user_id))
+    
+    if request.method == 'POST':
+        action = request.form.get('action')
+        
+        if action == 'preview':
+            # Get preview for selected events
+            selected_event_ids = request.form.getlist('selected_events')
+            if not selected_event_ids:
+                flash('Please select at least one event.', 'error')
+                return redirect(url_for('admin.delete_events'))
+            
+            previews = []
+            for eid in selected_event_ids:
+                preview = get_event_deletion_preview(int(eid))
+                if preview:
+                    previews.append(preview)
+            
+            return render_template('admin/delete_events_preview.html', 
+                                 previews=previews, 
+                                 selected_event_ids=selected_event_ids)
+        
+        elif action == 'confirm_delete':
+            # Perform actual deletion
+            selected_event_ids = request.form.getlist('confirmed_event_ids')
+            if not selected_event_ids:
+                flash('No events selected for deletion.', 'error')
+                return redirect(url_for('admin.delete_events'))
+            
+            # Convert to integers
+            event_ids = [int(eid) for eid in selected_event_ids]
+            
+            # Perform deletion
+            result = delete_multiple_events(event_ids)
+            
+            if result.success:
+                flash(f'Successfully deleted {len(event_ids)} events and all related data. {result.get_summary()}', 'success')
+            else:
+                flash(f'Deletion completed with errors: {"; ".join(result.errors)}', 'error')
+            
+            return redirect(url_for('admin.delete_events'))
+    
+    # GET request - show event selection interface
+    events = Event.query.order_by(Event.event_name).all()
+    return render_template('admin/delete_events.html', events=events)

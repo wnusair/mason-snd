@@ -1,5 +1,6 @@
 <!-- Dropdown menu partial for navigation, using Alpine.js for better interactivity -->
 <script src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js" defer></script>
+<link rel="icon" type="image/png" href="{{ url_for('static', filename='icon.png') }}">
 <nav class="bg-white shadow-sm">
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div class="flex justify-between h-16 items-center">
@@ -49,6 +50,8 @@
                     </button>
                     <div x-show="open" @click.away="open = false" class="absolute left-0 mt-2 w-48 rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5 z-10" x-transition>
                         <a href="{{ url_for('tournaments.index') }}" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">All Tournaments</a>
+                        <a href="{{ url_for('tournaments.my_tournaments') }}" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">My Tournaments</a>
+                        <a href="{{ url_for('tournaments.signup') }}" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">Tournament Signup</a>
                         {% if session.get('role', 0) >= 2 %}
                         <a href="{{ url_for('tournaments.add_tournament') }}" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">Add Tournament</a>
                         <a href="{{ url_for('tournaments.add_form') }}" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">Add Form</a>

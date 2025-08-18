@@ -1,6 +1,7 @@
-from flask import Blueprint, render_template, request, redirect, url_for, flash, session, Response
+from flask import Blueprint, render_template, request, redirect, url_for, flash, session, Response, send_from_directory
 import csv
 from io import StringIO
+import os
 
 from mason_snd.extensions import db
 from mason_snd.models.events import Event, User_Event, Effort_Score
@@ -23,3 +24,9 @@ def index():
 @main_bp.route('life')
 def life():
     return render_template('main/life.html')
+
+@main_bp.route('/favicon.ico')
+def favicon():
+    """Serve the favicon from the images directory."""
+    images_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'images')
+    return send_from_directory(images_dir, 'icon.png', mimetype='image/png')

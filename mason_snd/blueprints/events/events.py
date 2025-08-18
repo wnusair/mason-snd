@@ -166,13 +166,22 @@ def manage_members(event_id):
                 )
                 db.session.add(effort_score_entry)
 
-                # Update the user's total score
+                # Award points and handle bids
                 user = User.query.get(ue.user_id)
                 if user:
-                    user.points = (user.points or 0) + new_score
+                    # Check if user has any previous bids in their tournament performance history
+                    from mason_snd.models.tournaments import Tournament_Performance
+                    previous_bids = Tournament_Performance.query.filter_by(user_id=user.id, bid=True).first()
+                    
+                    if previous_bids is None:
+                        # User has never received a tournament bid before - award 15 points
+                        user.points = (user.points or 0) + 15
+                    else:
+                        # User has received tournament bid(s) before - award 5 points
+                        user.points = (user.points or 0) + 5
 
         db.session.commit()
-        flash("Effort scores updated successfully.", "success")
+        flash("Effort scores and points/bids updated successfully.", "success")
         return redirect(url_for("events.manage_members", event_id=event_id, sort=sort, direction=direction))
 
     def next_direction(column):

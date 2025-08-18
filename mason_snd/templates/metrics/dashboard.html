@@ -1,0 +1,321 @@
+{% extends "metrics/base.html" %}
+{% block title %}Analytics Dashboard{% endblock %}
+
+{% block content %}
+<div class="px-4 sm:px-6 lg:px-8">
+    <!-- Header -->
+    <div class="sm:flex sm:items-center">
+        <div class="sm:flex-auto">
+            <h1 class="text-2xl font-bold text-gray-900">Analytics Dashboard</h1>
+            <p class="mt-2 text-sm text-gray-700">Comprehensive metrics and insights across the debate program.</p>
+        </div>
+        <div class="mt-4 sm:mt-0 sm:ml-16 sm:flex-none space-x-2">
+            <a href="{{ url_for('metrics.user_metrics') }}" class="inline-flex items-center justify-center rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50">User Metrics</a>
+            <a href="{{ url_for('metrics.tournaments_overview') }}" class="inline-flex items-center justify-center rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50">Tournaments</a>
+            <a href="{{ url_for('metrics.events_overview') }}" class="inline-flex items-center justify-center rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50">Events</a>
+            <a href="{{ url_for('metrics.settings') }}" class="inline-flex items-center justify-center rounded-md border border-transparent bg-[color:var(--color-primary-600)] px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-[color:var(--color-primary-700)]">Settings</a>
+        </div>
+    </div>
+
+    <!-- Key Statistics Cards -->
+    <div class="mt-8 grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
+        <div class="bg-white overflow-hidden shadow rounded-lg">
+            <div class="p-5">
+                <div class="flex items-center">
+                    <div class="flex-shrink-0">
+                        <svg class="h-6 w-6 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197m13.5-9a2.5 2.5 0 11-5 0 2.5 2.5 0 015 0z" />
+                        </svg>
+                    </div>
+                    <div class="ml-5 w-0 flex-1">
+                        <dl>
+                            <dt class="text-sm font-medium text-gray-500 truncate">Total Users</dt>
+                            <dd class="text-lg font-medium text-gray-900">{{ stats.total_users }}</dd>
+                        </dl>
+                    </div>
+                </div>
+            </div>
+            <div class="bg-gray-50 px-5 py-3">
+                <div class="text-sm">
+                    <span class="font-medium text-green-600">{{ stats.active_users }}</span> active members
+                    <span class="text-gray-500">({{ stats.engagement_rate }}%)</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="bg-white overflow-hidden shadow rounded-lg">
+            <div class="p-5">
+                <div class="flex items-center">
+                    <div class="flex-shrink-0">
+                        <svg class="h-6 w-6 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 20H5a2 2 0 01-2-2V6a2 2 0 012-2h10a2 2 0 012 2v1m2 13a2 2 0 01-2-2V7m2 13a2 2 0 002-2V9.5a2.5 2.5 0 00-2.5-2.5H15" />
+                        </svg>
+                    </div>
+                    <div class="ml-5 w-0 flex-1">
+                        <dl>
+                            <dt class="text-sm font-medium text-gray-500 truncate">Tournaments</dt>
+                            <dd class="text-lg font-medium text-gray-900">{{ stats.total_tournaments }}</dd>
+                        </dl>
+                    </div>
+                </div>
+            </div>
+            <div class="bg-gray-50 px-5 py-3">
+                <div class="text-sm">
+                    <span class="font-medium text-blue-600">{{ stats.past_tournaments }}</span> completed
+                    <span class="text-gray-500">{{ stats.upcoming_tournaments }} upcoming</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="bg-white overflow-hidden shadow rounded-lg">
+            <div class="p-5">
+                <div class="flex items-center">
+                    <div class="flex-shrink-0">
+                        <svg class="h-6 w-6 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                        </svg>
+                    </div>
+                    <div class="ml-5 w-0 flex-1">
+                        <dl>
+                            <dt class="text-sm font-medium text-gray-500 truncate">Avg Points/Tournament</dt>
+                            <dd class="text-lg font-medium text-gray-900">{{ stats.avg_points_per_tournament }}</dd>
+                        </dl>
+                    </div>
+                </div>
+            </div>
+            <div class="bg-gray-50 px-5 py-3">
+                <div class="text-sm">
+                    <span class="font-medium text-purple-600">{{ stats.total_performances }}</span> total performances
+                </div>
+            </div>
+        </div>
+
+        <div class="bg-white overflow-hidden shadow rounded-lg">
+            <div class="p-5">
+                <div class="flex items-center">
+                    <div class="flex-shrink-0">
+                        <svg class="h-6 w-6 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
+                        </svg>
+                    </div>
+                    <div class="ml-5 w-0 flex-1">
+                        <dl>
+                            <dt class="text-sm font-medium text-gray-500 truncate">Avg Effort Score</dt>
+                            <dd class="text-lg font-medium text-gray-900">{{ stats.avg_effort_score }}</dd>
+                        </dl>
+                    </div>
+                </div>
+            </div>
+            <div class="bg-gray-50 px-5 py-3">
+                <div class="text-sm">
+                    <span class="font-medium text-yellow-600">{{ stats.recent_effort_scores }}</span> recent scores (30d)
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Charts Row -->
+    <div class="mt-8 grid grid-cols-1 gap-6 lg:grid-cols-2">
+        <!-- Tournament Trends Chart -->
+        <div class="bg-white p-6 rounded-lg shadow">
+            <h3 class="text-lg font-medium text-gray-900 mb-4">Tournament Performance Trends</h3>
+            <canvas id="tournamentTrendsChart"></canvas>
+        </div>
+
+        <!-- Performance Distribution -->
+        <div class="bg-white p-6 rounded-lg shadow">
+            <h3 class="text-lg font-medium text-gray-900 mb-4">Performance Distribution</h3>
+            <div class="space-y-4">
+                <div class="flex justify-between items-center">
+                    <span class="text-sm font-medium text-gray-700">High Performers</span>
+                    <span class="px-2 py-1 text-xs font-medium bg-green-100 text-green-800 rounded-full">{{ performance_distribution.high_performers|length }}</span>
+                </div>
+                <div class="flex justify-between items-center">
+                    <span class="text-sm font-medium text-gray-700">Mid Performers</span>
+                    <span class="px-2 py-1 text-xs font-medium bg-blue-100 text-blue-800 rounded-full">{{ performance_distribution.mid_performers|length }}</span>
+                </div>
+                <div class="flex justify-between items-center">
+                    <span class="text-sm font-medium text-gray-700">Developing</span>
+                    <span class="px-2 py-1 text-xs font-medium bg-yellow-100 text-yellow-800 rounded-full">{{ performance_distribution.low_performers|length }}</span>
+                </div>
+                <div class="flex justify-between items-center">
+                    <span class="text-sm font-medium text-gray-700">Inactive</span>
+                    <span class="px-2 py-1 text-xs font-medium bg-gray-100 text-gray-800 rounded-full">{{ performance_distribution.inactive|length }}</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Top Performers and Event Analytics -->
+    <div class="mt-8 grid grid-cols-1 gap-6 lg:grid-cols-2">
+        <!-- Top Performers -->
+        <div class="bg-white shadow rounded-lg">
+            <div class="px-4 py-5 sm:p-6">
+                <h3 class="text-lg font-medium text-gray-900 mb-4">Top Performers</h3>
+                <div class="space-y-3">
+                    {% for performer in top_performers[:5] %}
+                    <div class="flex items-center justify-between">
+                        <div class="flex items-center">
+                            <div class="flex-shrink-0">
+                                <span class="inline-flex items-center justify-center h-8 w-8 rounded-full bg-[color:var(--color-primary-100)] text-[color:var(--color-primary-800)] text-sm font-medium">
+                                    {{ loop.index }}
+                                </span>
+                            </div>
+                            <div class="ml-3">
+                                <p class="text-sm font-medium text-gray-900">
+                                    <a href="{{ url_for('metrics.user_detail', user_id=performer.user.id) }}" class="hover:text-[color:var(--color-primary-600)]">
+                                        {{ performer.user.first_name }} {{ performer.user.last_name }}
+                                    </a>
+                                </p>
+                                <p class="text-sm text-gray-500">{{ performer.total_score }} total points</p>
+                            </div>
+                        </div>
+                        <div class="text-sm font-medium text-gray-900">
+                            {{ performer.weighted_score|round(1) }}
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+                <div class="mt-4">
+                    <a href="{{ url_for('metrics.user_metrics') }}" class="text-sm text-[color:var(--color-primary-600)] hover:text-[color:var(--color-primary-700)]">
+                        View all users →
+                    </a>
+                </div>
+            </div>
+        </div>
+
+        <!-- Top Events -->
+        <div class="bg-white shadow rounded-lg">
+            <div class="px-4 py-5 sm:p-6">
+                <h3 class="text-lg font-medium text-gray-900 mb-4">Top Events</h3>
+                <div class="space-y-3">
+                    {% for event_data in event_analytics %}
+                    <div class="flex items-center justify-between">
+                        <div class="flex items-center">
+                            <div class="flex-shrink-0">
+                                <span class="text-xl">{{ event_data.event.event_emoji or '🎯' }}</span>
+                            </div>
+                            <div class="ml-3">
+                                <p class="text-sm font-medium text-gray-900">
+                                    <a href="{{ url_for('metrics.event_detail', event_id=event_data.event.id) }}" class="hover:text-[color:var(--color-primary-600)]">
+                                        {{ event_data.event.event_name }}
+                                    </a>
+                                </p>
+                                <p class="text-sm text-gray-500">{{ event_data.participant_count }} participants</p>
+                            </div>
+                        </div>
+                        <div class="text-right">
+                            <div class="text-sm font-medium text-gray-900">{{ event_data.avg_tournament_points|round(1) }}</div>
+                            <div class="text-xs text-gray-500">avg points</div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+                <div class="mt-4">
+                    <a href="{{ url_for('metrics.events_overview') }}" class="text-sm text-[color:var(--color-primary-600)] hover:text-[color:var(--color-primary-700)]">
+                        View all events →
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Recent Activity -->
+    <div class="mt-8">
+        <div class="bg-white shadow rounded-lg">
+            <div class="px-4 py-5 sm:p-6">
+                <h3 class="text-lg font-medium text-gray-900 mb-4">Recent Activity (Last 30 Days)</h3>
+                <div class="grid grid-cols-1 gap-4 sm:grid-cols-3">
+                    <div class="text-center">
+                        <dt class="text-sm font-medium text-gray-500">Recent Tournaments</dt>
+                        <dd class="mt-1 text-3xl font-semibold text-gray-900">{{ stats.recent_tournaments }}</dd>
+                    </div>
+                    <div class="text-center">
+                        <dt class="text-sm font-medium text-gray-500">Effort Scores</dt>
+                        <dd class="mt-1 text-3xl font-semibold text-gray-900">{{ stats.recent_effort_scores }}</dd>
+                    </div>
+                    <div class="text-center">
+                        <dt class="text-sm font-medium text-gray-500">Users with Bids</dt>
+                        <dd class="mt-1 text-3xl font-semibold text-gray-900">{{ stats.users_with_bids }}</dd>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    // Tournament Trends Chart
+    const ctx = document.getElementById('tournamentTrendsChart').getContext('2d');
+    const tournamentTrendsChart = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: {{ trend_labels | safe }},
+            datasets: [{
+                label: 'Total Points',
+                data: {{ trend_points | safe }},
+                backgroundColor: 'rgba(79, 70, 229, 0.1)',
+                borderColor: 'rgba(79, 70, 229, 1)',
+                borderWidth: 2,
+                pointBackgroundColor: 'rgba(79, 70, 229, 1)',
+                tension: 0.2,
+                yAxisID: 'y'
+            }, {
+                label: 'Participants',
+                data: {{ trend_participants | safe }},
+                backgroundColor: 'rgba(16, 185, 129, 0.1)',
+                borderColor: 'rgba(16, 185, 129, 1)',
+                borderWidth: 2,
+                pointBackgroundColor: 'rgba(16, 185, 129, 1)',
+                tension: 0.2,
+                yAxisID: 'y1'
+            }]
+        },
+        options: {
+            responsive: true,
+            interaction: {
+                mode: 'index',
+                intersect: false,
+            },
+            scales: {
+                x: {
+                    display: true,
+                    title: {
+                        display: true,
+                        text: 'Tournament'
+                    }
+                },
+                y: {
+                    type: 'linear',
+                    display: true,
+                    position: 'left',
+                    title: {
+                        display: true,
+                        text: 'Total Points'
+                    }
+                },
+                y1: {
+                    type: 'linear',
+                    display: true,
+                    position: 'right',
+                    title: {
+                        display: true,
+                        text: 'Participants'
+                    },
+                    grid: {
+                        drawOnChartArea: false,
+                    },
+                }
+            },
+            plugins: {
+                legend: {
+                    position: 'top',
+                },
+                title: {
+                    display: false
+                }
+            }
+        }
+    });
+</script>
+{% endblock %}
