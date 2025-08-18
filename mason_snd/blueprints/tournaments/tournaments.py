@@ -25,10 +25,32 @@ def index():
         flash("Please Log in", "error")
         return redirect(url_for('auth.login'))
 
+    now = datetime.now(EST)
+    
+    # Separate tournaments into upcoming and past
+    upcoming_tournaments = []
+    past_tournaments = []
+    
     for tournament in tournaments:
-        print(tournament.name,tournament.date,tournament.address,tournament.signup_deadline,tournament.performance_deadline)
+        # Make tournament date timezone-aware if it's naive
+        tournament_date = tournament.date
+        if tournament_date.tzinfo is None:
+            tournament_date = EST.localize(tournament_date)
+        
+        if tournament_date >= now:
+            upcoming_tournaments.append(tournament)
+        else:
+            past_tournaments.append(tournament)
+    
+    # Sort tournaments by date
+    upcoming_tournaments.sort(key=lambda t: t.date)
+    past_tournaments.sort(key=lambda t: t.date, reverse=True)
 
-    return render_template('tournaments/index.html', tournaments=tournaments, user=user)
+    return render_template('tournaments/index.html', 
+                         upcoming_tournaments=upcoming_tournaments, 
+                         past_tournaments=past_tournaments, 
+                         user=user, 
+                         now=now)
 
 from datetime import datetime
 
@@ -389,21 +411,116 @@ def judge_requests():
 @tournaments_bp.route('/my_tournaments')
 def my_tournaments():
     user_id = session.get('user_id')
-
     if not user_id:
         flash("Must Be Logged In")
         return redirect(url_for('auth.login'))
 
-    tournaments = Tournament.query.all()
+    user = User.query.filter_by(id=user_id).first()
+    tournaments = Tournament.query.order_by(Tournament.date.desc()).all()
+    now = datetime.now(EST)
 
-    # Localize performance_deadline for all tournaments
+    # Prepare data for template: show past tournaments, allow submit if not submitted, view-only if submitted
+    my_tournaments_data = []
     for tournament in tournaments:
+        # Localize performance_deadline if needed
         if tournament.performance_deadline and tournament.performance_deadline.tzinfo is None:
             tournament.performance_deadline = EST.localize(tournament.performance_deadline)
 
-    now = datetime.now(EST)
+        # Check if user attended (signed up and is_going)
+        signup = Tournament_Signups.query.filter_by(user_id=user_id, tournament_id=tournament.id, is_going=True).first()
+        if not signup:
+            continue  # Only show tournaments the user attended
 
-    return render_template('tournaments/my_tournaments.html', tournaments=tournaments, now=now)
+        # Check if user already submitted performance
+        performance = Tournament_Performance.query.filter_by(user_id=user_id, tournament_id=tournament.id).first()
+
+        # Only allow submission if performance_deadline is in the future and not already submitted
+        can_submit = (tournament.performance_deadline and now < tournament.performance_deadline and not performance)
+
+        my_tournaments_data.append({
+            'tournament': tournament,
+            'performance': performance,
+            'can_submit': can_submit
+        })
+
+    return render_template('tournaments/my_tournaments.html', my_tournaments=my_tournaments_data, now=now, user=user)
+
+@tournaments_bp.route('/submit_results/<int:tournament_id>', methods=['GET', 'POST'])
+def submit_results(tournament_id):
+    user_id = session.get('user_id')
+    if not user_id:
+        flash("Please log in", "error")
+        return redirect(url_for('auth.login'))
+    
+    user = User.query.filter_by(id=user_id).first()
+    if not user or user.role < 2:  # Only admins can submit results
+        flash("You are not authorized to submit tournament results", "error")
+        return redirect(url_for('tournaments.index'))
+    
+    tournament = Tournament.query.get_or_404(tournament_id)
+    now = datetime.now(EST)
+    
+    # Check if tournament date has passed
+    tournament_date = tournament.date
+    if tournament_date.tzinfo is None:
+        tournament_date = EST.localize(tournament_date)
+    
+    if tournament_date >= now:
+        flash("Cannot submit results for a tournament that hasn't happened yet", "error")
+        return redirect(url_for('tournaments.index'))
+    
+    # Check if results have already been submitted
+    if tournament.results_submitted:
+        flash("Results have already been submitted for this tournament", "error")
+        return redirect(url_for('tournaments.view_results', tournament_id=tournament_id))
+    
+    if request.method == 'POST':
+        # Mark results as submitted (closes result collection)
+        tournament.results_submitted = True
+        db.session.commit()
+        
+        flash("Tournament results collection has been closed successfully", "success")
+        return redirect(url_for('tournaments.view_results', tournament_id=tournament_id))
+    
+    # Get tournament signups and performances for context
+    signups = Tournament_Signups.query.filter_by(tournament_id=tournament_id, is_going=True).all()
+    performances = Tournament_Performance.query.filter_by(tournament_id=tournament_id).all()
+    
+    # Calculate statistics
+    total_participants = len(signups)
+    submitted_results = len(performances)
+    pending_results = total_participants - submitted_results
+    
+    return render_template('tournaments/submit_results.html', 
+                         tournament=tournament, 
+                         signups=signups,
+                         performances=performances,
+                         total_participants=total_participants,
+                         submitted_results=submitted_results,
+                         pending_results=pending_results)
+
+@tournaments_bp.route('/view_results/<int:tournament_id>')
+def view_results(tournament_id):
+    user_id = session.get('user_id')
+    if not user_id:
+        flash("Please log in", "error")
+        return redirect(url_for('auth.login'))
+    
+    tournament = Tournament.query.get_or_404(tournament_id)
+    
+    # Get all tournament performances for this tournament
+    performances = Tournament_Performance.query.filter_by(tournament_id=tournament_id).all()
+    
+    # Get user details for each performance
+    performance_data = []
+    for performance in performances:
+        user = User.query.get(performance.user_id)
+        performance_data.append({
+            'user': user,
+            'performance': performance
+        })
+    
+    return render_template('tournaments/view_results.html', tournament=tournament, performance_data=performance_data)
 
 @tournaments_bp.route('/tournament_results/<int:tournament_id>', methods=['GET', 'POST'])
 def tournament_results(tournament_id):
@@ -412,17 +529,17 @@ def tournament_results(tournament_id):
         flash("Must Be Logged In")
         return redirect(url_for('auth.login'))
 
-    if request.method == 'POST':
-        # Check if results already submitted
-        existing_results = Tournament_Performance.query.filter_by(
-            user_id=user_id,
-            tournament_id=tournament_id
-        ).first()
+    tournament = Tournament.query.get_or_404(tournament_id)
+    
+    # Check if results collection has been closed
+    if tournament.results_submitted:
+        flash("Results collection for this tournament has been closed", "error")
+        return redirect(url_for('tournaments.view_results', tournament_id=tournament_id))
 
-        if existing_results:
-            flash("You have already submitted results for this tournament")
-            return redirect(url_for('tournaments.my_tournaments'))
+    # Check if user already submitted performance
+    performance = Tournament_Performance.query.filter_by(user_id=user_id, tournament_id=tournament_id).first()
 
+    if request.method == 'POST' and not performance:
         # Get form data
         bid_str = request.form.get('bid')  # 'yes' or 'no'
         rank_str = request.form.get('rank')
@@ -482,14 +599,12 @@ def tournament_results(tournament_id):
         )
 
         user.points += points
-        
         db.session.add(tournament_performance)
         db.session.commit()
 
-
         return redirect(url_for('profile.index', user_id=user_id))
 
-    return render_template("tournaments/tournament_results.html")
+    return render_template("tournaments/tournament_results.html", performance=performance, tournament=tournament)
 
 @tournaments_bp.route('/search_partners')
 def search_partners():

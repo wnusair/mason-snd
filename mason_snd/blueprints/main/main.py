@@ -15,6 +15,9 @@ main_bp = Blueprint('main', __name__, template_folder='templates')
 def index():
     user_id = session.get('user_id')
 
+    if user_id is not None:
+        return redirect(url_for('profile.index', user_id=user_id))
+
     return render_template('main/index.html', user_id=user_id)
 
 @main_bp.route('life')

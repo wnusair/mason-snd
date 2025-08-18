@@ -1,14 +1,29 @@
 {% extends "tournaments/base.html" %}
-{% block title %}Submit Tournament Results{% endblock %}
+{% block title %}Tournament Results{% endblock %}
 
 {% block content %}
 <div class="min-h-full flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
     <div class="max-w-md w-full space-y-8">
         <div>
             <h2 class="mt-6 text-center text-3xl font-extrabold text-gray-900">
-                Submit Results
+                Tournament Results
             </h2>
         </div>
+        {% if performance %}
+        <div class="bg-white p-6 rounded-md shadow">
+            <h3 class="text-lg font-semibold text-gray-700 mb-2">Your Submitted Performance</h3>
+            <ul class="text-sm text-gray-600">
+                <li><span class="font-medium">Bid:</span> {{ 'Yes' if performance.bid else 'No' }}</li>
+                <li><span class="font-medium">Rank:</span> {{ performance.rank }}</li>
+                <li><span class="font-medium">Stage:</span> 
+                    {% set stage_map = {0:'None',1:'Double Octafinals',2:'Octafinals',3:'Quarter Finals',4:'Semifinals',5:'Finals'} %}
+                    {{ stage_map[performance.stage] if performance.stage in stage_map else 'Unknown' }}
+                </li>
+                <li><span class="font-medium">Points:</span> {{ performance.points }}</li>
+            </ul>
+            <p class="mt-2 text-xs text-center text-gray-400">Submitted</p>
+        </div>
+        {% else %}
         <form class="mt-8 space-y-6" method="POST">
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
             <div class="rounded-md shadow-sm bg-white p-6 space-y-4">
@@ -26,11 +41,12 @@
                 <div>
                     <label for="stage" class="block text-sm font-medium text-gray-700">What stage did you reach?</label>
                     <select id="stage" name="stage" class="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-[color:var(--color-primary-500)] focus:border-[color:var(--color-primary-500)] sm:text-sm rounded-md">
-                        <option value="double_octafinals">Double Octafinals</option>
-                        <option value="octafinals">Octafinals</option>
-                        <option value="quarterfinals">Quarterfinals</option>
-                        <option value="semifinals">Semifinals</option>
-                        <option value="finals">Finals</option>
+                        <option value="None">None</option>
+                        <option value="Double Octafinals">Double Octafinals</option>
+                        <option value="Octafinals">Octafinals</option>
+                        <option value="Quarter Finals">Quarter Finals</option>
+                        <option value="Semifinals">Semifinals</option>
+                        <option value="Finals">Finals</option>
                     </select>
                 </div>
             </div>
@@ -40,6 +56,7 @@
                 </button>
             </div>
         </form>
+        {% endif %}
     </div>
 </div>
 {% endblock %}

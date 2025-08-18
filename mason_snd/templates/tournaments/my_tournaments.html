@@ -6,12 +6,13 @@
     <div class="sm:flex sm:items-center">
         <div class="sm:flex-auto">
             <h1 class="text-xl font-semibold text-gray-900">My Tournaments</h1>
-            <p class="mt-2 text-sm text-gray-700">A list of tournaments you are attending.</p>
+            <p class="mt-2 text-sm text-gray-700">A list of tournaments you attended or are attending. You can only submit your performance once, and then you can view your results (read-only).</p>
         </div>
     </div>
 
     <div class="mt-8 grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-        {% for tournament in tournaments %}
+        {% for entry in my_tournaments %}
+        {% set tournament = entry.tournament %}
         <div class="bg-white overflow-hidden shadow rounded-lg divide-y divide-gray-200">
             <div class="px-4 py-5 sm:px-6">
                 <h2 class="text-lg font-medium text-gray-900">{{ tournament.name }}</h2>
@@ -19,16 +20,28 @@
                 <p class="mt-1 text-sm text-gray-500">Date: {{ tournament.date.strftime('%b %d, %Y') }}</p>
             </div>
             <div class="px-4 py-4 sm:px-6">
-                {% if now >= tournament.performance_deadline %}
-                <a href="{{ url_for('tournaments.tournament_results', tournament_id=tournament.id) }}" class="w-full inline-flex items-center justify-center rounded-md border border-transparent bg-red-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-red-700">
-                    Submit Results (LATE)
-                </a>
+                {% if entry.can_submit %}
+                    <a href="{{ url_for('tournaments.tournament_results', tournament_id=tournament.id) }}" class="w-full inline-flex items-center justify-center rounded-md border border-transparent bg-[color:var(--color-primary-600)] px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-[color:var(--color-primary-700)]">
+                        Submit Results
+                    </a>
+                    <p class="mt-2 text-xs text-center text-gray-500">Performance Deadline: {{ tournament.performance_deadline.strftime('%b %d, %Y') }}</p>
+                {% elif entry.performance %}
+                    <div class="bg-gray-50 p-4 rounded-md">
+                        <h3 class="text-sm font-semibold text-gray-700 mb-2">Your Performance</h3>
+                        <ul class="text-sm text-gray-600">
+                            <li><span class="font-medium">Bid:</span> {{ 'Yes' if entry.performance.bid else 'No' }}</li>
+                            <li><span class="font-medium">Rank:</span> {{ entry.performance.rank }}</li>
+                            <li><span class="font-medium">Stage:</span> 
+                                {% set stage_map = {0:'None',1:'Double Octafinals',2:'Octafinals',3:'Quarter Finals',4:'Semifinals',5:'Finals'} %}
+                                {{ stage_map[entry.performance.stage] if entry.performance.stage in stage_map else 'Unknown' }}
+                            </li>
+                            <li><span class="font-medium">Points:</span> {{ entry.performance.points }}</li>
+                        </ul>
+                        <p class="mt-2 text-xs text-center text-gray-400">Submitted</p>
+                    </div>
                 {% else %}
-                <a href="{{ url_for('tournaments.tournament_results', tournament_id=tournament.id) }}" class="w-full inline-flex items-center justify-center rounded-md border border-transparent bg-[color:var(--color-primary-600)] px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-[color:var(--color-primary-700)]">
-                    Submit Results
-                </a>
+                    <p class="text-sm text-gray-400 text-center">Performance submission closed or not available.</p>
                 {% endif %}
-                 <p class="mt-2 text-xs text-center text-gray-500">Performance Deadline: {{ tournament.performance_deadline.strftime('%b %d, %Y') }}</p>
             </div>
         </div>
         {% else %}

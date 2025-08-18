@@ -12,6 +12,7 @@ class Tournament(db.Model):
     address = db.Column(db.String(255), nullable=False)
     signup_deadline = db.Column(db.DateTime, nullable=False)
     performance_deadline = db.Column(db.DateTime, nullable=False)
+    results_submitted = db.Column(db.Boolean, default=False, nullable=False)
     created_at = db.Column(db.DateTime, default=lambda: datetime.now(EST), nullable=False)
 
 class Form_Fields(db.Model):

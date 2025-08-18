@@ -1,0 +1,121 @@
+{% extends "tournaments/base.html" %}
+{% block title %}Submit Results - {{ tournament.name }}{% endblock %}
+
+{% block content %}
+<div class="px-4 sm:px-6 lg:px-8">
+    <div class="sm:flex sm:items-center">
+        <div class="sm:flex-auto">
+            <h1 class="text-xl font-semibold text-gray-900">Submit Results</h1>
+            <p class="mt-2 text-sm text-gray-700">Submit results for {{ tournament.name }} - {{ tournament.date.strftime('%b %d, %Y') }}</p>
+        </div>
+        <div class="mt-4 sm:mt-0 sm:ml-16 sm:flex-none">
+            <a href="{{ url_for('tournaments.index') }}" class="inline-flex items-center justify-center rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50">Back to Tournaments</a>
+        </div>
+    </div>
+
+    <div class="mt-8">
+        <div class="bg-white shadow sm:rounded-lg">
+            <div class="px-4 py-5 sm:p-6">
+                <h3 class="text-lg font-medium leading-6 text-gray-900">Tournament Information</h3>
+                <div class="mt-2 max-w-xl text-sm text-gray-500">
+                    <p><strong>Tournament:</strong> {{ tournament.name }}</p>
+                    <p><strong>Date:</strong> {{ tournament.date.strftime('%B %d, %Y at %I:%M %p') }}</p>
+                    <p><strong>Location:</strong> {{ tournament.address }}</p>
+                    <p><strong>Total Participants:</strong> {{ total_participants }}</p>
+                    <p><strong>Results Submitted:</strong> {{ submitted_results }}</p>
+                    <p><strong>Pending Results:</strong> {{ pending_results }}</p>
+                </div>
+                
+                <form method="POST" class="mt-5">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                    <div class="bg-yellow-50 border border-yellow-200 rounded-md p-4">
+                        <div class="flex">
+                            <div class="flex-shrink-0">
+                                <svg class="h-5 w-5 text-yellow-400" viewBox="0 0 20 20" fill="currentColor">
+                                    <path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd" />
+                                </svg>
+                            </div>
+                            <div class="ml-3">
+                                <h3 class="text-sm font-medium text-yellow-800">
+                                    Close Results Collection
+                                </h3>
+                                <div class="mt-2 text-sm text-yellow-700">
+                                    <p>By clicking "Close Results Collection", you confirm that:</p>
+                                    <ul class="list-disc list-inside mt-1">
+                                        <li>The tournament has concluded and participants have had time to submit their results</li>
+                                        <li>No more individual performance submissions will be accepted</li>
+                                        <li>Tournament results will be finalized and visible to all users</li>
+                                        <li>This action cannot be undone without admin intervention</li>
+                                    </ul>
+                                    {% if pending_results > 0 %}
+                                    <p class="mt-2 font-medium text-yellow-800">
+                                        Note: {{ pending_results }} participants have not yet submitted their results.
+                                    </p>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="mt-5 flex justify-end space-x-3">
+                        <a href="{{ url_for('tournaments.index') }}" class="inline-flex items-center justify-center rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50">Cancel</a>
+                        <button type="submit" class="inline-flex items-center justify-center rounded-md border border-transparent bg-red-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-red-700">Close Results Collection</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Participants List -->
+    {% if signups %}
+    <div class="mt-8">
+        <div class="bg-white shadow sm:rounded-lg">
+            <div class="px-4 py-5 sm:p-6">
+                <h3 class="text-lg font-medium leading-6 text-gray-900">Tournament Participants & Results Status</h3>
+                <div class="mt-6">
+                    <div class="overflow-hidden shadow ring-1 ring-black ring-opacity-5 md:rounded-lg">
+                        <table class="min-w-full divide-y divide-gray-300">
+                            <thead class="bg-gray-50">
+                                <tr>
+                                    <th scope="col" class="py-3.5 pl-4 pr-3 text-left text-sm font-semibold text-gray-900 sm:pl-6">Participant</th>
+                                    <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Event</th>
+                                    <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Partner</th>
+                                    <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Results Status</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-gray-200 bg-white">
+                                {% for signup in signups %}
+                                <tr>
+                                    <td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-6">
+                                        {{ signup.user.first_name }} {{ signup.user.last_name }}
+                                    </td>
+                                    <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
+                                        {{ signup.event.name }}
+                                    </td>
+                                    <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
+                                        {% if signup.partner %}
+                                            {{ signup.partner.first_name }} {{ signup.partner.last_name }}
+                                        {% else %}
+                                            Individual
+                                        {% endif %}
+                                    </td>
+                                    <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
+                                        {% set user_performance = performances | selectattr('user_id', 'equalto', signup.user.id) | first %}
+                                        {% if user_performance %}
+                                            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">Submitted</span>
+                                        {% else %}
+                                            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">Pending</span>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}
