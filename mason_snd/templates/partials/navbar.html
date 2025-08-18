@@ -5,22 +5,30 @@
         <div class="flex justify-between h-16 items-center">
             <!-- Home Link -->
             <div class="flex items-center space-x-4">
-                <a href="{{ url_for('main.index') }}" class="text-2xl font-bold text-[color:var(--color-primary-600)]">Home</a>
+                {% if session.get('user_id') %}
+                    <a href="{{ url_for('profile.index', user_id=session.get('user_id')) }}" class="text-2xl font-bold text-[color:var(--color-primary-600)]">Home</a>
+                {% else %}
+                    <a href="{{ url_for('main.index') }}" class="text-2xl font-bold text-[color:var(--color-primary-600)]">Home</a>
+                {% endif %}
             </div>
             <!-- Dropdown Menus for each main route -->
             <div class="hidden md:flex items-center space-x-6">
-                <!-- Metrics Dropdown -->
+                {# Metrics Dropdown: Only for role 2+ #}
+                {% if session.get('role', 0) >= 2 %}
                 <div x-data="{ open: false }" class="relative">
                     <button @click="open = !open" @keydown.escape="open = false" class="inline-flex items-center px-3 py-2 text-sm font-medium text-gray-700 hover:text-[color:var(--color-primary-600)] focus:outline-none">
                         Metrics
                         <svg class="ml-1 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
                     </button>
-                    <div x-show="open" @click.away="open = false" class="absolute left-0 mt-2 w-40 rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5 z-10" x-transition>
-                        <a href="{{ url_for('metrics.index') }}" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">Dashboard</a>
-                        <!-- Add more metrics links here -->
+                    <div x-show="open" @click.away="open = false" class="absolute left-0 mt-2 w-48 rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5 z-10" x-transition>
+                        <a href="{{ url_for('metrics.index') }}" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">User Metrics</a>
+                        <a href="{{ url_for('metrics.tournaments_overview') }}" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">Tournament Metrics</a>
+                        <a href="{{ url_for('metrics.events_overview') }}" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">Event Metrics</a>
+                        <a href="{{ url_for('metrics.settings') }}" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">Settings</a>
                     </div>
                 </div>
-                <!-- Events Dropdown -->
+                {% endif %}
+                <!-- Events Dropdown: Always visible -->
                 <div x-data="{ open: false }" class="relative">
                     <button @click="open = !open" @keydown.escape="open = false" class="inline-flex items-center px-3 py-2 text-sm font-medium text-gray-700 hover:text-[color:var(--color-primary-600)] focus:outline-none">
                         Events
@@ -28,22 +36,27 @@
                     </button>
                     <div x-show="open" @click.away="open = false" class="absolute left-0 mt-2 w-40 rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5 z-10" x-transition>
                         <a href="{{ url_for('events.index') }}" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">All Events</a>
-                        <a href="{{ url_for('events.add_event') }}" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">Add Event</a>
+                            {% if session.get('role', 0) >= 2 %}
+                            <a href="{{ url_for('events.add_event') }}" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">Add Event</a>
+                            {% endif %}
                     </div>
                 </div>
-                <!-- Tournaments Dropdown -->
+                <!-- Tournaments Dropdown: Add Tournament/Add Form only for role 2+ -->
                 <div x-data="{ open: false }" class="relative">
                     <button @click="open = !open" @keydown.escape="open = false" class="inline-flex items-center px-3 py-2 text-sm font-medium text-gray-700 hover:text-[color:var(--color-primary-600)] focus:outline-none">
                         Tournaments
                         <svg class="ml-1 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
                     </button>
-                    <div x-show="open" @click.away="open = false" class="absolute left-0 mt-2 w-40 rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5 z-10" x-transition>
+                    <div x-show="open" @click.away="open = false" class="absolute left-0 mt-2 w-48 rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5 z-10" x-transition>
                         <a href="{{ url_for('tournaments.index') }}" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">All Tournaments</a>
+                        {% if session.get('role', 0) >= 2 %}
                         <a href="{{ url_for('tournaments.add_tournament') }}" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">Add Tournament</a>
                         <a href="{{ url_for('tournaments.add_form') }}" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">Add Form</a>
+                        {% endif %}
                     </div>
                 </div>
-                <!-- Rosters Dropdown -->
+                <!-- Rosters Dropdown: Only for role 2+ -->
+                {% if session.get('role', 0) >= 2 %}
                 <div x-data="{ open: false }" class="relative">
                     <button @click="open = !open" @keydown.escape="open = false" class="inline-flex items-center px-3 py-2 text-sm font-medium text-gray-700 hover:text-[color:var(--color-primary-600)] focus:outline-none">
                         Rosters
@@ -54,15 +67,20 @@
                         <a href="{{ url_for('rosters.upload_roster') }}" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">Add Roster</a>
                     </div>
                 </div>
-                <!-- Profile Dropdown -->
-                {% if session.get('user_id') %}
+                {% endif %}
+                <!-- Admin Dropdown: Only for role 2+ -->
+                {% if session.get('role', 0) >= 2 %}
                 <div x-data="{ open: false }" class="relative">
                     <button @click="open = !open" @keydown.escape="open = false" class="inline-flex items-center px-3 py-2 text-sm font-medium text-gray-700 hover:text-[color:var(--color-primary-600)] focus:outline-none">
-                        Profile
+                        Admin
                         <svg class="ml-1 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
                     </button>
-                    <div x-show="open" @click.away="open = false" class="absolute left-0 mt-2 w-40 rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5 z-10" x-transition>
-                        <a href="{{ url_for('profile.index', user_id=session.get('user_id')) }}" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">My Profile</a>
+                    <div x-show="open" @click.away="open = false" class="absolute left-0 mt-2 w-48 rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5 z-10" x-transition>
+                        <a href="{{ url_for('admin.index') }}" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">Admin Dashboard</a>
+                        <a href="{{ url_for('admin.requirements') }}" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">My Requirements</a>
+                        <a href="{{ url_for('admin.add_popup') }}" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">Add Popup</a>
+                        <a href="{{ url_for('admin.events_management') }}" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">Manage Events</a>
+                        <a href="{{ url_for('admin.search') }}" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">Search</a>
                     </div>
                 </div>
                 {% endif %}
@@ -88,12 +106,21 @@
         <!-- Mobile menu, hidden by default -->
         <div id="mobile-menu" class="md:hidden hidden mt-2">
             <div class="space-y-1 bg-white rounded-md shadow-lg p-2">
-                <a href="{{ url_for('main.index') }}" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 font-bold">Home</a>
+                {% if session.get('user_id') %}
+                    <a href="{{ url_for('profile.index', user_id=session.get('user_id')) }}" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 font-bold">Home</a>
+                {% else %}
+                    <a href="{{ url_for('main.index') }}" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 font-bold">Home</a>
+                {% endif %}
                 <div class="border-t border-gray-100"></div>
-                <a href="{{ url_for('metrics.index') }}" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">Metrics</a>
+                {% if session.get('role', 0) >= 2 %}
+                    <a href="{{ url_for('metrics.index') }}" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">Metrics</a>
+                {% endif %}
                 <a href="{{ url_for('events.index') }}" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">Events</a>
                 <a href="{{ url_for('tournaments.index') }}" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">Tournaments</a>
-                <a href="{{ url_for('rosters.index') }}" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">Rosters</a>
+                {% if session.get('role', 0) >= 2 %}
+                    <a href="{{ url_for('rosters.index') }}" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">Rosters</a>
+                    <a href="{{ url_for('admin.index') }}" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">Admin</a>
+                {% endif %}
                 {% if session.get('user_id') %}
                     <a href="{{ url_for('profile.index', user_id=session.get('user_id')) }}" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">My Profile</a>
                     <a href="{{ url_for('auth.logout') }}" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">Logout</a>

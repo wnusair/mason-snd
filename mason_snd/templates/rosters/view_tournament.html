@@ -69,12 +69,12 @@
                 <tr>
                     <td class="px-4 py-2">{{ row.rank }}</td>
                     <td class="px-4 py-2">{{ users[row.user_id].first_name if row.user_id in users else 'Unknown' }} {{ users[row.user_id].last_name if row.user_id in users else '' }}</td>
-                    <td class="px-4 py-2">{{ users[row.user_id].points if row.user_id in users else 0 }}</td>
+                    <td class="px-4 py-2">{{ ((users[row.user_id].tournament_points or 0) * tournament_weight + (users[row.user_id].effort_points or 0) * effort_weight) | round(2) if row.user_id in users else 0 }}</td>
                     <td class="px-4 py-2">{{ events[row.event_id].event_name if row.event_id in events else 'Unknown Event' }}</td>
                     <td class="px-4 py-2">
-                        {% if events[row.event_id] and events[row.event_id].event_type == 0 %}Speech
-                        {% elif events[row.event_id] and events[row.event_id].event_type == 1 %}LD
-                        {% elif events[row.event_id] and events[row.event_id].event_type == 2 %}PF
+                        {% if row.event_id in events and events[row.event_id].event_type == 0 %}Speech
+                        {% elif row.event_id in events and events[row.event_id].event_type == 1 %}LD
+                        {% elif row.event_id in events and events[row.event_id].event_type == 2 %}PF
                         {% else %}Unknown{% endif %}
                     </td>
                 </tr>
@@ -87,6 +87,7 @@
     <!-- Event View Section -->
     <div class="mt-8">
         <h2 class="text-xl font-semibold text-gray-900">Event View</h2>
+        {% if event_competitors %}
         {% for event_id, competitors in event_competitors.items() %}
             <div class="mt-4">
                 <h3 class="text-lg font-medium text-gray-800">{{ events[event_id].event_name if event_id in events else 'Unknown Event' }}</h3>
@@ -106,14 +107,57 @@
                         <tr>
                             <td class="px-4 py-2">{{ events[event_id].event_name if event_id in events else 'Unknown Event' }}</td>
                             <td class="px-4 py-2">
-                                {% if events[event_id] and events[event_id].event_type == 0 %}Speech
-                                {% elif events[event_id] and events[event_id].event_type == 1 %}LD
-                                {% elif events[event_id] and events[event_id].event_type == 2 %}PF
+                                {% if event_id in events and events[event_id].event_type == 0 %}Speech
+                                {% elif event_id in events and events[event_id].event_type == 1 %}LD
+                                {% elif event_id in events and events[event_id].event_type == 2 %}PF
                                 {% else %}Unknown{% endif %}
                             </td>
                             <td class="px-4 py-2">{{ comp.rank if comp.rank else 'N/A' }}</td>
                             <td class="px-4 py-2">{{ users[comp.user_id].first_name if comp.user_id in users else 'Unknown' }} {{ users[comp.user_id].last_name if comp.user_id in users else '' }}</td>
-                            <td class="px-4 py-2">{{ users[comp.user_id].points if comp.user_id in users else 0 }}</td>
+                            <td class="px-4 py-2">{{ ((users[comp.user_id].tournament_points or 0) * tournament_weight + (users[comp.user_id].effort_points or 0) * effort_weight) | round(2) if comp.user_id in users else 0 }}</td>
+                        </tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+                </div>
+            </div>
+        {% endfor %}
+        {% else %}
+        <p class="text-gray-500 mt-4">No event competitors found for this tournament.</p>
+        {% endif %}
+    </div>
+
+    <!-- Penalized Users Section -->
+    {% if penalty_info %}
+    <div class="mt-8">
+        <h2 class="text-xl font-semibold text-gray-900">Penalized Users (Drop Penalties)</h2>
+        <p class="text-sm text-gray-600 mb-4">Users who were removed from the roster due to drop penalties.</p>
+        {% for event_id, penalties in penalty_info.items() %}
+            <div class="mt-4">
+                <h3 class="text-lg font-medium text-gray-800">{{ events[event_id].event_name if event_id in events else 'Unknown Event' }}</h3>
+                <div class="overflow-x-auto">
+                <table class="min-w-full divide-y divide-gray-200 border">
+                    <thead class="bg-gray-50">
+                        <tr>
+                            <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Original Rank</th>
+                            <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Penalized User</th>
+                            <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Drops Applied</th>
+                            <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Replacement</th>
+                        </tr>
+                    </thead>
+                    <tbody class="bg-white divide-y divide-gray-200">
+                    {% for penalty in penalties %}
+                        <tr class="bg-black text-white">
+                            <td class="px-4 py-2">{{ penalty.original_rank }}</td>
+                            <td class="px-4 py-2">{{ users[penalty.user_id].first_name if penalty.user_id in users else 'Unknown' }} {{ users[penalty.user_id].last_name if penalty.user_id in users else '' }}</td>
+                            <td class="px-4 py-2">{{ penalty.drops }}</td>
+                            <td class="px-4 py-2">
+                                {% if penalty.replacement_user_id %}
+                                    {{ users[penalty.replacement_user_id].first_name if penalty.replacement_user_id in users else 'Unknown' }} {{ users[penalty.replacement_user_id].last_name if penalty.replacement_user_id in users else '' }}
+                                {% else %}
+                                    No replacement available
+                                {% endif %}
+                            </td>
                         </tr>
                     {% endfor %}
                     </tbody>
@@ -122,5 +166,6 @@
             </div>
         {% endfor %}
     </div>
+    {% endif %}
 </div>
 {% endblock %}

@@ -22,6 +22,22 @@
                     <textarea id="event_description" name="event_description" rows="3" required class="mt-1 appearance-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-md focus:outline-none focus:ring-[color:var(--color-primary-500)] focus:border-[color:var(--color-primary-500)] sm:text-sm" placeholder="A short summary of the event."></textarea>
                 </div>
                 <div>
+                    <label for="event_type" class="block text-sm font-medium text-gray-700">Event Type</label>
+                    <select id="event_type" name="event_type" required class="mt-1 appearance-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-md focus:outline-none focus:ring-[color:var(--color-primary-500)] focus:border-[color:var(--color-primary-500)] sm:text-sm">
+                        <option value="">Select an event type...</option>
+                        <option value="0">Speech</option>
+                        <option value="1">Lincoln-Douglas (LD)</option>
+                        <option value="2">Public Forum (PF)</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="flex items-center space-x-2">
+                        <input type="checkbox" id="is_partner_event" name="is_partner_event" class="rounded border-gray-300 text-[color:var(--color-primary-600)] focus:ring-[color:var(--color-primary-500)]">
+                        <span class="text-sm font-medium text-gray-700">This is a partner event</span>
+                    </label>
+                    <p class="mt-1 text-sm text-gray-500">When enabled, participants can search for and select partners when signing up for tournaments in this event.</p>
+                </div>
+                <div>
                     <label for="owner_first_name" class="block text-sm font-medium text-gray-700">Event Leader First Name</label>
                     <input id="owner_first_name" name="owner_first_name" type="text" required class="mt-1 appearance-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-md focus:outline-none focus:ring-[color:var(--color-primary-500)] focus:border-[color:var(--color-primary-500)] sm:text-sm" placeholder="John">
                 </div>
@@ -30,8 +46,8 @@
                     <input id="owner_last_name" name="owner_last_name" type="text" required class="mt-1 appearance-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-md focus:outline-none focus:ring-[color:var(--color-primary-500)] focus:border-[color:var(--color-primary-500)] sm:text-sm" placeholder="Doe">
                 </div>
                 <div>
-                    <label for="event_emoji" class="block text-sm font-medium text-gray-700">Event Emoji</label>
-                    <input id="event_emoji" name="event_emoji" type="text" required class="mt-1 appearance-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-md focus:outline-none focus:ring-[color:var(--color-primary-500)] focus:border-[color:var(--color-primary-500)] sm:text-sm" placeholder="🏆">
+                    <label for="event_emoji" class="block text-sm font-medium text-gray-700">Event Emoji (Optional)</label>
+                    <input id="event_emoji" name="event_emoji" type="text" class="mt-1 appearance-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-md focus:outline-none focus:ring-[color:var(--color-primary-500)] focus:border-[color:var(--color-primary-500)] sm:text-sm" placeholder="🏆" maxlength="2">
                 </div>
             </div>
 
@@ -43,4 +59,52 @@
         </form>
     </div>
 </div>
+
+<script>
+// Add some client-side validation and UX improvements
+document.addEventListener('DOMContentLoaded', function() {
+    const form = document.querySelector('form');
+    const eventTypeSelect = document.getElementById('event_type');
+    const emojiInput = document.getElementById('event_emoji');
+    
+    // Add emoji suggestions based on event type
+    eventTypeSelect.addEventListener('change', function() {
+        const selectedType = this.value;
+        let suggestedEmoji = '';
+        
+        switch(selectedType) {
+            case '0': // Speech
+                suggestedEmoji = '🎤';
+                break;
+            case '1': // LD
+                suggestedEmoji = '⚖️';
+                break;
+            case '2': // PF
+                suggestedEmoji = '🗣️';
+                break;
+        }
+        
+        if (suggestedEmoji && !emojiInput.value) {
+            emojiInput.value = suggestedEmoji;
+        }
+    });
+    
+    // Limit emoji input to 2 characters
+    emojiInput.addEventListener('input', function() {
+        if (this.value.length > 2) {
+            this.value = this.value.slice(0, 2);
+        }
+    });
+    
+    // Form validation
+    form.addEventListener('submit', function(e) {
+        const eventType = eventTypeSelect.value;
+        if (!eventType) {
+            e.preventDefault();
+            alert('Please select an event type.');
+            eventTypeSelect.focus();
+        }
+    });
+});
+</script>
 {% endblock %}

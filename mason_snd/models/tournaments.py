@@ -54,11 +54,13 @@ class Tournament_Signups(db.Model):
         nullable=True,
         default=0
     )
+    partner_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=True)
 
     user = db.relationship('User', foreign_keys=[user_id], backref='tournament_signups')
     tournament = db.relationship('Tournament', foreign_keys=[tournament_id], backref='tournament_signups')
     event = db.relationship('Event', foreign_keys=[event_id], backref='tournament_signups')
     judge = db.relationship('User', foreign_keys=[judge_id], backref="judge_id_tournament_signup")
+    partner = db.relationship('User', foreign_keys=[partner_id], backref="partner_tournament_signup")
 
 class Tournaments_Attended(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -98,3 +100,20 @@ class Tournament_Judges(db.Model):
     child = db.relationship('User', foreign_keys=[child_id], backref='tournament_judges_child')
     tournament = db.relationship('Tournament', foreign_keys=[tournament_id], backref='tournament_judges')
     event = db.relationship('Event', foreign_keys=[event_id], backref='tournament_judges')
+
+class Tournament_Partners(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+
+    partner1_user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    partner1_user = db.relationship('User', foreign_keys=[partner1_user_id], backref='tournament_partner1')
+
+    partner2_user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    partner2_user = db.relationship('User', foreign_keys=[partner2_user_id], backref='tournament_partner2')
+
+    tournament_id = db.Column(db.Integer, db.ForeignKey('tournament.id'), nullable=False)
+    tournament = db.relationship('Tournament', foreign_keys=[tournament_id], backref='tournament_partners')
+
+    event_id = db.Column(db.Integer, db.ForeignKey('event.id'), nullable=False)
+    event = db.relationship('Event', foreign_keys=[event_id], backref='tournament_partners')
+
+    created_at = db.Column(db.DateTime, default=lambda: datetime.now(EST), nullable=False)

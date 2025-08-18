@@ -77,6 +77,7 @@ def edit_event(event_id):
         event.event_description = request.form.get('event_description')
         event.event_type = request.form.get('event_type')
         event.event_emoji = request.form.get('event_emoji')
+        event.is_partner_event = request.form.get('is_partner_event') == 'on'
 
         db.session.commit()
         flash('Event updated successfully', 'success')
@@ -240,6 +241,22 @@ def add_event():
         owner_first_name = request.form.get('owner_first_name')
         owner_last_name = request.form.get('owner_last_name')
         event_emoji = request.form.get('event_emoji')
+        is_partner_event = request.form.get('is_partner_event') == 'on'
+
+        # Validate required fields
+        if not event_name or not event_description or not event_type or not owner_first_name or not owner_last_name:
+            flash("Please fill in all required fields", "error")
+            return redirect(url_for("events.add_event"))
+
+        # Validate event_type
+        try:
+            event_type_int = int(event_type)
+            if event_type_int not in [0, 1, 2]:
+                flash("Invalid event type selected", "error")
+                return redirect(url_for("events.add_event"))
+        except (ValueError, TypeError):
+            flash("Invalid event type", "error")
+            return redirect(url_for("events.add_event"))
 
         owner = User.query.filter_by(first_name=owner_first_name.lower(), last_name=owner_last_name.lower()).first()
         
@@ -251,8 +268,9 @@ def add_event():
             event_name=event_name,
             event_description=event_description,
             event_emoji=event_emoji,
-            event_type=int(event_type),
-            owner_id=owner.id
+            event_type=event_type_int,
+            owner_id=owner.id,
+            is_partner_event=is_partner_event
         )
 
         db.session.add(new_event)

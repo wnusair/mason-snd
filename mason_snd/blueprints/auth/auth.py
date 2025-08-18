@@ -172,6 +172,7 @@ def login():
 
         if user and check_password_hash(user.password, password):
             session['user_id'] = user.id
+            session['role'] = user.role
             get_requirements(user)
             req_checks(user)
             flash("Logged in successfully!")

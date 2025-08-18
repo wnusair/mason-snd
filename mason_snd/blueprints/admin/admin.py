@@ -1,13 +1,15 @@
+
 from flask import Blueprint, render_template, request, redirect, url_for, flash, session
 from difflib import get_close_matches
+from datetime import datetime
+import random
 
 from mason_snd.extensions import db
-from mason_snd.models.auth import User
-from mason_snd.models.admin import User_Requirements, Requirements
+from mason_snd.models.auth import User, Judges
+from mason_snd.models.admin import User_Requirements, Requirements, Popups
 from mason_snd.models.events import User_Event, Event
-from mason_snd.models.tournaments import Tournament_Performance
+from mason_snd.models.tournaments import Tournament_Performance, Tournament, Tournament_Signups
 from mason_snd.models.metrics import MetricsSettings
-from mason_snd.models.admin import User_Requirements
 
 from werkzeug.security import generate_password_hash, check_password_hash
 
@@ -16,50 +18,89 @@ admin_bp = Blueprint('admin', __name__, template_folder='templates')
 @admin_bp.route('/')
 def index():
     user_id = session.get('user_id')
+    if not user_id:
+        flash('Please log in to access this page.', 'error')
+        return redirect(url_for('auth.login'))
+        
     user = User.query.filter_by(id=user_id).first()
-    print(user)
-
-    if user.role <= 1:
+    if not user or user.role <= 1:
         flash('Restricted Access!!!!!')
-        return redirect(url_for('profile.index'))
+        return redirect(url_for('profile.index', user_id=user_id))
     return render_template('admin/index.html')
 
+
+# Requirements management page
+@admin_bp.route('/requirements', methods=['GET', 'POST'])
+def requirements():
+    user_id = session.get('user_id')
+    if not user_id:
+        flash('Please log in to access this page.', 'error')
+        return redirect(url_for('auth.login'))
+        
+    user = User.query.filter_by(id=user_id).first()
+    if not user or user.role <= 1:
+        flash('Restricted Access!!!!!')
+        return redirect(url_for('profile.index', user_id=user_id))
+
+    requirements = Requirements.query.all()
+    if request.method == 'POST':
+        # Toggle active status
+        for req in requirements:
+            active = request.form.get(f'active_{req.id}') == 'on'
+            req.active = active
+        db.session.commit()
+        flash('Requirements updated.', 'success')
+        return redirect(url_for('admin.requirements'))
+    return render_template('admin/requirements.html', requirements=requirements)
+
+
+# Enhanced popup sending: select users, set expiration
 @admin_bp.route('/add_popup', methods=['POST', 'GET'])
 def add_popup():
     user_id = session.get('user_id')
-    user = User.query.filter_by(id=user_id).first()
-    print(user)
-
-    if user.role <= 1:
-        flash('Restricted Access!!!!!')
-        return redirect(url_for('profile.index'))
-
-    if request.method == 'POST':
-        recipient_first_name = request.form.get('recipient_first_name')
-        recipient_last_name = request.form.get('recipient_last_name')
-        message = request.form.get('message')
-
-        recipient = User.query.filter_by(first_name=recipient_first_name, last_name=recipient_last_name).first()
-
-        if not recipient:
-            flash("Recipient Does Not Exist, Please retype name")
-            return redirect(url_for('admin.add_popup'))
+    if not user_id:
+        flash('Please log in to access this page.', 'error')
+        return redirect(url_for('auth.login'))
         
-        #yu need to make popups with experation dates and checking if done
+    user = User.query.filter_by(id=user_id).first()
+    if not user or user.role <= 1:
+        flash('Restricted Access!!!!!')
+        return redirect(url_for('profile.index', user_id=user_id))
 
-    
-    return render_template('admin/add_popup.html')
+    users = User.query.all()
+    if request.method == 'POST':
+        selected_user_ids = request.form.getlist('recipient_ids')
+        message = request.form.get('message')
+        expires_at_str = request.form.get('expires_at')
+        expires_at = None
+        if expires_at_str:
+            try:
+                expires_at = datetime.strptime(expires_at_str, "%Y-%m-%dT%H:%M")
+            except Exception:
+                expires_at = None
+        if not selected_user_ids or not message:
+            flash("Please select at least one user and enter a message.", "error")
+            return redirect(url_for('admin.add_popup'))
+        for uid in selected_user_ids:
+            popup = Popups(
+                message=message,
+                user_id=uid,
+                admin_id=user_id,
+                expires_at=expires_at
+            )
+            db.session.add(popup)
+        db.session.commit()
+        flash("Popup(s) sent!", "success")
+        return redirect(url_for('admin.add_popup'))
+    return render_template('admin/add_popup.html', users=users)
 
 
 # Admin view of user details
-@admin_bp.route('/user/<int:user_id>')
+@admin_bp.route('/user/<int:user_id>', methods=['GET', 'POST'])
 def user_detail(user_id):
     user = User.query.get_or_404(user_id)
-    # Events
     user_events = User_Event.query.filter_by(user_id=user_id).all()
     events = [Event.query.get(ue.event_id) for ue in user_events]
-
-    # Tournament points, effort points, total, weighted
     tournament_points = user.tournament_points or 0
     effort_points = user.effort_points or 0
     total_points = tournament_points + effort_points
@@ -86,8 +127,47 @@ def user_detail(user_id):
         'email': user.emergency_contact_email
     }
 
-    # Requirements
     requirements = User_Requirements.query.filter_by(user_id=user_id).all()
+    all_requirements = Requirements.query.filter_by(active=True).all()
+
+    if request.method == 'POST':
+        action = request.form.get('action')
+        if action == 'reset_password':
+            new_password = request.form.get('new_password')
+            if new_password:
+                user.password = generate_password_hash(new_password)
+                db.session.commit()
+                flash('Password reset successfully.', 'success')
+        elif action == 'assign_role':
+            new_role = int(request.form.get('role', 0))
+            user.role = new_role
+            db.session.commit()
+            flash('Role updated.', 'success')
+        elif action == 'assign_requirement':
+            req_id = request.form.get('assign_requirement_id')
+            if req_id:
+                # Only assign if not already assigned
+                exists = User_Requirements.query.filter_by(user_id=user_id, requirement_id=req_id).first()
+                if not exists:
+                    new_ur = User_Requirements(user_id=user_id, requirement_id=req_id)
+                    db.session.add(new_ur)
+                    db.session.commit()
+                    flash('Requirement assigned.', 'success')
+                else:
+                    flash('Requirement already assigned.', 'info')
+        elif action == 'toggle_requirements':
+            # Toggle requirements for this user
+            for req in requirements:
+                checked = request.form.get(f'requirement_{req.id}') == 'on'
+                req.complete = checked
+            db.session.commit()
+            flash('Requirements updated.', 'success')
+        elif action == 'add_drop':
+            # Add a drop penalty to the user
+            user.drops += 1
+            db.session.commit()
+            flash(f'Drop penalty added. User now has {user.drops} drops.', 'warning')
+        return redirect(url_for('admin.user_detail', user_id=user_id))
 
     return render_template(
         'admin/user_detail.html',
@@ -99,7 +179,8 @@ def user_detail(user_id):
         weighted_points=weighted_points,
         emergency_contact=emergency_contact,
         child_info=child_info,
-        requirements=requirements
+        requirements=requirements,
+        all_requirements=all_requirements
     )
 
 # Fuzzy search for users by name
@@ -126,3 +207,367 @@ def search():
             results = [(user_map[name], name) for name in close]
     return render_template('admin/search.html', results=results, query=query)
 
+
+# Quick add drop penalty from search page
+@admin_bp.route('/add_drop/<int:user_id>', methods=['POST'])
+def add_drop(user_id):
+    admin_user_id = session.get('user_id')
+    if not admin_user_id:
+        flash('Please log in to access this page.', 'error')
+        return redirect(url_for('auth.login'))
+        
+    admin_user = User.query.filter_by(id=admin_user_id).first()
+    if not admin_user or admin_user.role <= 1:
+        flash('Restricted Access!!!!!')
+        return redirect(url_for('profile.index', user_id=admin_user_id))
+
+    user = User.query.get_or_404(user_id)
+    user.drops += 1
+    db.session.commit()
+    flash(f'Drop penalty added to {user.first_name} {user.last_name}. They now have {user.drops} drops.', 'warning')
+    return redirect(url_for('admin.search'))
+
+
+# Events management
+@admin_bp.route('/events_management')
+def events_management():
+    user_id = session.get('user_id')
+    if not user_id:
+        flash('Please log in to access this page.', 'error')
+        return redirect(url_for('auth.login'))
+        
+    user = User.query.filter_by(id=user_id).first()
+    if not user or user.role <= 1:
+        flash('Restricted Access!!!!!')
+        return redirect(url_for('profile.index', user_id=user_id))
+
+    events = Event.query.all()
+    
+    # Get participant counts for each event
+    event_stats = {}
+    for event in events:
+        participant_count = User_Event.query.filter_by(event_id=event.id).count()
+        active_participants = User_Event.query.filter_by(event_id=event.id, active=True).count()
+        event_stats[event.id] = {
+            'total_participants': participant_count,
+            'active_participants': active_participants
+        }
+    
+    return render_template('admin/events_management.html', events=events, event_stats=event_stats)
+
+
+# Change event leader
+@admin_bp.route('/change_event_leader/<int:event_id>', methods=['GET', 'POST'])
+def change_event_leader(event_id):
+    user_id = session.get('user_id')
+    if not user_id:
+        flash('Please log in to access this page.', 'error')
+        return redirect(url_for('auth.login'))
+        
+    user = User.query.filter_by(id=user_id).first()
+    if not user or user.role <= 1:
+        flash('Restricted Access!!!!!')
+        return redirect(url_for('profile.index', user_id=user_id))
+
+    event = Event.query.get_or_404(event_id)
+    
+    if request.method == 'POST':
+        action = request.form.get('action')
+        
+        if action == 'search_leader':
+            # Search for new leader
+            search_query = request.form.get('search_query', '').strip().lower()
+            search_results = []
+            
+            if search_query:
+                # Get all users and their full names
+                users = User.query.all()
+                user_map = {f"{u.first_name.lower()} {u.last_name.lower()}": u for u in users}
+                names = list(user_map.keys())
+                # Use difflib to get close matches
+                close = get_close_matches(search_query, names, n=10, cutoff=0.0)
+                search_results = [(user_map[name], name) for name in close]
+            
+            return render_template('admin/change_event_leader.html', 
+                                 event=event, 
+                                 search_query=search_query,
+                                 search_results=search_results)
+        
+        elif action == 'assign_leader':
+            # Assign new leader
+            new_leader_id = request.form.get('new_leader_id')
+            if new_leader_id:
+                old_leader = User.query.get(event.owner_id) if event.owner_id else None
+                new_leader = User.query.get(new_leader_id)
+                
+                if new_leader:
+                    event.owner_id = new_leader_id
+                    db.session.commit()
+                    
+                    old_leader_name = f"{old_leader.first_name} {old_leader.last_name}" if old_leader else "None"
+                    new_leader_name = f"{new_leader.first_name} {new_leader.last_name}"
+                    
+                    flash(f'Event leader changed from {old_leader_name} to {new_leader_name}', 'success')
+                    return redirect(url_for('admin.events_management'))
+                else:
+                    flash('Selected user not found', 'error')
+            else:
+                flash('Please select a new leader', 'error')
+        
+        elif action == 'remove_leader':
+            # Remove current leader
+            old_leader = User.query.get(event.owner_id) if event.owner_id else None
+            event.owner_id = None
+            db.session.commit()
+            
+            old_leader_name = f"{old_leader.first_name} {old_leader.last_name}" if old_leader else "None"
+            flash(f'Removed {old_leader_name} as event leader', 'success')
+            return redirect(url_for('admin.events_management'))
+    
+    return render_template('admin/change_event_leader.html', event=event)
+
+
+@admin_bp.route('/test_data', methods=['GET', 'POST'])
+def test_data():
+    user_id = session.get('user_id')
+    if not user_id:
+        flash('Please log in to access this page.', 'error')
+        return redirect(url_for('auth.login'))
+        
+    user = User.query.filter_by(id=user_id).first()
+    if not user or user.role <= 1:
+        flash('Restricted Access!!!!!')
+        return redirect(url_for('profile.index', user_id=user_id))
+
+    if request.method == 'POST':
+        action = request.form.get('action')
+        password = request.form.get('password', 'testpass123')
+        
+        if action == 'create_users':
+            created_students = []
+            created_parents = []
+            
+            try:
+                # Create 15 test students and their parents
+                for i in range(1, 16):
+                    # Create student
+                    student = User(
+                        first_name=f'Student{i}',
+                        last_name='Test',
+                        email=f'student{i}@gmail.com',
+                        password=generate_password_hash(password),
+                        phone_number=f'555-000-{1000+i}',
+                        is_parent=False,
+                        role=0,
+                        emergency_contact_first_name=f'Parent{i}',
+                        emergency_contact_last_name='Test',
+                        emergency_contact_number=f'555-100-{1000+i}',
+                        emergency_contact_relationship='Parent',
+                        emergency_contact_email=f'parent{i}@gmail.com',
+                        account_claimed=True
+                    )
+                    db.session.add(student)
+                    db.session.flush()  # Get the ID
+                    
+                    # Create parent
+                    parent = User(
+                        first_name=f'Parent{i}',
+                        last_name='Test',
+                        email=f'parent{i}@gmail.com',
+                        password=generate_password_hash(password),
+                        phone_number=f'555-100-{1000+i}',
+                        is_parent=True,
+                        role=0,
+                        child_first_name=f'Student{i}',
+                        child_last_name='Test',
+                        account_claimed=True
+                    )
+                    db.session.add(parent)
+                    db.session.flush()  # Get the ID
+                    
+                    # Create judge relationship
+                    judge_rel = Judges(
+                        judge_id=parent.id,
+                        child_id=student.id,
+                        background_check=True
+                    )
+                    db.session.add(judge_rel)
+                    
+                    created_students.append(student.id)
+                    created_parents.append(parent.id)
+                
+                db.session.commit()
+                flash(f'Successfully created 15 test students and 15 test parents with password: {password}', 'success')
+                
+            except Exception as e:
+                db.session.rollback()
+                flash(f'Error creating test users: {str(e)}', 'error')
+        
+        elif action == 'join_events':
+            # Get all test students
+            test_students = User.query.filter(
+                User.first_name.like('Student%'),
+                User.last_name == 'Test'
+            ).all()
+            
+            # Get all events
+            events = Event.query.all()
+            
+            if not events:
+                flash('No events found to join', 'error')
+                return redirect(url_for('admin.test_data'))
+            
+            try:
+                for student in test_students:
+                    # Join 1-3 random events
+                    num_events = random.randint(1, min(3, len(events)))
+                    selected_events = random.sample(events, num_events)
+                    
+                    for event in selected_events:
+                        # Check if already joined
+                        existing = User_Event.query.filter_by(
+                            user_id=student.id,
+                            event_id=event.id
+                        ).first()
+                        
+                        if not existing:
+                            user_event = User_Event(
+                                user_id=student.id,
+                                event_id=event.id,
+                                active=True
+                            )
+                            db.session.add(user_event)
+                
+                db.session.commit()
+                flash(f'Successfully enrolled {len(test_students)} test students in random events', 'success')
+                
+            except Exception as e:
+                db.session.rollback()
+                flash(f'Error enrolling students in events: {str(e)}', 'error')
+        
+        elif action == 'signup_tournaments':
+            # Get all test students
+            test_students = User.query.filter(
+                User.first_name.like('Student%'),
+                User.last_name == 'Test'
+            ).all()
+            
+            # Get all tournaments
+            tournaments = Tournament.query.all()
+            
+            if not tournaments:
+                flash('No tournaments found to sign up for', 'error')
+                return redirect(url_for('admin.test_data'))
+            
+            try:
+                for student in test_students:
+                    # Get student's events
+                    student_events = User_Event.query.filter_by(user_id=student.id, active=True).all()
+                    
+                    if not student_events:
+                        continue
+                    
+                    # Sign up for 1-2 random tournaments
+                    num_tournaments = random.randint(1, min(2, len(tournaments)))
+                    selected_tournaments = random.sample(tournaments, num_tournaments)
+                    
+                    # Get parent for judge
+                    parent = User.query.filter(
+                        User.child_first_name == student.first_name,
+                        User.child_last_name == student.last_name,
+                        User.is_parent == True
+                    ).first()
+                    
+                    for tournament in selected_tournaments:
+                        # Pick a random event from student's events
+                        event = random.choice(student_events).event
+                        
+                        # Check if already signed up
+                        existing = Tournament_Signups.query.filter_by(
+                            user_id=student.id,
+                            tournament_id=tournament.id,
+                            event_id=event.id
+                        ).first()
+                        
+                        if not existing:
+                            signup = Tournament_Signups(
+                                user_id=student.id,
+                                tournament_id=tournament.id,
+                                event_id=event.id,
+                                bringing_judge=True if parent else False,
+                                judge_id=parent.id if parent else None,
+                                is_going=True
+                            )
+                            db.session.add(signup)
+                
+                db.session.commit()
+                flash(f'Successfully signed up {len(test_students)} test students for random tournaments', 'success')
+                
+            except Exception as e:
+                db.session.rollback()
+                flash(f'Error signing up students for tournaments: {str(e)}', 'error')
+        
+        elif action == 'cleanup':
+            try:
+                # Delete all test data
+                test_students = User.query.filter(
+                    User.first_name.like('Student%'),
+                    User.last_name == 'Test'
+                ).all()
+                
+                test_parents = User.query.filter(
+                    User.first_name.like('Parent%'),
+                    User.last_name == 'Test'
+                ).all()
+                
+                # Delete related records first
+                for student in test_students:
+                    User_Event.query.filter_by(user_id=student.id).delete()
+                    Tournament_Signups.query.filter_by(user_id=student.id).delete()
+                    User_Requirements.query.filter_by(user_id=student.id).delete()
+                    Judges.query.filter_by(child_id=student.id).delete()
+                
+                for parent in test_parents:
+                    Tournament_Signups.query.filter_by(judge_id=parent.id).delete()
+                    User_Requirements.query.filter_by(user_id=parent.id).delete()
+                    Judges.query.filter_by(judge_id=parent.id).delete()
+                
+                # Delete users
+                for student in test_students:
+                    db.session.delete(student)
+                for parent in test_parents:
+                    db.session.delete(parent)
+                
+                db.session.commit()
+                flash('Successfully cleaned up all test data', 'success')
+                
+            except Exception as e:
+                db.session.rollback()
+                flash(f'Error cleaning up test data: {str(e)}', 'error')
+    
+    # Get current test data stats
+    test_students = User.query.filter(
+        User.first_name.like('Student%'),
+        User.last_name == 'Test'
+    ).all()
+    
+    test_parents = User.query.filter(
+        User.first_name.like('Parent%'),
+        User.last_name == 'Test'
+    ).all()
+    
+    # Count event enrollments
+    event_enrollments = 0
+    tournament_signups = 0
+    for student in test_students:
+        event_enrollments += User_Event.query.filter_by(user_id=student.id).count()
+        tournament_signups += Tournament_Signups.query.filter_by(user_id=student.id).count()
+    
+    stats = {
+        'students': len(test_students),
+        'parents': len(test_parents),
+        'event_enrollments': event_enrollments,
+        'tournament_signups': tournament_signups
+    }
+    
+    return render_template('admin/test_data.html', stats=stats)

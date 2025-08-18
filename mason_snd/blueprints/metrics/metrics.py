@@ -44,7 +44,7 @@ def index():
     user = User.query.filter_by(id=user_id).first()
     if not user or user.role < 2:
         flash("Restricted Access!")
-        return redirect(url_for('profile.user', user_id=user_id))
+        return redirect(url_for('profile.index', user_id=user_id))
 
     page = request.args.get('page', 1, type=int)
     per_page = 15
@@ -123,6 +123,15 @@ def index():
 
 @metrics_bp.route('/user_metrics/download')
 def download_user_metrics():
+    user_id = session.get('user_id')
+    if not user_id:
+        flash("Log in first!")
+        return redirect(url_for('auth.login'))
+    user = User.query.filter_by(id=user_id).first()
+    if not user or user.role < 2:
+        flash("Restricted Access!")
+        return redirect(url_for('profile.index', user_id=user_id))
+
     sort = request.args.get('sort', 'default')
     direction = request.args.get('direction', 'default')
     
@@ -198,7 +207,15 @@ def download_user_metrics():
 
 @metrics_bp.route('/user/<int:user_id>')
 def user_detail(user_id):
-    user = User.query.get_or_404(user_id)
+    user_id = session.get('user_id')
+    if not user_id:
+        flash("Log in first!")
+        return redirect(url_for('auth.login'))
+    user = User.query.filter_by(id=user_id).first()
+    if not user or user.role < 2:
+        flash("Restricted Access!")
+        return redirect(url_for('profile.index', user_id=user_id))
+
     performances = Tournament_Performance.query.filter_by(user_id=user_id).join(Tournament).order_by(Tournament.date).all()
     
     tournament_weight, effort_weight = get_point_weights()
@@ -230,6 +247,15 @@ def user_detail(user_id):
 
 @metrics_bp.route('/tournaments')
 def tournaments_overview():
+    user_id = session.get('user_id')
+    if not user_id:
+        flash("Log in first!")
+        return redirect(url_for('auth.login'))
+    user = User.query.filter_by(id=user_id).first()
+    if not user or user.role < 2:
+        flash("Restricted Access!")
+        return redirect(url_for('profile.index', user_id=user_id))
+
     page = request.args.get('page', 1, type=int)
     per_page = 15
     sort = request.args.get('sort', 'name')
@@ -317,6 +343,15 @@ def tournaments_overview():
 
 @metrics_bp.route('/tournament/<int:tournament_id>')
 def tournament_detail(tournament_id):
+    user_id = session.get('user_id')
+    if not user_id:
+        flash("Log in first!")
+        return redirect(url_for('auth.login'))
+    user = User.query.filter_by(id=user_id).first()
+    if not user or user.role < 2:
+        flash("Restricted Access!")
+        return redirect(url_for('profile.index', user_id=user_id))
+
     tournament = Tournament.query.get_or_404(tournament_id)
     tournament_weight, effort_weight = get_point_weights()
 
@@ -353,6 +388,15 @@ def tournament_detail(tournament_id):
 
 @metrics_bp.route('/events')
 def events_overview():
+    user_id = session.get('user_id')
+    if not user_id:
+        flash("Log in first!")
+        return redirect(url_for('auth.login'))
+    user = User.query.filter_by(id=user_id).first()
+    if not user or user.role < 2:
+        flash("Restricted Access!")
+        return redirect(url_for('profile.index', user_id=user_id))
+
     page = request.args.get('page', 1, type=int)
     per_page = 15
     sort = request.args.get('sort', 'weighted_points')
@@ -433,7 +477,7 @@ def settings():
     user = User.query.filter_by(id=user_id).first()
     if not user or user.role < 2:
         flash("Restricted Access!")
-        return redirect(url_for('profile.user', user_id=user_id))
+        return redirect(url_for('profile.index', user_id=user_id))
 
     settings = MetricsSettings.query.first()
     if not settings:
@@ -459,6 +503,15 @@ def settings():
 
 @metrics_bp.route('/download_events')
 def download_events():
+    user_id = session.get('user_id')
+    if not user_id:
+        flash("Log in first!")
+        return redirect(url_for('auth.login'))
+    user = User.query.filter_by(id=user_id).first()
+    if not user or user.role < 2:
+        flash("Restricted Access!")
+        return redirect(url_for('profile.index', user_id=user_id))
+
     sort = request.args.get('sort', 'weighted_points')
     direction = request.args.get('direction', 'desc')
     
@@ -526,6 +579,15 @@ def download_events():
 
 @metrics_bp.route('/download_tournaments')
 def download_tournaments():
+    user_id = session.get('user_id')
+    if not user_id:
+        flash("Log in first!")
+        return redirect(url_for('auth.login'))
+    user = User.query.filter_by(id=user_id).first()
+    if not user or user.role < 2:
+        flash("Restricted Access!")
+        return redirect(url_for('profile.index', user_id=user_id))
+
     sort = request.args.get('sort', 'name')
     direction = request.args.get('direction', 'asc')
     
@@ -571,6 +633,15 @@ def download_tournaments():
 
 @metrics_bp.route('/download_user_metrics_for_tournament/<int:tournament_id>')
 def download_user_metrics_for_tournament(tournament_id):
+    user_id = session.get('user_id')
+    if not user_id:
+        flash("Log in first!")
+        return redirect(url_for('auth.login'))
+    user = User.query.filter_by(id=user_id).first()
+    if not user or user.role < 2:
+        flash("Restricted Access!")
+        return redirect(url_for('profile.index', user_id=user_id))
+
     tournament = Tournament.query.get_or_404(tournament_id)
     tournament_weight, effort_weight = get_point_weights()
     

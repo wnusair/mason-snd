@@ -1,4 +1,6 @@
 from ..extensions import db
+from datetime import datetime
+import pytz
 
 class User(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -44,6 +46,38 @@ class User(db.Model):
         return sum([s.score or 0 for s in scores])
 
     account_claimed = db.Column(db.Boolean, default=False)
+
+class User_Published_Rosters(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    roster_id = db.Column(db.Integer, db.ForeignKey('roster.id'), nullable=False)
+    tournament_id = db.Column(db.Integer, db.ForeignKey('tournament.id'), nullable=False)
+    event_id = db.Column(db.Integer, db.ForeignKey('event.id'), nullable=False)
+    notified = db.Column(db.Boolean, default=False)
+    created_at = db.Column(db.DateTime, default=lambda: datetime.now(pytz.timezone('US/Eastern')))
+    
+    user = db.relationship('User', foreign_keys=[user_id], backref='published_rosters')
+    roster = db.relationship('Roster', foreign_keys=[roster_id], backref='published_users')
+    tournament = db.relationship('Tournament', foreign_keys=[tournament_id], backref='published_roster_entries')
+    event = db.relationship('Event', foreign_keys=[event_id], backref='published_roster_entries')
+
+class Roster_Penalty_Entries(db.Model):
+    """Tracks penalty entries that should show in published rosters as '+1' instead of user names"""
+    id = db.Column(db.Integer, primary_key=True)
+    
+    roster_id = db.Column(db.Integer, db.ForeignKey('roster.id'), nullable=False)
+    tournament_id = db.Column(db.Integer, db.ForeignKey('tournament.id'), nullable=False)
+    event_id = db.Column(db.Integer, db.ForeignKey('event.id'), nullable=False)
+    penalized_user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    original_rank = db.Column(db.Integer, nullable=False)
+    drops_applied = db.Column(db.Integer, nullable=False)
+    created_at = db.Column(db.DateTime, default=lambda: datetime.now(pytz.timezone('US/Eastern')))
+    
+    roster = db.relationship('Roster', foreign_keys=[roster_id], backref='penalty_entries')
+    tournament = db.relationship('Tournament', foreign_keys=[tournament_id], backref='penalty_entries')
+    event = db.relationship('Event', foreign_keys=[event_id], backref='penalty_entries')
+    penalized_user = db.relationship('User', foreign_keys=[penalized_user_id], backref='penalty_entries')
 
 class Judges(db.Model):
     id = db.Column(db.Integer, primary_key=True)

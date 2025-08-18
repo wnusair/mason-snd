@@ -9,6 +9,11 @@ class Roster(db.Model):
     id = db.Column(db.Integer, primary_key=True)
 
     name = db.Column(db.String)
+    
+    published = db.Column(db.Boolean, default=False)
+    published_at = db.Column(db.DateTime, nullable=True)
+    tournament_id = db.Column(db.Integer, db.ForeignKey('tournament.id'), nullable=True)
+    tournament = db.relationship('Tournament', foreign_keys=[tournament_id], backref='rosters')
 
     date_made = db.Column(db.DateTime, default=lambda: datetime.now(pytz.timezone('US/Eastern')))
 

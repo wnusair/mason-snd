@@ -6,11 +6,12 @@ import random
 from flask import Blueprint, render_template, request, redirect, url_for, flash, session, Response, send_file
 
 from mason_snd.extensions import db
-from mason_snd.models.auth import User
+from mason_snd.models.auth import User, User_Published_Rosters, Roster_Penalty_Entries
 from mason_snd.models.admin import User_Requirements, Requirements
 from mason_snd.models.tournaments import Tournament, Tournament_Performance, Tournament_Judges, Tournament_Signups
 from mason_snd.models.events import Event, User_Event, Effort_Score
 from mason_snd.models.metrics import MetricsSettings
+from mason_snd.blueprints.metrics.metrics import get_point_weights
 
 # Create a new Roster entry
 from mason_snd.models.rosters import Roster, Roster_Competitors, Roster_Judge
@@ -75,7 +76,7 @@ def get_roster_count(tournament_id):
 from mason_snd.models.tournaments import Tournament_Signups
 
 def get_signups_by_event(tournament_id):
-    signups = Tournament_Signups.query.filter_by(tournament_id=tournament_id).all()
+    signups = Tournament_Signups.query.filter_by(tournament_id=tournament_id, is_going=True).all()
     event_dict = {}
     for signup in signups:
         if signup.event_id not in event_dict:
@@ -90,6 +91,45 @@ def rank_signups(event_dict):
         # Get weighted points from user, fallback to user.points or 0
         ranked[event_id] = sorted(signups, key=lambda s: getattr(s.user, 'weighted_points', getattr(s.user, 'points', 0)), reverse=True)
     return ranked
+
+# Helper: Filter out users with drop penalties and track them
+def filter_drops_and_track_penalties(ranked):
+    """
+    Filter out users with drops > 0 and return both filtered rankings and penalty info
+    """
+    filtered_ranked = {}
+    penalty_info = {}  # {event_id: [(user_id, rank, replacement_user_id), ...]}
+    
+    for event_id, signups in ranked.items():
+        filtered_signups = []
+        penalties = []
+        
+        for i, signup in enumerate(signups):
+            if signup.user.drops > 0:
+                # Find replacement (next user without drops)
+                replacement = None
+                for j in range(i + 1, len(signups)):
+                    if signups[j].user.drops == 0:
+                        replacement = signups[j].user_id
+                        break
+                        
+                penalties.append({
+                    'user_id': signup.user_id,
+                    'original_rank': i + 1,
+                    'replacement_user_id': replacement,
+                    'drops': signup.user.drops
+                })
+                # Decrement user's drops by 1 (penalty applied)
+                signup.user.drops -= 1
+                db.session.commit()
+            else:
+                filtered_signups.append(signup)
+        
+        filtered_ranked[event_id] = filtered_signups
+        if penalties:
+            penalty_info[event_id] = penalties
+    
+    return filtered_ranked, penalty_info
 
 # Helper: Select competitors for speech (rotation) and LD/PF (top N with randomness)
 def select_competitors_by_event_type(ranked, speech_spots, ld_spots, pf_spots, event_type_map, seed_randomness=True):
@@ -203,6 +243,10 @@ def view_tournament(tournament_id):
 
     event_dict = get_signups_by_event(tournament_id)
     ranked = rank_signups(event_dict)
+    
+    # Filter out users with drops and track penalties
+    filtered_ranked, penalty_info = filter_drops_and_track_penalties(ranked)
+    
     # Build event_type_map: event_id -> event_type
     event_type_map = {}
     for eid in event_dict.keys():
@@ -210,7 +254,7 @@ def view_tournament(tournament_id):
         if event:
             event_type_map[eid] = event.event_type
     event_view, rank_view, random_selections = select_competitors_by_event_type(
-        ranked,
+        filtered_ranked,  # Use filtered rankings
         speech_spots=speech_competitors,
         ld_spots=LD_competitors,
         pf_spots=PF_competitors,
@@ -233,18 +277,40 @@ def view_tournament(tournament_id):
     # Build users and events dicts for template lookup
     user_ids = set([comp['user_id'] for comp in event_view] + [row['user_id'] for row in rank_view])
     event_ids = set([comp['event_id'] for comp in event_view] + [row['event_id'] for row in rank_view])
-    users = {u.id: u for u in User.query.filter(User.id.in_(user_ids)).all()}
-    events = {e.id: e for e in Event.query.filter(Event.id.in_(event_ids)).all()}
+
+    users = {}
+    events = {}
+
+    if user_ids:
+        users = {u.id: u for u in User.query.filter(User.id.in_(user_ids)).all()}
+    if event_ids:
+        events = {e.id: e for e in Event.query.filter(Event.id.in_(event_ids)).all()}
+
+    # Get point weights for weighted points calculation
+    tournament_weight, effort_weight = get_point_weights()
+
+    # Add weighted_points to event_competitors for display
+    for eid, competitors in event_competitors.items():
+        for comp in competitors:
+            user = users.get(comp['user_id'])
+            if user:
+                comp['weighted_points'] = getattr(user, 'weighted_points', getattr(user, 'points', 0))
 
     # Judges for the tournament
     judges = Tournament_Judges.query.filter_by(tournament_id=tournament_id, accepted=True).all()
     judge_user_ids = [j.judge_id for j in judges if j.judge_id]
     child_user_ids = [j.child_id for j in judges if j.child_id]
     all_judge_user_ids = list(set(judge_user_ids + child_user_ids))
-    judge_users = {u.id: u for u in User.query.filter(User.id.in_(all_judge_user_ids)).all() if all_judge_user_ids}
+    
+    judge_users = {}
+    if all_judge_user_ids:
+        judge_users = {u.id: u for u in User.query.filter(User.id.in_(all_judge_user_ids)).all()}
 
     # Debug output
     print(f"Tournament {tournament_id}: {len(judges)} judges, {len(event_view)} competitors in event_view, {len(rank_view)} in rank_view")
+    print(f"Event competitors: {list(event_competitors.keys())}")
+    print(f"Users dict has {len(users)} users")
+    print(f"Events dict has {len(events)} events")
 
     tournament = Tournament.query.get(tournament_id)
     return render_template('rosters/view_tournament.html',
@@ -256,6 +322,10 @@ def view_tournament(tournament_id):
                           events=events,
                           judges=judges,
                           judge_users=judge_users,
+                          penalty_info=penalty_info,
+                          random_selections=random_selections,
+                          tournament_weight=tournament_weight,
+                          effort_weight=effort_weight,
                           upcoming_tournaments=[],
                           tournaments=[],
                           rosters=[])
@@ -365,7 +435,8 @@ def download_tournament(tournament_id):
     # Rank View sheet
     rank_data = []
     for row in rank_view:
-        user_name = f"{users[row['user_id']].first_name} {users[row['user_id']].last_name}" if row['user_id'] in users else 'Unknown'
+        user = users.get(row['user_id'])
+        user_name = f"{user.first_name} {user.last_name}" if user else 'Unknown'
         event_name = events[row['event_id']].event_name if row['event_id'] in events else 'Unknown Event'
         event_type = 'Unknown'
         if row['event_id'] in events:
@@ -375,17 +446,17 @@ def download_tournament(tournament_id):
                 event_type = 'LD'
             elif events[row['event_id']].event_type == 2:
                 event_type = 'PF'
-        
+        weighted_points = getattr(user, 'weighted_points', getattr(user, 'points', 0)) if user else 0
         rank_data.append({
             'Rank': row['rank'],
             'Competitor Name': user_name,
-            'Weighted Points': users[row['user_id']].points if row['user_id'] in users else 0,
+            'Weighted Points': weighted_points,
             'Event': event_name,
             'Category': event_type,
             'User ID': row['user_id'],
             'Event ID': row['event_id']
         })
-    
+
     rank_df = pd.DataFrame(rank_data)
     rank_df.to_excel(writer, sheet_name='Rank View', index=False)
 
@@ -393,9 +464,10 @@ def download_tournament(tournament_id):
     for event_id, competitors_list in event_competitors.items():
         event_name = events[event_id].event_name if event_id in events else f'Event {event_id}'
         event_data = []
-        
+
         for comp in competitors_list:
-            user_name = f"{users[comp['user_id']].first_name} {users[comp['user_id']].last_name}" if comp['user_id'] in users else 'Unknown'
+            user = users.get(comp['user_id'])
+            user_name = f"{user.first_name} {user.last_name}" if user else 'Unknown'
             event_type = 'Unknown'
             if event_id in events:
                 if events[event_id].event_type == 0:
@@ -404,17 +476,17 @@ def download_tournament(tournament_id):
                     event_type = 'LD'
                 elif events[event_id].event_type == 2:
                     event_type = 'PF'
-            
+            weighted_points = getattr(user, 'weighted_points', getattr(user, 'points', 0)) if user else 0
             event_data.append({
                 'Event': event_name,
                 'Category': event_type,
                 'Rank': comp['rank'],
                 'Competitor': user_name,
-                'Weighted Points': users[comp['user_id']].points if comp['user_id'] in users else 0,
+                'Weighted Points': weighted_points,
                 'User ID': comp['user_id'],
                 'Event ID': comp['event_id']
             })
-        
+
         event_df = pd.DataFrame(event_data)
         # Limit sheet name length and remove invalid characters
         sheet_name = event_name[:30].replace('/', '-').replace('\\', '-').replace('*', '-').replace('?', '-').replace(':', '-').replace('[', '-').replace(']', '-')
@@ -446,13 +518,17 @@ def save_tournament(tournament_id):
     speech_competitors, LD_competitors, PF_competitors = get_roster_count(tournament_id)
     event_dict = get_signups_by_event(tournament_id)
     ranked = rank_signups(event_dict)
+    
+    # Filter out users with drops and track penalties
+    filtered_ranked, penalty_info = filter_drops_and_track_penalties(ranked)
+    
     event_type_map = {}
     for eid in event_dict.keys():
         event = Event.query.filter_by(id=eid).first()
         if event:
             event_type_map[eid] = event.event_type
     event_view, rank_view, random_selections = select_competitors_by_event_type(
-        ranked,
+        filtered_ranked,  # Use filtered rankings
         speech_spots=speech_competitors,
         ld_spots=LD_competitors,
         pf_spots=PF_competitors,
@@ -463,7 +539,7 @@ def save_tournament(tournament_id):
     tz = pytz.timezone('US/Eastern')
     tournament = Tournament.query.get(tournament_id)
     roster_name = f"{tournament.name} {datetime.now(tz).strftime('%Y-%m-%d %H:%M:%S')}"
-    new_roster = Roster(name=roster_name, date_made=datetime.now(tz))
+    new_roster = Roster(name=roster_name, date_made=datetime.now(tz), tournament_id=tournament_id)
     db.session.add(new_roster)
     db.session.commit()  # Commit to get the roster id
 
@@ -476,6 +552,41 @@ def save_tournament(tournament_id):
             roster_id=new_roster.id
         )
         db.session.add(rc)
+
+    # Save partner relationships for partner events
+    from mason_snd.models.rosters import Roster_Partners
+    processed_partnerships = set()  # To avoid duplicate partnerships
+    
+    for comp in event_view:
+        # Check if this is a partner event
+        event = Event.query.get(comp['event_id'])
+        if event and event.is_partner_event:
+            # Find the signup to get partner information
+            signup = Tournament_Signups.query.filter_by(
+                tournament_id=tournament_id,
+                user_id=comp['user_id'],
+                event_id=comp['event_id'],
+                is_going=True
+            ).first()
+            
+            if signup and signup.partner_id:
+                # Check if partner is also selected for the roster
+                partner_in_roster = any(
+                    c['user_id'] == signup.partner_id and c['event_id'] == comp['event_id'] 
+                    for c in event_view
+                )
+                
+                if partner_in_roster:
+                    # Create partnership entry (avoid duplicates)
+                    partnership_key = tuple(sorted([comp['user_id'], signup.partner_id]))
+                    if partnership_key not in processed_partnerships:
+                        rp = Roster_Partners(
+                            partner1_user_id=partnership_key[0],
+                            partner2_user_id=partnership_key[1],
+                            roster_id=new_roster.id
+                        )
+                        db.session.add(rp)
+                        processed_partnerships.add(partnership_key)
 
     # Save judges using the current Tournament_Judges with proper people_bringing calculation
     judges = Tournament_Judges.query.filter_by(tournament_id=tournament_id, accepted=True).all()
@@ -499,9 +610,97 @@ def save_tournament(tournament_id):
         )
         db.session.add(rj)
 
+    # Save penalty entries
+    for event_id, penalties in penalty_info.items():
+        for penalty in penalties:
+            rpe = Roster_Penalty_Entries(
+                roster_id=new_roster.id,
+                tournament_id=tournament_id,
+                event_id=event_id,
+                penalized_user_id=penalty['user_id'],
+                original_rank=penalty['original_rank'],
+                drops_applied=penalty['drops']
+            )
+            db.session.add(rpe)
+
     db.session.commit()
     flash("Roster saved!")
     return redirect(url_for('rosters.view_roster', roster_id=new_roster.id))
+
+
+@rosters_bp.route('/publish_roster/<int:roster_id>')
+def publish_roster(roster_id):
+    user_id = session.get('user_id')
+    user = User.query.filter_by(id=user_id).first()
+
+    if not user_id:
+        flash("Log In First")
+        return redirect(url_for('auth.login'))
+
+    if user.role < 2:
+        flash("You are not authorized to access this page")
+        return redirect(url_for('main.index'))
+
+    roster = Roster.query.get_or_404(roster_id)
+    
+    if roster.published:
+        flash("This roster is already published!")
+        return redirect(url_for('rosters.view_roster', roster_id=roster_id))
+
+    # Mark roster as published
+    tz = pytz.timezone('US/Eastern')
+    roster.published = True
+    roster.published_at = datetime.now(tz)
+    
+    # Create entries for all users on this roster so they can see it in their profile
+    competitors = Roster_Competitors.query.filter_by(roster_id=roster_id).all()
+    for competitor in competitors:
+        # Check if entry already exists
+        existing = User_Published_Rosters.query.filter_by(
+            user_id=competitor.user_id,
+            roster_id=roster_id
+        ).first()
+        
+        if not existing:
+            published_entry = User_Published_Rosters(
+                user_id=competitor.user_id,
+                roster_id=roster_id,
+                tournament_id=roster.tournament_id,
+                event_id=competitor.event_id,
+                notified=False
+            )
+            db.session.add(published_entry)
+    
+    db.session.commit()
+    flash("Roster has been published! Users will be notified.")
+    return redirect(url_for('rosters.view_roster', roster_id=roster_id))
+
+
+@rosters_bp.route('/unpublish_roster/<int:roster_id>')
+def unpublish_roster(roster_id):
+    user_id = session.get('user_id')
+    user = User.query.filter_by(id=user_id).first()
+
+    if not user_id:
+        flash("Log In First")
+        return redirect(url_for('auth.login'))
+
+    if user.role < 2:
+        flash("You are not authorized to access this page")
+        return redirect(url_for('main.index'))
+
+    roster = Roster.query.get_or_404(roster_id)
+    
+    # Mark roster as unpublished
+    roster.published = False
+    roster.published_at = None
+    
+    # Remove published roster entries for users
+    User_Published_Rosters.query.filter_by(roster_id=roster_id).delete()
+    
+    db.session.commit()
+    flash("Roster has been unpublished.")
+    return redirect(url_for('rosters.view_roster', roster_id=roster_id))
 
 
 
@@ -529,31 +728,66 @@ def view_roster(roster_id):
     # Get competitors and judges from the roster
     competitors = Roster_Competitors.query.filter_by(roster_id=roster_id).all()
     judges = Roster_Judge.query.filter_by(roster_id=roster_id).all()
+    
+    # Get penalty entries for this roster
+    penalty_entries = Roster_Penalty_Entries.query.filter_by(roster_id=roster_id).all()
+    penalty_info = {}
+    for entry in penalty_entries:
+        if entry.event_id not in penalty_info:
+            penalty_info[entry.event_id] = []
+        penalty_info[entry.event_id].append({
+            'user_id': entry.penalized_user_id,
+            'original_rank': entry.original_rank,
+            'drops': entry.drops_applied,
+            'replacement_user_id': None  # For saved rosters, we don't track replacements
+        })
 
     # Build event_view and rank_view from competitors
     event_view = []
     rank_view = []
     event_competitors = {}
-    for comp in competitors:
+    
+    for i, comp in enumerate(competitors):
         event_view.append({'user_id': comp.user_id, 'event_id': comp.event_id})
-        # For rank_view, just use the order in the DB (or you could add a rank field to Roster_Competitors)
-        rank_view.append({'user_id': comp.user_id, 'event_id': comp.event_id, 'rank': 'N/A'})
+        # Use index + 1 as rank for saved rosters
+        rank_view.append({'user_id': comp.user_id, 'event_id': comp.event_id, 'rank': i + 1})
+        
         eid = comp.event_id
         if eid not in event_competitors:
             event_competitors[eid] = []
-        event_competitors[eid].append({'user_id': comp.user_id, 'event_id': eid, 'rank': 'N/A'})
+        event_competitors[eid].append({'user_id': comp.user_id, 'event_id': eid, 'rank': i + 1})
 
     # Build users and events dicts for template lookup
-    user_ids = set([comp.user_id for comp in competitors])
-    event_ids = set([comp.event_id for comp in competitors])
-    users = {u.id: u for u in User.query.filter(User.id.in_(user_ids)).all()}
-    events = {e.id: e for e in Event.query.filter(Event.id.in_(event_ids)).all()}
+    user_ids = set([comp.user_id for comp in competitors] + [j.user_id for j in judges if j.user_id] + [j.child_id for j in judges if j.child_id])
+    event_ids = set([comp.event_id for comp in competitors] + [j.event_id for j in judges if j.event_id])
+    
+    users = {}
+    events = {}
+    
+    if user_ids:
+        users = {u.id: u for u in User.query.filter(User.id.in_(user_ids)).all()}
+    if event_ids:
+        events = {e.id: e for e in Event.query.filter(Event.id.in_(event_ids)).all()}
+
+    # Get point weights for weighted points calculation
+    tournament_weight, effort_weight = get_point_weights()
 
     # Judges for the roster
     judge_user_ids = [j.user_id for j in judges if j.user_id]
     child_user_ids = [j.child_id for j in judges if j.child_id]
     all_judge_user_ids = list(set(judge_user_ids + child_user_ids))
-    judge_users = {u.id: u for u in User.query.filter(User.id.in_(all_judge_user_ids)).all() if all_judge_user_ids}
+    
+    judge_users = {}
+    if all_judge_user_ids:
+        judge_users = {u.id: u for u in User.query.filter(User.id.in_(all_judge_user_ids)).all()}
+
+    # Debug information
+    print(f"Roster {roster_id}: {len(competitors)} competitors, {len(judges)} judges")
+    print(f"Event view has {len(event_view)} entries")
+    print(f"Rank view has {len(rank_view)} entries")
+    print(f"Event competitors: {list(event_competitors.keys())}")
+    print(f"Users dict has {len(users)} users")
+    print(f"Events dict has {len(events)} events")
 
     return render_template('rosters/view_roster.html',
                           roster=roster,
@@ -564,6 +798,9 @@ def view_roster(roster_id):
                           events=events,
                           judges=judges,
                           judge_users=judge_users,
+                          penalty_info=penalty_info,
+                          tournament_weight=tournament_weight,
+                          effort_weight=effort_weight,
                           upcoming_tournaments=[],
                           tournaments=[],
                           rosters=[])
@@ -594,6 +831,16 @@ def download_roster(roster_id):
     # Get competitors and judges from the roster
     competitors = Roster_Competitors.query.filter_by(roster_id=roster_id).all()
     judges = Roster_Judge.query.filter_by(roster_id=roster_id).all()
+
+    # Get partner information
+    from mason_snd.models.rosters import Roster_Partners
+    roster_partners = Roster_Partners.query.filter_by(roster_id=roster_id).all()
+    
+    # Build partnership map for quick lookup
+    partnership_map = {}
+    for partnership in roster_partners:
+        partnership_map[partnership.partner1_user_id] = partnership.partner2_user_id
+        partnership_map[partnership.partner2_user_id] = partnership.partner1_user_id
 
     # Build event_view and rank_view from competitors
     event_view = []
@@ -664,9 +911,17 @@ def download_roster(roster_id):
             elif events[row['event_id']].event_type == 2:
                 event_type = 'PF'
         
+        # Get partner information
+        partner_name = ''
+        if row['user_id'] in partnership_map:
+            partner_id = partnership_map[row['user_id']]
+            if partner_id in users:
+                partner_name = f"{users[partner_id].first_name} {users[partner_id].last_name}"
+        
         rank_data.append({
             'Rank': row['rank'],
             'Competitor Name': user_name,
+            'Partner': partner_name,
             'Weighted Points': users[row['user_id']].points if row['user_id'] in users else 0,
             'Event': event_name,
             'Category': event_type,
@@ -693,11 +948,19 @@ def download_roster(roster_id):
                 elif events[event_id].event_type == 2:
                     event_type = 'PF'
             
+            # Get partner information
+            partner_name = ''
+            if comp['user_id'] in partnership_map:
+                partner_id = partnership_map[comp['user_id']]
+                if partner_id in users:
+                    partner_name = f"{users[partner_id].first_name} {users[partner_id].last_name}"
+            
             event_data.append({
                 'Event': event_name,
                 'Category': event_type,
                 'Rank': comp['rank'],
                 'Competitor': user_name,
+                'Partner': partner_name,
                 'Weighted Points': users[comp['user_id']].points if comp['user_id'] in users else 0,
                 'User ID': comp['user_id'],
                 'Event ID': comp['event_id']

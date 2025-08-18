@@ -35,10 +35,14 @@ from datetime import datetime
 @tournaments_bp.route('/add_tournament', methods=['POST', 'GET'])
 def add_tournament():
     user_id = session.get('user_id')
-
     if not user_id:
         flash("Please Log in", "error")
         return redirect(url_for('auth.login'))
+    
+    user = User.query.filter_by(id=user_id).first()
+    if not user or user.role < 2:
+        flash("You are not authorized to access this page", "error")
+        return redirect(url_for('tournaments.index'))
     
     if request.method == "POST":
         name = request.form.get("name")
@@ -88,10 +92,14 @@ def add_tournament():
 @tournaments_bp.route('/add_form', methods=['GET', 'POST'])
 def add_form():
     user_id = session.get('user_id')
-    user = User.query.filter_by(id=user_id).first()
     if not user_id:
         flash("Please log in", "error")
         return redirect(url_for('auth.login'))
+        
+    user = User.query.filter_by(id=user_id).first()
+    if not user or user.role < 2:
+        flash("You are not authorized to access this page", "error")
+        return redirect(url_for('tournaments.index'))
 
     tournaments = Tournament.query.all()
 
@@ -165,16 +173,46 @@ def signup():
         # Create or update Tournament_Signups for each selected event
         for event_id in selected_event_ids:
             signup = Tournament_Signups.query.filter_by(user_id=user_id, tournament_id=tournament_id, event_id=event_id).first()
+            
+            # Get partner ID for this event if it's a partner event
+            partner_id = request.form.get(f'partner_{event_id}')
+            if partner_id:
+                try:
+                    partner_id = int(partner_id)
+                except (ValueError, TypeError):
+                    partner_id = None
+            else:
+                partner_id = None
+            
             if not signup:
                 signup = Tournament_Signups(
                     user_id=user_id,
                     tournament_id=tournament_id,
                     event_id=event_id,
-                    is_going=True
+                    is_going=True,
+                    partner_id=partner_id
                 )
                 db.session.add(signup)
             else:
                 signup.is_going = True
+                signup.partner_id = partner_id
+            
+            # If this is a partner event and a partner was selected, create/update the partner's signup too
+            if partner_id:
+                partner_signup = Tournament_Signups.query.filter_by(user_id=partner_id, tournament_id=tournament_id, event_id=event_id).first()
+                if not partner_signup:
+                    partner_signup = Tournament_Signups(
+                        user_id=partner_id,
+                        tournament_id=tournament_id,
+                        event_id=event_id,
+                        is_going=True,
+                        partner_id=user_id
+                    )
+                    db.session.add(partner_signup)
+                else:
+                    partner_signup.partner_id = user_id
+                    if not partner_signup.is_going:
+                        partner_signup.is_going = True
 
         # For each field in the selected tournament, capture the user's response
         for field in tournament.form_fields:
@@ -194,16 +232,24 @@ def signup():
             )
             db.session.add(new_response)
 
-        # Add Tournament_Judges rows for selected events
+        # Add Tournament_Judges rows for selected events only
         for event_id in selected_event_ids:
-            judge_acceptance = Tournament_Judges(
-                accepted=False,
-                judge_id=None,
+            # Check if Tournament_Judges entry already exists for this child/tournament/event combination
+            existing_judge = Tournament_Judges.query.filter_by(
                 child_id=user_id,
                 tournament_id=tournament_id,
                 event_id=event_id
-            )
-            db.session.add(judge_acceptance)
+            ).first()
+            
+            if not existing_judge:
+                judge_acceptance = Tournament_Judges(
+                    accepted=False,
+                    judge_id=None,
+                    child_id=user_id,
+                    tournament_id=tournament_id,
+                    event_id=event_id
+                )
+                db.session.add(judge_acceptance)
 
         # Commit all changes (Tournament_Signups, Form_Responses, Tournament_Judges)
         db.session.commit()
@@ -283,16 +329,15 @@ def bringing_judge(tournament_id):
 
 @tournaments_bp.route('/delete_tournament/<int:tournament_id>', methods=['POST'])
 def delete_tournament(tournament_id):
-    tournaments = Tournament.query.all()
-
     user_id = session.get('user_id')
-    user = User.query.filter_by(id=user_id).first()
-
-    now = datetime.now(EST)
-
     if not user_id:
         flash("Please Log in", "error")
         return redirect(url_for('auth.login'))
+        
+    user = User.query.filter_by(id=user_id).first()
+    if not user or user.role < 2:
+        flash("You are not authorized to access this page", "error")
+        return redirect(url_for('tournaments.index'))
 
     tournament = Tournament.query.filter_by(id=tournament_id).first()
 
@@ -445,3 +490,45 @@ def tournament_results(tournament_id):
         return redirect(url_for('profile.index', user_id=user_id))
 
     return render_template("tournaments/tournament_results.html")
+
+@tournaments_bp.route('/search_partners')
+def search_partners():
+    from flask import jsonify
+    
+    user_id = session.get('user_id')
+    if not user_id:
+        return jsonify({'error': 'Not logged in'}), 401
+    
+    query = request.args.get('q', '').strip()
+    event_id = request.args.get('event_id')
+    
+    if not query or len(query) < 2:
+        return jsonify({'users': []})
+    
+    # Search for users by name, excluding current user
+    users = User.query.filter(
+        db.or_(
+            User.first_name.ilike(f'%{query}%'),
+            User.last_name.ilike(f'%{query}%'),
+            db.func.concat(User.first_name, ' ', User.last_name).ilike(f'%{query}%')
+        ),
+        User.id != user_id  # Exclude current user
+    ).limit(10).all()
+    
+    # Filter users who are signed up for the same event
+    if event_id:
+        from mason_snd.models.events import User_Event
+        event_users = User_Event.query.filter_by(event_id=event_id, active=True).all()
+        event_user_ids = [eu.user_id for eu in event_users]
+        users = [user for user in users if user.id in event_user_ids]
+    
+    return jsonify({
+        'users': [
+            {
+                'id': user.id,
+                'first_name': user.first_name,
+                'last_name': user.last_name
+            }
+            for user in users
+        ]
+    })

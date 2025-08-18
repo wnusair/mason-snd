@@ -25,6 +25,13 @@
                     <label for="event_emoji" class="block text-sm font-medium text-gray-700">Event Emoji</label>
                     <input id="event_emoji" name="event_emoji" type="text" required value="{{ event.event_emoji }}" class="mt-1 appearance-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-md focus:outline-none focus:ring-[color:var(--color-primary-500)] focus:border-[color:var(--color-primary-500)] sm:text-sm">
                 </div>
+                <div>
+                    <label class="flex items-center space-x-2">
+                        <input type="checkbox" id="is_partner_event" name="is_partner_event" {% if event.is_partner_event %}checked{% endif %} class="rounded border-gray-300 text-[color:var(--color-primary-600)] focus:ring-[color:var(--color-primary-500)]">
+                        <span class="text-sm font-medium text-gray-700">This is a partner event</span>
+                    </label>
+                    <p class="mt-1 text-sm text-gray-500">When enabled, participants can search for and select partners when signing up for tournaments in this event.</p>
+                </div>
             </div>
 
             <div>

@@ -1,8 +1,13 @@
 from flask import Blueprint, session, redirect, url_for, render_template, request, flash, abort
 from werkzeug.security import generate_password_hash
 from mason_snd.extensions import db
-from mason_snd.models.auth import User, Judges
-from mason_snd.models.admin import User_Requirements, Requirements
+from mason_snd.models.auth import User, Judges, User_Published_Rosters
+from mason_snd.models.admin import User_Requirements, Requirements, Popups
+from mason_snd.models.rosters import Roster
+from mason_snd.models.tournaments import Tournament
+from mason_snd.models.events import Event
+from datetime import datetime
+import pytz
 
 profile_bp = Blueprint('profile', __name__, template_folder='templates')
 
@@ -78,6 +83,44 @@ def index(user_id):
 
     user_requirements = User_Requirements.query.filter_by(user_id=user_id, complete=False).all()
 
+    # Get active popups for the user
+    EST = pytz.timezone('US/Eastern')
+    now = datetime.now(EST)
+    
+    active_popups = Popups.query.filter_by(
+        user_id=user_id, 
+        completed=False
+    ).filter(
+        (Popups.expires_at.is_(None)) | (Popups.expires_at > now)
+    ).all()
+
+    # Get published rosters for this user
+    published_rosters = db.session.query(
+        User_Published_Rosters, Roster, Tournament, Event
+    ).join(
+        Roster, User_Published_Rosters.roster_id == Roster.id
+    ).join(
+        Tournament, User_Published_Rosters.tournament_id == Tournament.id
+    ).join(
+        Event, User_Published_Rosters.event_id == Event.id
+    ).filter(
+        User_Published_Rosters.user_id == user_id
+    ).order_by(
+        Roster.published_at.desc()
+    ).all()
+
+    # Check for new notifications (unnotified published rosters)
+    new_roster_notifications = User_Published_Rosters.query.filter_by(
+        user_id=user_id, 
+        notified=False
+    ).all()
+
+    # Mark notifications as seen if we're viewing our own profile
+    if current_user.id == target_user.id and new_roster_notifications:
+        for notification in new_roster_notifications:
+            notification.notified = True
+        db.session.commit()
+
     # Render the profile page with the correct judge_link
     return render_template(
         'profile/profile.html',
@@ -85,7 +128,10 @@ def index(user_id):
         user=target_user,
         user_requirements=user_requirements,
         requirements={r.id: r for r in Requirements.query.all()},
-        current_user=target_user
+        current_user=target_user,
+        active_popups=active_popups,
+        published_rosters=published_rosters,
+        new_roster_notifications=new_roster_notifications if current_user.id == target_user.id else []
     )
 
 @profile_bp.route('/update', methods=['GET', 'POST'])
@@ -236,3 +282,18 @@ def add_child():
 
         return redirect(url_for('profile.index', user_id=user_id))
     return render_template('profile/add_child.html', current_user=user)
+
+@profile_bp.route('/dismiss_popup/<int:popup_id>', methods=['POST'])
+def dismiss_popup(popup_id):
+    if not session.get('user_id'):
+        return redirect(url_for('auth.login'))
+    
+    user_id = session.get('user_id')
+    popup = Popups.query.filter_by(id=popup_id, user_id=user_id).first()
+    
+    if popup:
+        popup.completed = True
+        db.session.commit()
+        flash('Message dismissed.', 'success')
+    
+    return redirect(url_for('profile.index', user_id=user_id))

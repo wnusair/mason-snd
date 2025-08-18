@@ -10,7 +10,15 @@
         </div>
     </div>
     <div class="mt-8 flex flex-col">
-        <!-- Tournaments Table -->
+        <form method="get" class="max-w-md mx-auto mb-8">
+            <label for="tournament_id" class="block text-sm font-medium text-gray-700 mb-2">Select a Tournament</label>
+            <select name="tournament_id" id="tournament_id" class="w-full rounded-md border-gray-300 shadow-sm focus:border-[color:var(--color-primary-500)] focus:ring-[color:var(--color-primary-500)] sm:text-sm" onchange="this.form.submit()">
+                <option value="">-- Choose a tournament --</option>
+                {% for tournament in tournaments %}
+                    <option value="{{ tournament.id }}" {% if selected_tournament and tournament.id == selected_tournament.id %}selected{% endif %}>{{ tournament.name }} ({{ tournament.date.strftime('%Y-%m-%d') }})</option>
+                {% endfor %}
+            </select>
+        </form>
     </div>
 
     {% if selected_tournament %}
@@ -56,12 +64,38 @@
                             {% for event in user_events %}
                                 <div class="flex items-start">
                                     <div class="flex h-5 items-center">
-                                        <input id="event_{{ event.id }}" name="user_event" type="checkbox" value="{{ event.id }}" class="h-4 w-4 rounded border-gray-300 text-[color:var(--color-primary-600)] focus:ring-[color:var(--color-primary-500)]">
+                                        <input id="event_{{ event.id }}" name="user_event" type="checkbox" value="{{ event.id }}" class="h-4 w-4 rounded border-gray-300 text-[color:var(--color-primary-600)] focus:ring-[color:var(--color-primary-500)]" onchange="togglePartnerSelection({{ event.id }}, {{ event.is_partner_event|default(false)|tojson }})">
                                     </div>
                                     <div class="ml-3 text-sm">
                                         <label for="event_{{ event.id }}" class="font-medium text-gray-700">{{ event.event_name }} {{ event.event_emoji }}</label>
+                                        {% if event.is_partner_event %}
+                                            <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-800 ml-2">Partner Event</span>
+                                        {% endif %}
                                     </div>
                                 </div>
+                                {% if event.is_partner_event %}
+                                <div id="partner_selection_{{ event.id }}" class="ml-7 mt-2 hidden">
+                                    <label for="partner_{{ event.id }}" class="block text-sm font-medium text-gray-700">Select Partner</label>
+                                    <div class="mt-1 relative">
+                                        <input type="text" id="partner_search_{{ event.id }}" name="partner_search_{{ event.id }}" placeholder="Search for a partner..." class="w-full rounded-md border-gray-300 shadow-sm focus:border-[color:var(--color-primary-500)] focus:ring-[color:var(--color-primary-500)] sm:text-sm" onkeyup="searchPartners({{ event.id }})">
+                                        <input type="hidden" id="partner_{{ event.id }}" name="partner_{{ event.id }}" value="">
+                                        <div id="partner_results_{{ event.id }}" class="absolute z-10 mt-1 w-full bg-white shadow-lg max-h-60 rounded-md py-1 text-base ring-1 ring-black ring-opacity-5 overflow-auto focus:outline-none sm:text-sm hidden">
+                                            <!-- Search results will be populated here -->
+                                        </div>
+                                    </div>
+                                    <div id="selected_partner_{{ event.id }}" class="mt-2 hidden">
+                                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                                            Selected: <span id="partner_name_{{ event.id }}"></span>
+                                            <button type="button" class="ml-1 inline-flex flex-shrink-0 h-4 w-4 text-green-400 hover:text-green-500" onclick="clearPartner({{ event.id }})">
+                                                <span class="sr-only">Remove</span>
+                                                <svg class="h-2 w-2" stroke="currentColor" fill="none" viewBox="0 0 8 8">
+                                                    <path stroke-linecap="round" d="m1 1 6 6m0-6-6 6" />
+                                                </svg>
+                                            </button>
+                                        </span>
+                                    </div>
+                                </div>
+                                {% endif %}
                             {% endfor %}
                             </div>
                         </fieldset>
@@ -78,4 +112,86 @@
     </div>
     {% endif %}
 </div>
+
+<script>
+function togglePartnerSelection(eventId, isPartnerEvent) {
+    const checkbox = document.getElementById(`event_${eventId}`);
+    const partnerDiv = document.getElementById(`partner_selection_${eventId}`);
+    
+    if (isPartnerEvent && partnerDiv) {
+        if (checkbox.checked) {
+            partnerDiv.classList.remove('hidden');
+        } else {
+            partnerDiv.classList.add('hidden');
+            clearPartner(eventId);
+        }
+    }
+}
+
+function searchPartners(eventId) {
+    const searchInput = document.getElementById(`partner_search_${eventId}`);
+    const resultsDiv = document.getElementById(`partner_results_${eventId}`);
+    const query = searchInput.value.trim();
+    
+    if (query.length < 2) {
+        resultsDiv.classList.add('hidden');
+        return;
+    }
+    
+    // Make AJAX request to search for partners
+    fetch(`/tournaments/search_partners?q=${encodeURIComponent(query)}&event_id=${eventId}`)
+        .then(response => response.json())
+        .then(data => {
+            resultsDiv.innerHTML = '';
+            if (data.users && data.users.length > 0) {
+                data.users.forEach(user => {
+                    const div = document.createElement('div');
+                    div.className = 'cursor-pointer select-none relative py-2 pl-3 pr-9 hover:bg-gray-50';
+                    div.onclick = () => selectPartner(eventId, user.id, `${user.first_name} ${user.last_name}`);
+                    div.innerHTML = `
+                        <span class="block truncate">${user.first_name} ${user.last_name}</span>
+                    `;
+                    resultsDiv.appendChild(div);
+                });
+                resultsDiv.classList.remove('hidden');
+            } else {
+                resultsDiv.innerHTML = '<div class="py-2 pl-3 pr-9 text-gray-500">No users found</div>';
+                resultsDiv.classList.remove('hidden');
+            }
+        })
+        .catch(error => {
+            console.error('Error searching partners:', error);
+            resultsDiv.classList.add('hidden');
+        });
+}
+
+function selectPartner(eventId, partnerId, partnerName) {
+    document.getElementById(`partner_${eventId}`).value = partnerId;
+    document.getElementById(`partner_search_${eventId}`).value = '';
+    document.getElementById(`partner_results_${eventId}`).classList.add('hidden');
+    document.getElementById(`partner_name_${eventId}`).textContent = partnerName;
+    document.getElementById(`selected_partner_${eventId}`).classList.remove('hidden');
+}
+
+function clearPartner(eventId) {
+    document.getElementById(`partner_${eventId}`).value = '';
+    document.getElementById(`partner_search_${eventId}`).value = '';
+    document.getElementById(`partner_results_${eventId}`).classList.add('hidden');
+    document.getElementById(`selected_partner_${eventId}`).classList.add('hidden');
+}
+
+// Hide partner search results when clicking outside
+document.addEventListener('click', function(e) {
+    const partnerSearchInputs = document.querySelectorAll('[id^="partner_search_"]');
+    partnerSearchInputs.forEach(input => {
+        if (!input.contains(e.target)) {
+            const eventId = input.id.split('_')[2];
+            const resultsDiv = document.getElementById(`partner_results_${eventId}`);
+            if (resultsDiv) {
+                resultsDiv.classList.add('hidden');
+            }
+        }
+    });
+});
+</script>
 {% endblock %}

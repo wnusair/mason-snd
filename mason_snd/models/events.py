@@ -15,6 +15,7 @@ class Event(db.Model):
     owner = db.relationship('User', foreign_keys=[owner_id], backref='event')
 
     event_type = db.Column(db.Integer) # 0 = speech, 1 = LD, 2 = PF
+    is_partner_event = db.Column(db.Boolean, default=False) # True if event requires partners
 
 class User_Event(db.Model):
     id = db.Column(db.Integer, primary_key=True)

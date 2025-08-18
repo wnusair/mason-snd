@@ -21,7 +21,8 @@
                         <tr>
                             <th scope="col" class="py-3.5 pl-4 pr-3 text-left text-sm font-semibold text-gray-900 sm:pl-6">Name</th>
                             <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">User ID</th>
-                            <th scope="col" class="relative py-3.5 pl-3 pr-4 sm:pr-6"><span class="sr-only">Select</span></th>
+                            <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Drops</th>
+                            <th scope="col" class="relative py-3.5 pl-3 pr-4 sm:pr-6"><span class="sr-only">Actions</span></th>
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-gray-200 bg-white">
@@ -29,8 +30,13 @@
                         <tr>
                             <td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-6 capitalize">{{ user.first_name }} {{ user.last_name }}</td>
                             <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500">{{ user.id }}</td>
-                            <td class="relative whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium sm:pr-6">
-                                <a href="{{ url_for('admin.user_detail', user_id=user.id) }}" class="text-[color:var(--color-primary-600)] hover:text-[color:var(--color-primary-700)]">Select</a>
+                            <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500">{{ user.drops }}</td>
+                            <td class="relative whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium sm:pr-6 space-x-2">
+                                <a href="{{ url_for('admin.user_detail', user_id=user.id) }}" class="text-[color:var(--color-primary-600)] hover:text-[color:var(--color-primary-700)]">View</a>
+                                <form method="POST" action="{{ url_for('admin.add_drop', user_id=user.id) }}" class="inline">
+                                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                                    <button type="submit" class="text-red-600 hover:text-red-700" onclick="return confirm('Are you sure you want to add a drop penalty to {{ user.first_name }} {{ user.last_name }}?')">Add Drop</button>
+                                </form>
                             </td>
                         </tr>
                         {% endfor %}
