@@ -21,6 +21,7 @@
                         <tr>
                             <th scope="col" class="py-3.5 pl-4 pr-3 text-left text-sm font-semibold text-gray-900 sm:pl-6">Name</th>
                             <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">User ID</th>
+                            <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Type</th>
                             <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Drops</th>
                             <th scope="col" class="relative py-3.5 pl-3 pr-4 sm:pr-6"><span class="sr-only">Actions</span></th>
                         </tr>
@@ -30,6 +31,25 @@
                         <tr>
                             <td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-6 capitalize">{{ user.first_name }} {{ user.last_name }}</td>
                             <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500">{{ user.id }}</td>
+                            <td class="whitespace-nowrap px-3 py-4 text-sm">
+                                <div class="flex flex-wrap gap-1">
+                                    {% if user.is_parent %}
+                                    <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-blue-100 text-blue-800">
+                                        Judge
+                                    </span>
+                                    {% endif %}
+                                    {% if user.child_entries %}
+                                    <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-green-100 text-green-800">
+                                        Child
+                                    </span>
+                                    {% endif %}
+                                    {% if not user.is_parent and not user.child_entries %}
+                                    <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-gray-100 text-gray-800">
+                                        Student
+                                    </span>
+                                    {% endif %}
+                                </div>
+                            </td>
                             <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500">{{ user.drops }}</td>
                             <td class="relative whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium sm:pr-6 space-x-2">
                                 <a href="{{ url_for('admin.user_detail', user_id=user.id) }}" class="text-[color:var(--color-primary-600)] hover:text-[color:var(--color-primary-700)]">View</a>

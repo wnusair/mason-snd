@@ -202,6 +202,13 @@ def search():
         if query:
             # Get all users and their full names
             users = User.query.all()
+            
+            # Add judge/child relationship information to each user
+            for u in users:
+                # Check if user is a child (has entries in Judges table as child_id)
+                child_entries = Judges.query.filter_by(child_id=u.id).all()
+                u.child_entries = child_entries
+                
             user_map = {f"{u.first_name.lower()} {u.last_name.lower()}": u for u in users}
             names = list(user_map.keys())
             # Use difflib to get close matches
@@ -287,6 +294,13 @@ def change_event_leader(event_id):
             if search_query:
                 # Get all users and their full names
                 users = User.query.all()
+                
+                # Add judge/child relationship information to each user
+                for u in users:
+                    # Check if user is a child (has entries in Judges table as child_id)
+                    child_entries = Judges.query.filter_by(child_id=u.id).all()
+                    u.child_entries = child_entries
+                    
                 user_map = {f"{u.first_name.lower()} {u.last_name.lower()}": u for u in users}
                 names = list(user_map.keys())
                 # Use difflib to get close matches
@@ -618,9 +632,18 @@ def delete_users():
                 flash('Please select at least one user.', 'error')
                 return redirect(url_for('admin.delete_users'))
             
+            # Convert to integers for easier comparison
+            user_ids = [int(uid) for uid in selected_user_ids]
+            
+            # Don't allow deleting yourself - check if current user is in the list
+            current_user_id = session.get('user_id')
+            if current_user_id in user_ids:
+                flash('You cannot delete your own account. Please remove yourself from the selection.', 'error')
+                return redirect(url_for('admin.delete_users'))
+            
             previews = []
-            for uid in selected_user_ids:
-                preview = get_user_deletion_preview(int(uid))
+            for uid in user_ids:
+                preview = get_user_deletion_preview(uid)
                 if preview:
                     previews.append(preview)
             
@@ -637,6 +660,12 @@ def delete_users():
             
             # Convert to integers
             user_ids = [int(uid) for uid in selected_user_ids]
+            
+            # Don't allow deleting yourself - check if current user is in the list
+            current_user_id = session.get('user_id')
+            if current_user_id in user_ids:
+                flash('You cannot delete your own account. Please remove yourself from the selection.', 'error')
+                return redirect(url_for('admin.delete_users'))
             
             # Perform deletion
             result = delete_multiple_users(user_ids)
@@ -660,8 +689,17 @@ def delete_users():
                 User.email.contains(search_query)
             )
         ).limit(50).all()
+        
+        # Add judge/child relationship information to each user
+        for u in users:
+            # Check if user is a child (has entries in Judges table as child_id)
+            child_entries = Judges.query.filter_by(child_id=u.id).all()
+            u.child_entries = child_entries
     
-    return render_template('admin/delete_users.html', users=users, search_query=search_query)
+    return render_template('admin/delete_users.html', 
+                         users=users, 
+                         search_query=search_query,
+                         current_user_id=session.get('user_id'))
 
 @admin_bp.route('/delete_tournaments', methods=['GET', 'POST'])
 def delete_tournaments():

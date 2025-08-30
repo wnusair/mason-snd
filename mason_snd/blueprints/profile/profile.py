@@ -20,7 +20,9 @@ def create_ghost(first_name, last_name, email, phone_number, creator):
         phone_number=phone_number,
         judging_reqs="test",
         child_first_name=creator.first_name,
-        child_last_name=creator.last_name
+        child_last_name=creator.last_name,
+        is_parent=False,
+        account_claimed=False
     )
 
     db.session.add(ghost)
@@ -152,14 +154,136 @@ def update():
             user.password = generate_password_hash(password)
 
         if user.is_parent:
-            user.child_first_name = request.form.get('child_first_name').lower()
-            user.child_last_name = request.form.get('child_last_name').lower()
+            old_child_first = user.child_first_name
+            old_child_last = user.child_last_name
+            new_child_first = request.form.get('child_first_name').lower()
+            new_child_last = request.form.get('child_last_name').lower()
+            
+            user.child_first_name = new_child_first
+            user.child_last_name = new_child_last
+            
+            # Check if child information has changed and create ghost if needed
+            if (old_child_first != new_child_first or old_child_last != new_child_last):
+                # Check if the new child already exists
+                existing_child = User.query.filter_by(
+                    first_name=new_child_first,
+                    last_name=new_child_last,
+                    is_parent=False
+                ).first()
+                
+                if not existing_child:
+                    # Create ghost account for the new child
+                    create_ghost(new_child_first, new_child_last, "", "", user)
+                    existing_child = User.query.filter_by(
+                        first_name=new_child_first,
+                        last_name=new_child_last,
+                        is_parent=False
+                    ).first()
+                
+                # Update judge relationship if child changed
+                if existing_child:
+                    # Remove old relationship if it exists
+                    if old_child_first and old_child_last:
+                        old_child = User.query.filter_by(
+                            first_name=old_child_first,
+                            last_name=old_child_last,
+                            is_parent=False
+                        ).first()
+                        if old_child:
+                            old_relationship = Judges.query.filter_by(
+                                judge_id=user.id, 
+                                child_id=old_child.id
+                            ).first()
+                            if old_relationship:
+                                db.session.delete(old_relationship)
+                    
+                    # Add new relationship
+                    new_relationship = Judges.query.filter_by(
+                        judge_id=user.id, 
+                        child_id=existing_child.id
+                    ).first()
+                    if not new_relationship:
+                        new_relationship = Judges(
+                            background_check=False,
+                            judge_id=user.id,
+                            child_id=existing_child.id
+                        )
+                        db.session.add(new_relationship)
         else:
-            user.emergency_contact_first_name = request.form.get('emergency_contact_first_name').lower()
-            user.emergency_contact_last_name = request.form.get('emergency_contact_last_name').lower()
-            user.emergency_contact_number = request.form.get('emergency_contact_phone')
-            user.emergency_contact_email = request.form.get('emergency_contact_email')
+            old_emergency_first = user.emergency_contact_first_name
+            old_emergency_last = user.emergency_contact_last_name
+            old_emergency_phone = user.emergency_contact_number
+            old_emergency_email = user.emergency_contact_email
+            
+            new_emergency_first = request.form.get('emergency_first_name').lower()
+            new_emergency_last = request.form.get('emergency_last_name').lower()
+            new_emergency_phone = request.form.get('emergency_contact_phone')
+            new_emergency_email = request.form.get('emergency_contact_email')
+            
+            user.emergency_contact_first_name = new_emergency_first
+            user.emergency_contact_last_name = new_emergency_last
+            user.emergency_contact_number = new_emergency_phone
+            user.emergency_contact_email = new_emergency_email
             user.emergency_contact_relationship = request.form.get('emergency_contact_relationship')
+            
+            # Check if emergency contact information has changed and create ghost if needed
+            if (old_emergency_first != new_emergency_first or 
+                old_emergency_last != new_emergency_last or
+                old_emergency_phone != new_emergency_phone):
+                
+                # Check if the new emergency contact already exists
+                existing_parent = User.query.filter_by(
+                    first_name=new_emergency_first,
+                    last_name=new_emergency_last,
+                    phone_number=new_emergency_phone,
+                    is_parent=True
+                ).first()
+                
+                if not existing_parent:
+                    # Create ghost account for the new emergency contact
+                    ghost_parent = User(
+                        first_name=new_emergency_first,
+                        last_name=new_emergency_last,
+                        phone_number=new_emergency_phone,
+                        email=new_emergency_email,
+                        child_first_name=user.first_name,
+                        child_last_name=user.last_name,
+                        is_parent=True,
+                        account_claimed=False
+                    )
+                    db.session.add(ghost_parent)
+                    db.session.commit()
+                    existing_parent = ghost_parent
+                
+                # Update judge relationship if emergency contact changed
+                if existing_parent:
+                    # Remove old relationship if it exists
+                    if old_emergency_first and old_emergency_last:
+                        old_parent = User.query.filter_by(
+                            first_name=old_emergency_first,
+                            last_name=old_emergency_last,
+                            is_parent=True
+                        ).first()
+                        if old_parent:
+                            old_relationship = Judges.query.filter_by(
+                                judge_id=old_parent.id, 
+                                child_id=user.id
+                            ).first()
+                            if old_relationship:
+                                db.session.delete(old_relationship)
+                    
+                    # Add new relationship
+                    new_relationship = Judges.query.filter_by(
+                        judge_id=existing_parent.id, 
+                        child_id=user.id
+                    ).first()
+                    if not new_relationship:
+                        new_relationship = Judges(
+                            background_check=False,
+                            judge_id=existing_parent.id,
+                            child_id=user.id
+                        )
+                        db.session.add(new_relationship)
 
         db.session.commit()
         flash('Profile updated successfully', 'success')

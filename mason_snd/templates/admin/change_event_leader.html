@@ -111,16 +111,28 @@
                                     <p class="text-sm text-gray-500">{{ user.email }}</p>
                                 </div>
                                 <div class="text-right">
-                                    <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full 
-                                        {% if user.is_parent %}bg-green-100 text-green-800
-                                        {% else %}bg-blue-100 text-blue-800{% endif %}">
-                                        {% if user.is_parent %}Parent/Judge{% else %}Student{% endif %}
-                                    </span>
-                                    {% if user.role > 0 %}
-                                    <span class="ml-2 inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-purple-100 text-purple-800">
-                                        {% if user.role == 1 %}Leader{% elif user.role == 2 %}Admin{% endif %}
-                                    </span>
-                                    {% endif %}
+                                    <div class="flex flex-wrap gap-1 justify-end">
+                                        {% if user.is_parent %}
+                                        <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-blue-100 text-blue-800">
+                                            Judge
+                                        </span>
+                                        {% endif %}
+                                        {% if user.child_entries %}
+                                        <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-green-100 text-green-800">
+                                            Child
+                                        </span>
+                                        {% endif %}
+                                        {% if not user.is_parent and not user.child_entries %}
+                                        <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-gray-100 text-gray-800">
+                                            Student
+                                        </span>
+                                        {% endif %}
+                                        {% if user.role > 0 %}
+                                        <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-purple-100 text-purple-800">
+                                            {% if user.role == 1 %}Leader{% elif user.role == 2 %}Admin{% endif %}
+                                        </span>
+                                        {% endif %}
+                                    </div>
                                 </div>
                             </div>
                         </div>

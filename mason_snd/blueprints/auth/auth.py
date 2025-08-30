@@ -243,6 +243,79 @@ ghost_account = User(
             )
 """
 
+def find_or_create_user(first_name, last_name, is_parent, **user_data):
+    """
+    Find existing user or create new one, handling account claiming properly.
+    Returns the user object.
+    """
+    # Look for existing user with same name and parent status
+    existing_user = User.query.filter_by(
+        first_name=first_name.lower(), 
+        last_name=last_name.lower(),
+        is_parent=is_parent
+    ).first()
+    
+    if existing_user:
+        # If user exists but account not claimed, claim it with new data
+        if not existing_user.account_claimed:
+            for key, value in user_data.items():
+                if value is not None:  # Only update non-None values
+                    setattr(existing_user, key, value)
+            existing_user.account_claimed = True
+            db.session.commit()
+            print(f"Claimed existing ghost account for {first_name} {last_name}")
+        else:
+            # Account is already claimed, but update any missing critical information
+            updated_fields = []
+            critical_fields = ['email', 'phone_number', 'password']  # Fields that should be updated if missing
+            
+            for key, value in user_data.items():
+                if key in critical_fields and value is not None:
+                    current_value = getattr(existing_user, key)
+                    if current_value is None or current_value == '':
+                        setattr(existing_user, key, value)
+                        updated_fields.append(key)
+            
+            if updated_fields:
+                db.session.commit()
+                print(f"Updated existing claimed account for {first_name} {last_name} with fields: {updated_fields}")
+            else:
+                print(f"User {first_name} {last_name} already has a claimed account with complete information")
+        return existing_user
+    else:
+        # Create new user
+        new_user = User(
+            first_name=first_name.lower(),
+            last_name=last_name.lower(),
+            is_parent=is_parent,
+            account_claimed=True,
+            **user_data
+        )
+        db.session.add(new_user)
+        db.session.commit()
+        print(f"Created new user for {first_name} {last_name}")
+        return new_user
+
+def create_or_update_judge_relationship(judge_id, child_id):
+    """
+    Create judge relationship if it doesn't exist, avoiding duplicates.
+    """
+    existing_relationship = Judges.query.filter_by(
+        judge_id=judge_id,
+        child_id=child_id
+    ).first()
+    
+    if not existing_relationship:
+        judge_relationship = Judges(
+            judge_id=judge_id,
+            child_id=child_id
+        )
+        db.session.add(judge_relationship)
+        db.session.commit()
+        print(f"Created judge relationship: judge_id={judge_id}, child_id={child_id}")
+    else:
+        print(f"Judge relationship already exists: judge_id={judge_id}, child_id={child_id}")
+
 @auth_bp.route('/register', methods=['GET', 'POST'])
 def register():
     if request.method == 'POST':
@@ -250,9 +323,21 @@ def register():
         last_name = request.form.get('last_name')
         email = request.form.get('email')
         phone_number = request.form.get('phone_number')
-        is_parent = request.form.get('is_parent') == 'yes'
+        is_parent_form_value = request.form.get('is_parent')
         password = request.form.get('password')
         confirm_password = request.form.get('confirm_password')
+
+        # Validate basic required fields
+        if not all([first_name, last_name, email, phone_number, password, confirm_password]):
+            flash("All basic information fields are required.", 'error')
+            return render_template('auth/register.html')
+
+        # Validate that is_parent is actually selected
+        if is_parent_form_value not in ['yes', 'no']:
+            flash("Please select whether you are a parent or not.", 'error')
+            return render_template('auth/register.html')
+
+        is_parent = is_parent_form_value == 'yes'
 
         emergency_first_name = emergency_last_name = emergency_email = emergency_phone = emergency_relationship = None
         child_first_name = child_last_name = None
@@ -260,12 +345,22 @@ def register():
         if is_parent:
             child_first_name = request.form.get('child_first_name')
             child_last_name = request.form.get('child_last_name')
+            
+            # Validate required child information
+            if not child_first_name or not child_last_name:
+                flash("Child's first name and last name are required when registering as a parent.", 'error')
+                return render_template('auth/register.html')
         else:
             emergency_first_name = request.form.get('emergency_first_name')
             emergency_last_name = request.form.get('emergency_last_name')
             emergency_email = request.form.get('emergency_email')
             emergency_phone = request.form.get('emergency_phone')
             emergency_relationship = request.form.get('emergency_relationship')
+            
+            # Validate required emergency contact information
+            if not all([emergency_first_name, emergency_last_name, emergency_email, emergency_phone, emergency_relationship]):
+                flash("All emergency contact information is required when registering as a student.", 'error')
+                return render_template('auth/register.html')
         
         print(first_name, last_name, email, phone_number, is_parent, password, confirm_password, emergency_first_name, emergency_last_name, emergency_email, emergency_phone, emergency_relationship, child_first_name, child_last_name)
 
@@ -273,129 +368,70 @@ def register():
             flash("Passwords do not match", 'error')
             return render_template('auth/register.html')
 
-        if is_parent:
-            new_user = User(
-                first_name=first_name.lower(),
-                last_name=last_name.lower(),
-                email=email,
-                password=generate_password_hash(password),
-                phone_number=phone_number,
-                judging_reqs="test",
-                is_parent=is_parent,
-                child_first_name=child_first_name,
-                child_last_name=child_last_name,
-                account_claimed=True
+        # Check if someone is trying to register with an email that already exists
+        # But allow claiming of ghost accounts (unclaimed accounts with same name)
+        existing_email_user = User.query.filter_by(email=email).first()
+        if existing_email_user and existing_email_user.account_claimed:
+            # Check if this is the same person trying to claim their ghost account
+            is_same_person = (
+                existing_email_user.first_name.lower() == first_name.lower() and
+                existing_email_user.last_name.lower() == last_name.lower() and
+                existing_email_user.is_parent == is_parent
             )
-
-            # Check if the child already exists (real or ghost)
-            child_user = User.query.filter_by(
-                first_name=child_first_name.lower() if child_first_name else None,
-                last_name=child_last_name.lower() if child_last_name else None,
-                is_parent=False
-            ).first()
-
-            existing_user = User.query.filter_by(first_name=first_name.lower(), last_name=last_name.lower()).first()
-            print(existing_user)
-
-            if existing_user:
-                existing_user.email = email
-                existing_user.password = generate_password_hash(password)
-                existing_user.judging_reqs = "test"
-                existing_user.child_first_name = child_first_name.lower() if child_first_name else None
-                existing_user.child_last_name = child_last_name.lower() if child_last_name else None
-                existing_user.account_claimed = True
-                db.session.commit()
-                parent_user = existing_user
-                # Only create ghost child if not found
-                if not child_user:
-                    ghost_user = User(
-                        first_name=child_first_name.lower() if child_first_name else None,
-                        last_name=child_last_name.lower() if child_last_name else None,
-                        is_parent=False,
-                        account_claimed=False
-                    )
-                    db.session.add(ghost_user)
-                    db.session.commit()
-                    child_user = ghost_user
-            else:
-                db.session.add(new_user)
-                if not child_user:
-                    ghost_user = User(
-                        first_name=child_first_name.lower() if child_first_name else None,
-                        last_name=child_last_name.lower() if child_last_name else None,
-                        is_parent=False,
-                        account_claimed=False
-                    )
-                    db.session.add(ghost_user)
-                    db.session.commit()
-                    child_user = ghost_user
-                else:
-                    db.session.commit()
-                parent_user = new_user
-                # If child_user existed, don't create a new one
-        elif not is_parent:
-            new_user = User(
-                first_name=first_name.lower(),
-                last_name=last_name.lower(),
-                
-                email=email,
-                password=generate_password_hash(password),
-                phone_number=phone_number,
-
-                is_parent=is_parent,
-                emergency_contact_first_name=emergency_first_name.lower(),
-                emergency_contact_last_name=emergency_last_name.lower(),
-                emergency_contact_number=emergency_phone,
-                emergency_contact_relationship=emergency_relationship,
-                emergency_contact_email=emergency_email,
-
-                account_claimed=True
-            )
-
-            ghost_user = User(
-                first_name=emergency_first_name.lower(),
-                last_name=emergency_last_name.lower(),
-                phone_number=emergency_phone,
-                email=emergency_email,
-                child_first_name=child_first_name,
-                child_last_name=child_last_name,
-                is_parent=True,
-                account_claimed=False
-            )
-
-            existing_user = User.query.filter_by(first_name=first_name.lower(),last_name=last_name.lower()).first()
-            print(existing_user)
-
-            if existing_user:
-                existing_user.email = email
-                existing_user.password = generate_password_hash(password)
-                existing_user.emergency_contact_first_name = emergency_first_name
-                existing_user.emergency_contact_last_name = emergency_last_name
-                existing_user.account_claimed = True
-                db.session.commit()
-            else:
-                db.session.add(new_user)
-                db.session.add(ghost_user)
-                db.session.commit()
-        
+            
+            if not is_same_person:
+                flash("An account with this email address already exists. Please use a different email or try logging in.", 'error')
+                return render_template('auth/register.html')
 
         if is_parent:
-            judge = Judges(
-                judge_id=parent_user.id,
-                child_id=child_user.id
-            )
-            db.session.add(judge)
-            db.session.commit()
+            # Handle parent registration
+            parent_user_data = {
+                'email': email,
+                'password': generate_password_hash(password),
+                'phone_number': phone_number,
+                'judging_reqs': "test",
+                'child_first_name': child_first_name.lower() if child_first_name else None,
+                'child_last_name': child_last_name.lower() if child_last_name else None
+            }
+            
+            # Find or create parent user
+            parent_user = find_or_create_user(first_name, last_name, True, **parent_user_data)
+            
+            # Find or create child user (as ghost account if not exists)
+            child_user_data = {}  # Child gets minimal data initially
+            child_user = find_or_create_user(child_first_name, child_last_name, False, **child_user_data)
+            
+            # Create or update judge relationship
+            create_or_update_judge_relationship(parent_user.id, child_user.id)
             make_judge_reqs(parent_user)
+            
         else:
-            parent_user = User.query.filter_by(first_name=emergency_first_name.lower(), last_name=emergency_last_name.lower()).first()
-            child_user = User.query.filter_by(first_name=first_name.lower(), last_name=last_name.lower()).first()
-            judge = Judges(
-                judge_id=parent_user.id,
-                child_id=child_user.id
-            )
-            db.session.add(judge)
-            db.session.commit()
+            # Handle child registration
+            child_user_data = {
+                'email': email,
+                'password': generate_password_hash(password),
+                'phone_number': phone_number,
+                'emergency_contact_first_name': emergency_first_name.lower(),
+                'emergency_contact_last_name': emergency_last_name.lower(),
+                'emergency_contact_number': emergency_phone,
+                'emergency_contact_relationship': emergency_relationship,
+                'emergency_contact_email': emergency_email
+            }
+            
+            # Find or create child user
+            child_user = find_or_create_user(first_name, last_name, False, **child_user_data)
+            
+            # Find or create parent user (as ghost account if not exists)
+            parent_user_data = {
+                'phone_number': emergency_phone,
+                'email': emergency_email,
+                'child_first_name': first_name.lower(),
+                'child_last_name': last_name.lower()
+            }
+            parent_user = find_or_create_user(emergency_first_name, emergency_last_name, True, **parent_user_data)
+            
+            # Create or update judge relationship
+            create_or_update_judge_relationship(parent_user.id, child_user.id)
             make_child_reqs(child_user)
 
         flash("Registration successful!", "success")

@@ -32,55 +32,55 @@
                 </div>
 
                 <fieldset class="mt-6">
-                    <legend class="text-base font-medium text-gray-900">Are you a parent?</legend>
+                    <legend class="text-base font-medium text-gray-900">Are you a parent? <span class="text-red-500">*</span></legend>
                     <div class="mt-4 space-y-4">
                         <div class="flex items-center">
                             <input id="parent_yes" name="is_parent" type="radio" value="yes" required class="focus:ring-indigo-500 h-4 w-4 text-indigo-600 border-gray-300">
                             <label for="parent_yes" class="ml-3 block text-sm font-medium text-gray-700">Yes</label>
                         </div>
                         <div class="flex items-center">
-                            <input id="parent_no" name="is_parent" type="radio" value="no" class="focus:ring-indigo-500 h-4 w-4 text-indigo-600 border-gray-300">
+                            <input id="parent_no" name="is_parent" type="radio" value="no" required class="focus:ring-indigo-500 h-4 w-4 text-indigo-600 border-gray-300">
                             <label for="parent_no" class="ml-3 block text-sm font-medium text-gray-700">No</label>
                         </div>
                     </div>
                 </fieldset>
 
                 <div id="child-contact" class="hidden mt-6 space-y-4">
-                    <h3 class="text-lg font-medium leading-6 text-gray-900">Child's Information</h3>
+                    <h3 class="text-lg font-medium leading-6 text-gray-900">Child's Information <span class="text-red-500">*</span></h3>
                      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
                             <label for="child_first_name" class="sr-only">Child's first name</label>
-                            <input type="text" name="child_first_name" id="child_first_name" class="appearance-none rounded-md relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm" placeholder="Child's first name">
+                            <input type="text" name="child_first_name" id="child_first_name" class="appearance-none rounded-md relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm" placeholder="Child's first name *">
                         </div>
                         <div>
                             <label for="child_last_name" class="sr-only">Child's last name</label>
-                            <input type="text" name="child_last_name" id="child_last_name" class="appearance-none rounded-md relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm" placeholder="Child's last name">
+                            <input type="text" name="child_last_name" id="child_last_name" class="appearance-none rounded-md relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm" placeholder="Child's last name *">
                         </div>
                     </div>
                 </div>
 
                 <div id="emergency-contact" class="hidden mt-6 space-y-4">
-                    <h3 class="text-lg font-medium leading-6 text-gray-900">Emergency Contact</h3>
+                    <h3 class="text-lg font-medium leading-6 text-gray-900">Emergency Contact <span class="text-red-500">*</span></h3>
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                          <div>
                             <label for="emergency_first_name" class="sr-only">Emergency contact first name</label>
-                            <input type="text" name="emergency_first_name" id="emergency_first_name" class="appearance-none rounded-md relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm" placeholder="First name">
+                            <input type="text" name="emergency_first_name" id="emergency_first_name" class="appearance-none rounded-md relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm" placeholder="First name *">
                         </div>
                         <div>
                             <label for="emergency_last_name" class="sr-only">Emergency contact last name</label>
-                            <input type="text" name="emergency_last_name" id="emergency_last_name" class="appearance-none rounded-md relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm" placeholder="Last name">
+                            <input type="text" name="emergency_last_name" id="emergency_last_name" class="appearance-none rounded-md relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm" placeholder="Last name *">
                         </div>
                         <div class="md:col-span-2">
                             <label for="emergency_email" class="sr-only">Emergency contact email</label>
-                            <input type="email" name="emergency_email" id="emergency_email" class="appearance-none rounded-md relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm" placeholder="Email">
+                            <input type="email" name="emergency_email" id="emergency_email" class="appearance-none rounded-md relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm" placeholder="Email *">
                         </div>
                         <div class="md:col-span-2">
                             <label for="emergency_phone" class="sr-only">Emergency contact phone</label>
-                            <input type="tel" name="emergency_phone" id="emergency_phone" class="appearance-none rounded-md relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm" placeholder="Phone number">
+                            <input type="tel" name="emergency_phone" id="emergency_phone" class="appearance-none rounded-md relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm" placeholder="Phone number *">
                         </div>
                          <div class="md:col-span-2">
                             <label for="emergency_relationship" class="sr-only">Emergency contact relationship</label>
-                            <input type="text" name="emergency_relationship" id="emergency_relationship" class="appearance-none rounded-md relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm" placeholder="Relationship">
+                            <input type="text" name="emergency_relationship" id="emergency_relationship" class="appearance-none rounded-md relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm" placeholder="Relationship *">
                         </div>
                     </div>
                 </div>
@@ -119,13 +119,37 @@
     const childContact = document.getElementById('child-contact');
     const emergencyContact = document.getElementById('emergency-contact');
 
+    // Get all the form fields that need conditional required validation
+    const childFields = [
+        document.getElementById('child_first_name'),
+        document.getElementById('child_last_name')
+    ];
+    
+    const emergencyFields = [
+        document.getElementById('emergency_first_name'),
+        document.getElementById('emergency_last_name'),
+        document.getElementById('emergency_email'),
+        document.getElementById('emergency_phone'),
+        document.getElementById('emergency_relationship')
+    ];
+
     function toggleContactForms() {
         if (parentYes.checked) {
+            // Show child information, hide emergency contact
             childContact.classList.remove('hidden');
             emergencyContact.classList.add('hidden');
+            
+            // Make child fields required, emergency fields not required
+            childFields.forEach(field => field.setAttribute('required', 'required'));
+            emergencyFields.forEach(field => field.removeAttribute('required'));
         } else if (parentNo.checked) {
+            // Show emergency contact, hide child information
             childContact.classList.add('hidden');
             emergencyContact.classList.remove('hidden');
+            
+            // Make emergency fields required, child fields not required
+            emergencyFields.forEach(field => field.setAttribute('required', 'required'));
+            childFields.forEach(field => field.removeAttribute('required'));
         }
     }
 

@@ -60,6 +60,9 @@ def edit_event(event_id):
         flash('You must be logged in to edit an event', 'error')
         return redirect(url_for('auth.login'))
 
+
+    user = User.query.filter_by(id=user_id).first()
+
     # Fetch the event to edit
     event = Event.query.filter_by(id=event_id).first()
     if not event:
@@ -73,11 +76,33 @@ def edit_event(event_id):
 
     if request.method == 'POST':
         # Update event details
-        event.event_name = request.form.get('event_name')
-        event.event_description = request.form.get('event_description')
-        event.event_type = request.form.get('event_type')
-        event.event_emoji = request.form.get('event_emoji')
-        event.is_partner_event = request.form.get('is_partner_event') == 'on'
+        event_name = request.form.get('event_name')
+        event_description = request.form.get('event_description')
+        event_type = request.form.get('event_type')
+        event_emoji = request.form.get('event_emoji')
+        is_partner_event = request.form.get('is_partner_event') == 'on'
+
+        # Validate required fields
+        if not event_name or not event_description or not event_type:
+            flash("Please fill in all required fields", "error")
+            return redirect(url_for("events.edit_event", event_id=event_id))
+
+        # Validate event_type
+        try:
+            event_type_int = int(event_type)
+            if event_type_int not in [0, 1, 2]:
+                flash("Invalid event type selected", "error")
+                return redirect(url_for("events.edit_event", event_id=event_id))
+        except (ValueError, TypeError):
+            flash("Invalid event type", "error")
+            return redirect(url_for("events.edit_event", event_id=event_id))
+
+        # Update event details
+        event.event_name = event_name
+        event.event_description = event_description
+        event.event_type = event_type_int
+        event.event_emoji = event_emoji
+        event.is_partner_event = is_partner_event
 
         db.session.commit()
         flash('Event updated successfully', 'success')

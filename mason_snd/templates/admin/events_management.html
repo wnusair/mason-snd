@@ -10,10 +10,10 @@
                 <tr>
                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Event Name</th>
                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Description</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Type</th>
                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Participants</th>
                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Current Leader</th>
-                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
                 </tr>
             </thead>
             <tbody class="bg-white divide-y divide-gray-200">
@@ -29,6 +29,10 @@
                     </td>
                     <td class="px-6 py-4">
                         <div class="text-sm text-gray-500 max-w-xs truncate">{{ event.event_description or 'No description' }}</div>
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                        <a href="{{ url_for('admin.change_event_leader', event_id=event.id) }}"
+                           class="text-blue-600 hover:text-blue-900">Change Leader</a>
                     </td>
                     <td class="px-6 py-4 whitespace-nowrap">
                         <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full 
@@ -50,6 +54,7 @@
                             {{ event_stats[event.id].total_participants }} total
                         </div>
                     </td>
+
                     <td class="px-6 py-4 whitespace-nowrap">
                         {% if event.owner %}
                         <div class="text-sm font-medium text-gray-900 capitalize">{{ event.owner.first_name }} {{ event.owner.last_name }}</div>
@@ -57,10 +62,6 @@
                         {% else %}
                         <span class="text-sm text-gray-400 italic">No leader assigned</span>
                         {% endif %}
-                    </td>
-                    <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                        <a href="{{ url_for('admin.change_event_leader', event_id=event.id) }}" 
-                           class="text-blue-600 hover:text-blue-900">Change Leader</a>
                     </td>
                 </tr>
                 {% else %}

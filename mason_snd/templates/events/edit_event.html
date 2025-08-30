@@ -22,6 +22,15 @@
                     <textarea id="event_description" name="event_description" rows="3" required class="mt-1 appearance-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-md focus:outline-none focus:ring-[color:var(--color-primary-500)] focus:border-[color:var(--color-primary-500)] sm:text-sm">{{ event.event_description }}</textarea>
                 </div>
                 <div>
+                    <label for="event_type" class="block text-sm font-medium text-gray-700">Event Type</label>
+                    <select id="event_type" name="event_type" required class="mt-1 appearance-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-md focus:outline-none focus:ring-[color:var(--color-primary-500)] focus:border-[color:var(--color-primary-500)] sm:text-sm">
+                        <option value="">Select an event type...</option>
+                        <option value="0" {% if event.event_type == 0 %}selected{% endif %}>Speech</option>
+                        <option value="1" {% if event.event_type == 1 %}selected{% endif %}>Lincoln-Douglas (LD)</option>
+                        <option value="2" {% if event.event_type == 2 %}selected{% endif %}>Public Forum (PF)</option>
+                    </select>
+                </div>
+                <div>
                     <label for="event_emoji" class="block text-sm font-medium text-gray-700">Event Emoji</label>
                     <input id="event_emoji" name="event_emoji" type="text" required value="{{ event.event_emoji }}" class="mt-1 appearance-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-md focus:outline-none focus:ring-[color:var(--color-primary-500)] focus:border-[color:var(--color-primary-500)] sm:text-sm">
                 </div>
@@ -42,4 +51,53 @@
         </form>
     </div>
 </div>
+
+<script>
+// Add some client-side validation and UX improvements
+document.addEventListener('DOMContentLoaded', function() {
+    const form = document.querySelector('form');
+    const eventTypeSelect = document.getElementById('event_type');
+    const emojiInput = document.getElementById('event_emoji');
+    
+    // Add emoji suggestions based on event type
+    eventTypeSelect.addEventListener('change', function() {
+        const selectedType = this.value;
+        let suggestedEmoji = '';
+        
+        switch(selectedType) {
+            case '0': // Speech
+                suggestedEmoji = '🎤';
+                break;
+            case '1': // LD
+                suggestedEmoji = '⚖️';
+                break;
+            case '2': // PF
+                suggestedEmoji = '🗣️';
+                break;
+        }
+        
+        // Only suggest emoji if current field is empty or user wants to change it
+        if (suggestedEmoji && confirm('Would you like to change the emoji to the suggested one for this event type?')) {
+            emojiInput.value = suggestedEmoji;
+        }
+    });
+    
+    // Limit emoji input to 2 characters
+    emojiInput.addEventListener('input', function() {
+        if (this.value.length > 2) {
+            this.value = this.value.slice(0, 2);
+        }
+    });
+    
+    // Form validation
+    form.addEventListener('submit', function(e) {
+        const eventType = eventTypeSelect.value;
+        if (!eventType) {
+            e.preventDefault();
+            alert('Please select an event type.');
+            eventTypeSelect.focus();
+        }
+    });
+});
+</script>
 {% endblock %}

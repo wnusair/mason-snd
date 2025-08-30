@@ -63,17 +63,23 @@
             
             <div class="divide-y divide-gray-200">
                 {% for user in users %}
-                <div class="p-4 hover:bg-gray-50">
-                    <label class="flex items-center cursor-pointer">
+                <div class="p-4 hover:bg-gray-50 {% if user.id == current_user_id %}bg-yellow-50{% endif %}">
+                    <label class="flex items-center {% if user.id == current_user_id %}cursor-not-allowed opacity-75{% else %}cursor-pointer{% endif %}">
                         <input type="checkbox" 
                                name="selected_users" 
                                value="{{ user.id }}"
-                               class="user-checkbox rounded border-gray-300 mr-4">
+                               {% if user.id == current_user_id %}disabled{% endif %}
+                               class="user-checkbox rounded border-gray-300 mr-4 {% if user.id == current_user_id %}cursor-not-allowed{% endif %}">
                         <div class="flex-1">
                             <div class="flex items-center justify-between">
                                 <div>
                                     <h3 class="text-sm font-medium text-gray-900">
                                         {{ user.first_name }} {{ user.last_name }}
+                                        {% if user.id == current_user_id %}
+                                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800 ml-2">
+                                            You (Cannot Delete)
+                                        </span>
+                                        {% endif %}
                                     </h3>
                                     <p class="text-sm text-gray-500">{{ user.email or 'No email' }}</p>
                                 </div>
@@ -88,9 +94,23 @@
                                     </p>
                                 </div>
                             </div>
-                            {% if user.is_parent %}
-                            <p class="text-xs text-blue-600 mt-1">Parent Account</p>
-                            {% endif %}
+                            <div class="flex flex-wrap gap-1 mt-1">
+                                {% if user.is_parent %}
+                                <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-blue-100 text-blue-800">
+                                    Judge
+                                </span>
+                                {% endif %}
+                                {% if user.child_entries %}
+                                <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-green-100 text-green-800">
+                                    Child
+                                </span>
+                                {% endif %}
+                                {% if not user.is_parent and not user.child_entries %}
+                                <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-gray-100 text-gray-800">
+                                    Student
+                                </span>
+                                {% endif %}
+                            </div>
                         </div>
                     </label>
                 </div>
@@ -121,16 +141,17 @@
 <script>
 document.addEventListener('DOMContentLoaded', function() {
     const selectAll = document.getElementById('selectAll');
-    const userCheckboxes = document.querySelectorAll('.user-checkbox');
+    const userCheckboxes = document.querySelectorAll('.user-checkbox:not(:disabled)');
+    const allCheckboxes = document.querySelectorAll('.user-checkbox');
     const selectedCount = document.getElementById('selectedCount');
     const previewBtn = document.getElementById('previewBtn');
     
     function updateSelection() {
-        const checked = document.querySelectorAll('.user-checkbox:checked');
+        const checked = document.querySelectorAll('.user-checkbox:checked:not(:disabled)');
         selectedCount.textContent = `${checked.length} selected`;
         previewBtn.disabled = checked.length === 0;
         
-        // Update select all checkbox
+        // Update select all checkbox (only consider enabled checkboxes)
         if (checked.length === 0) {
             selectAll.indeterminate = false;
             selectAll.checked = false;
@@ -143,19 +164,20 @@ document.addEventListener('DOMContentLoaded', function() {
     }
     
     selectAll.addEventListener('change', function() {
+        // Only affect enabled checkboxes
         userCheckboxes.forEach(checkbox => {
             checkbox.checked = selectAll.checked;
         });
         updateSelection();
     });
     
-    userCheckboxes.forEach(checkbox => {
+    allCheckboxes.forEach(checkbox => {
         checkbox.addEventListener('change', updateSelection);
     });
     
     // Confirmation for preview
     document.getElementById('userSelectionForm').addEventListener('submit', function(e) {
-        const checked = document.querySelectorAll('.user-checkbox:checked');
+        const checked = document.querySelectorAll('.user-checkbox:checked:not(:disabled)');
         if (checked.length === 0) {
             e.preventDefault();
             alert('Please select at least one user.');
