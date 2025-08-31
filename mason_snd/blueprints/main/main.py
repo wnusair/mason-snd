@@ -22,15 +22,31 @@ def index():
 
     return render_template('main/index.html', user_id=user_id)
 
-@main_bp.route('life')
+@main_bp.route('/life')
 def life():
     return render_template('main/life.html')
 
 @main_bp.route('/favicon.ico')
+@main_bp.route('/favicon')
 def favicon():
-    """Serve the favicon from the images directory."""
-    images_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'images')
-    return send_from_directory(images_dir, 'icon.png', mimetype='image/png')
+    """Serve the favicon from the static directory."""
+    # Get the path to the mason_snd directory (three levels up from main.py)
+    current_file_dir = os.path.dirname(__file__)  # main directory
+    blueprints_dir = os.path.dirname(current_file_dir)  # blueprints directory
+    mason_snd_dir = os.path.dirname(blueprints_dir)  # mason_snd directory
+    static_dir = os.path.join(mason_snd_dir, 'static')
+    
+    # Check if the file exists
+    icon_path = os.path.join(static_dir, 'icon.png')
+    if not os.path.exists(icon_path):
+        current_app.logger.error(f"Favicon not found at: {icon_path}")
+        return "Favicon not found", 404
+    
+    response = send_from_directory(static_dir, 'icon.png', mimetype='image/png')
+    # Add cache headers to ensure the favicon is cached properly
+    response.headers['Cache-Control'] = 'public, max-age=86400'  # Cache for 1 day
+    response.headers['Expires'] = 'Wed, 31 Dec 2025 23:59:59 GMT'
+    return response
 
 @main_bp.route('/sitemap.xml')
 def sitemap():

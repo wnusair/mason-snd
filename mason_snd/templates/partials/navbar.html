@@ -1,6 +1,10 @@
 <!-- Dropdown menu partial for navigation, using Alpine.js for better interactivity -->
 <script src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js" defer></script>
-<link rel="icon" type="image/png" href="{{ url_for('static', filename='icon.png') }}">
+<!-- Favicon configurations for maximum browser compatibility -->
+<link rel="icon" type="image/png" sizes="32x32" href="{{ url_for('main.favicon') }}">
+<link rel="shortcut icon" href="{{ url_for('main.favicon') }}">
+<link rel="apple-touch-icon" href="{{ url_for('main.favicon') }}">
+<meta name="msapplication-TileImage" content="{{ url_for('main.favicon') }}">
 <nav class="bg-white shadow-sm">
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div class="flex justify-between h-16 items-center">
