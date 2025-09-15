@@ -1,0 +1,163 @@
+{% extends "admin/base.html" %}
+{% block title %}User Details{% endblock %}
+
+{% block content %}
+<div class="px-4 sm:px-6 lg:px-8">
+    <!-- Header -->
+    <div>
+        <h1 class="text-2xl font-bold text-gray-900 capitalize">{{ user.first_name }} {{ user.last_name }}</h1>
+        <p class="mt-1 text-sm text-gray-500">Viewing details for User ID: {{ user.id }}</p>
+    </div>
+
+    <div class="mt-8 grid grid-cols-1 lg:grid-cols-3 gap-8">
+        <!-- Left Column: Key Info and Admin Controls -->
+        <div class="lg:col-span-1 space-y-6">
+            <div class="bg-white shadow rounded-lg p-6">
+                <h3 class="text-lg font-medium text-gray-900 mb-2">Admin Controls</h3>
+                <form method="post" action="{{ url_for('admin.user_detail', user_id=user.id) }}" class="space-y-3">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">Reset Password</label>
+                        <input type="password" name="new_password" placeholder="New password" class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm">
+                        <button type="submit" name="action" value="reset_password" class="mt-2 w-full py-1 px-2 bg-blue-600 text-white rounded hover:bg-blue-700">Reset</button>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">Assign Role</label>
+                        <select name="role" class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm">
+                            <option value="0" {% if user.role == 0 %}selected{% endif %}>User</option>
+                            <option value="1" {% if user.role == 1 %}selected{% endif %}>Leader</option>
+                            <option value="2" {% if user.role == 2 %}selected{% endif %}>Admin</option>
+                        </select>
+                        <button type="submit" name="action" value="assign_role" class="mt-2 w-full py-1 px-2 bg-blue-600 text-white rounded hover:bg-blue-700">Update Role</button>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">Assign Requirement</label>
+                        <select name="assign_requirement_id" class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm">
+                            <option value="">-- Select Requirement --</option>
+                            {% for req in all_requirements %}
+                                <option value="{{ req.id }}">{{ req.body }}</option>
+                            {% endfor %}
+                        </select>
+                        <button type="submit" name="action" value="assign_requirement" class="mt-2 w-full py-1 px-2 bg-blue-600 text-white rounded hover:bg-blue-700">Assign</button>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">Drop Penalty</label>
+                        <p class="text-xs text-gray-500 mb-2">Add a drop penalty when user drops out of tournament</p>
+                        <button type="submit" name="action" value="add_drop" class="w-full py-1 px-2 bg-red-600 text-white rounded hover:bg-red-700" onclick="return confirm('Are you sure you want to add a drop penalty to this user? This will increase their drops count by 1.')">Add Drop Penalty</button>
+                    </div>
+                </form>
+                
+                <!-- Danger Zone -->
+                <div class="mt-6 pt-6 border-t border-red-200">
+                    <h4 class="text-sm font-medium text-red-900 mb-2">⚠️ Danger Zone</h4>
+                    <form method="POST" action="{{ url_for('admin.delete_single_user', user_id=user.id) }}" 
+                          onsubmit="return confirm('⚠️ WARNING ⚠️\n\nThis will permanently delete {{ user.first_name }} {{ user.last_name }} and ALL their related data including:\n- Tournament signups and performances\n- Judge assignments and partnerships\n- Roster entries and form responses\n- ALL related records\n\nThis action CANNOT be undone.\n\nType the user\'s full name to confirm: {{ user.first_name }} {{ user.last_name }}') && prompt('Type the user\'s full name to confirm:') === '{{ user.first_name }} {{ user.last_name }}'">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        <button type="submit" 
+                                class="w-full py-2 px-4 bg-red-700 hover:bg-red-800 text-white text-sm rounded font-medium">
+                            🗑️ Delete User & All Data
+                        </button>
+                    </form>
+                </div>
+            </div>
+            <div class="bg-white shadow rounded-lg p-6">
+                <h3 class="text-lg font-medium text-gray-900">Contact Information</h3>
+                <dl class="mt-4 space-y-2 text-sm">
+                    <div class="flex justify-between">
+                        <dt class="text-gray-500">Email</dt>
+                        <dd class="text-gray-900 font-medium">{{ user.email }}</dd>
+                    </div>
+                    <div class="flex justify-between">
+                        <dt class="text-gray-500">Phone</dt>
+                        <dd class="text-gray-900 font-medium">{{ user.phone_number }}</dd>
+                    </div>
+                </dl>
+            </div>
+            
+            <div class="bg-white shadow rounded-lg p-6">
+                <h3 class="text-lg font-medium text-gray-900">Performance Metrics</h3>
+                 <dl class="mt-4 space-y-2 text-sm">
+                    <div class="flex justify-between">
+                        <dt class="text-gray-500">Weighted Points</dt>
+                        <dd class="text-gray-900 font-bold text-[color:var(--color-primary-600)]">{{ weighted_points | round(2) }}</dd>
+                    </div>
+                    <div class="flex justify-between">
+                        <dt class="text-gray-500">Total Points</dt>
+                        <dd class="text-gray-900 font-medium">{{ total_points }}</dd>
+                    </div>
+                    <div class="flex justify-between">
+                        <dt class="text-gray-500">Tournament Points</dt>
+                        <dd class="text-gray-900 font-medium">{{ tournament_points }}</dd>
+                    </div>
+                     <div class="flex justify-between">
+                        <dt class="text-gray-500">Effort Points</dt>
+                        <dd class="text-gray-900 font-medium">{{ effort_points }}</dd>
+                    </div>
+                    <div class="flex justify-between">
+                        <dt class="text-gray-500">Drops</dt>
+                        <dd class="text-gray-900 font-medium text-red-600">{{ user.drops }}</dd>
+                    </div>
+                </dl>
+            </div>
+
+            {% if user.is_parent and child_info %}
+            <div class="bg-white shadow rounded-lg p-6">
+                <h3 class="text-lg font-medium text-gray-900">Child Info</h3>
+                <p class="mt-2 text-sm text-gray-600 capitalize">{{ child_info.first_name }} {{ child_info.last_name }}</p>
+            </div>
+            {% endif %}
+
+            {% if emergency_contact %}
+            <div class="bg-white shadow rounded-lg p-6">
+                <h3 class="text-lg font-medium text-gray-900">Emergency Contact</h3>
+                <p class="mt-2 text-sm text-gray-600 capitalize">{{ emergency_contact.first_name }} {{ emergency_contact.last_name }} ({{ emergency_contact.relationship }})</p>
+                <p class="mt-1 text-sm text-gray-500">{{ emergency_contact.email }}</p>
+                <p class="mt-1 text-sm text-gray-500">{{ emergency_contact.number }}</p>
+            </div>
+            {% endif %}
+        </div>
+
+        <!-- Right Column: Requirements & Events -->
+        <div class="lg:col-span-2 space-y-6">
+            <div class="bg-white shadow rounded-lg p-6">
+                <h3 class="text-lg font-medium text-gray-900">Requirements</h3>
+                <form method="post" action="{{ url_for('admin.user_detail', user_id=user.id) }}">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+                    <input type="hidden" name="action" value="toggle_requirements">
+                    <ul role="list" class="mt-4 divide-y divide-gray-200">
+                        {% for req in requirements %}
+                        <li class="py-3 flex items-center justify-between">
+                            <div>
+                                <label class="text-sm font-medium text-gray-900">
+                                    <input type="checkbox" name="requirement_{{ req.id }}" {% if req.complete %}checked{% endif %}>
+                                    {{ req.requirement.body }}
+                                </label>
+                                {% if req.deadline %}<p class="text-xs text-gray-500">Deadline: {{ req.deadline.strftime('%Y-%m-%d') }}</p>{% endif %}
+                            </div>
+                            {% if req.complete %}
+                            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">Complete</span>
+                            {% else %}
+                            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">Incomplete</span>
+                            {% endif %}
+                        </li>
+                        {% else %}
+                        <li class="py-3 text-sm text-gray-500">No requirements found.</li>
+                        {% endfor %}
+                    </ul>
+                    <button type="submit" class="mt-4 w-full py-2 px-4 bg-blue-600 text-white font-semibold rounded-md hover:bg-blue-700">Save Requirements</button>
+                </form>
+            </div>
+             <div class="bg-white shadow rounded-lg p-6">
+                <h3 class="text-lg font-medium text-gray-900">Events Attended</h3>
+                 <ul role="list" class="mt-4 divide-y divide-gray-200">
+                    {% for event in events %}
+                    <li class="py-3 text-sm font-medium text-gray-700">{{ event.event_name }}</li>
+                    {% else %}
+                    <li class="py-3 text-sm text-gray-500">No events found.</li>
+                    {% endfor %}
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

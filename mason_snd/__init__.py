@@ -5,7 +5,6 @@ from dotenv import load_dotenv
 
 from .extensions import db, csrf
 from .models.auth import User, Judges
-from .admin import init_admin
 
 load_dotenv()  # This will load variables from .env into the environment
 
@@ -25,6 +24,7 @@ def create_app():
     from mason_snd.blueprints.events.events import events_bp
     from mason_snd.blueprints.tournaments.tournaments import tournaments_bp
     from mason_snd.blueprints.metrics.metrics import metrics_bp
+    from mason_snd.blueprints.admin.admin import admin_bp
     from mason_snd.blueprints.rosters.rosters import rosters_bp
     from mason_snd.blueprints.main.main import main_bp
 
@@ -33,11 +33,9 @@ def create_app():
     app.register_blueprint(events_bp, url_prefix='/events')
     app.register_blueprint(tournaments_bp, url_prefix='/tournaments')
     app.register_blueprint(metrics_bp, url_prefix='/metrics')
+    app.register_blueprint(admin_bp, url_prefix='/admin')
     app.register_blueprint(rosters_bp, url_prefix='/rosters')
     app.register_blueprint(main_bp, url_prefix='/')
-
-    # Initialize Flask-Admin (replaces the old admin blueprint)
-    init_admin(app)
 
     with app.app_context():
         db.create_all()

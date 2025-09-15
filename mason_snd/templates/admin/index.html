@@ -1,0 +1,34 @@
+{% extends "admin/base.html" %}
+{% block title %}Admin Dashboard{% endblock %}
+{% block content %}
+<div class="py-8 px-4 sm:px-6 lg:px-8">
+	<h1 class="text-3xl font-bold text-gray-900 mb-6">Admin Dashboard</h1>
+	<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
+		<a href="{{ url_for('admin.search') }}" class="bg-white shadow rounded-lg p-6 hover:shadow-lg transition">
+			<div class="text-xl font-semibold text-gray-800 mb-2">User Management</div>
+			<div class="text-gray-500">Search, edit, and manage users</div>
+		</a>
+		<a href="{{ url_for('admin.requirements') }}" class="bg-white shadow rounded-lg p-6 hover:shadow-lg transition">
+			<div class="text-xl font-semibold text-gray-800 mb-2">Requirements</div>
+			<div class="text-gray-500">Toggle and assign requirements</div>
+		</a>
+		<a href="{{ url_for('admin.add_popup') }}" class="bg-white shadow rounded-lg p-6 hover:shadow-lg transition">
+			<div class="text-xl font-semibold text-gray-800 mb-2">Popups</div>
+			<div class="text-gray-500">Send popups to users</div>
+		</a>
+		<a href="{{ url_for('admin.events_management') }}" class="bg-white shadow rounded-lg p-6 hover:shadow-lg transition">
+			<div class="text-xl font-semibold text-gray-800 mb-2">Events Management</div>
+			<div class="text-gray-500">Manage event leaders and settings</div>
+		</a>
+		<a href="{{ url_for('admin.test_data') }}" class="bg-white shadow rounded-lg p-6 hover:shadow-lg transition border-2 border-blue-200">
+			<div class="text-xl font-semibold text-blue-800 mb-2">🧪 Test Data</div>
+			<div class="text-blue-600">Create test users for development</div>
+		</a>
+		<a href="{{ url_for('admin.delete_management') }}" class="bg-white shadow rounded-lg p-6 hover:shadow-lg transition border-2 border-red-200">
+			<div class="text-xl font-semibold text-red-800 mb-2">🗑️ Deletion Management</div>
+			<div class="text-red-600">Safely delete users and tournaments with all related data</div>
+		</a>
+	</div>
+	<!-- You can add stats or quick info cards here if desired -->
+</div>
+{% endblock %}

@@ -2,7 +2,4 @@ flask
 python-dotenv
 flask-migrate
 Flask-WTF
-Flask-Admin
-wtforms
-WTForms-SQLAlchemy
 pytz
