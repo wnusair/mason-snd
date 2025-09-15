@@ -212,6 +212,7 @@
                 <h3 class="text-lg font-medium text-gray-900">Requirements Checklist</h3>
                 <ul role="list" class="mt-4 divide-y divide-gray-200">
                     {% for user_requirement in user_requirements %}
+                    {% if user_requirement.requirement_id in requirements %}
                     <li class="py-3 flex items-center">
                         {% if user_requirement.complete %}
                         <span class="h-8 w-8 rounded-full bg-green-100 flex items-center justify-center">
@@ -229,6 +230,7 @@
                         <p class="ml-4 text-sm font-medium text-gray-900">{{ requirements[user_requirement.requirement_id].body }}</p>
                         {% endif %}
                     </li>
+                    {% endif %}
                     {% else %}
                      <li class="py-3 text-sm text-gray-500">No requirements assigned yet.</li>
                     {% endfor %}
