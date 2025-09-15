@@ -1,0 +1,146 @@
+{% extends "admin/base.html" %}
+{% block title %}View Requirement Assignments{% endblock %}
+{% block content %}
+<div class="py-8 px-4 sm:px-6 lg:px-8">
+    <div class="flex justify-between items-center mb-6">
+        <h1 class="text-2xl font-bold text-gray-900">Requirement Assignments</h1>
+        <a href="{{ url_for('admin.requirements') }}" 
+           class="bg-gray-600 hover:bg-gray-700 text-white px-4 py-2 rounded-md text-sm font-medium transition">
+            ← Back to Requirements
+        </a>
+    </div>
+    
+    <!-- Requirement Details -->
+    <div class="bg-white shadow rounded-lg p-6 mb-6">
+        <div class="flex justify-between items-start mb-4">
+            <div>
+                <h2 class="text-lg font-semibold text-gray-900">{{ requirement.body }}</h2>
+                <div class="mt-2 flex items-center space-x-4">
+                    <span class="flex items-center">
+                        Status: 
+                        {% if requirement.active %}
+                            <span class="ml-1 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                                Active
+                            </span>
+                        {% else %}
+                            <span class="ml-1 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
+                                Inactive
+                            </span>
+                        {% endif %}
+                    </span>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Statistics -->
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div class="bg-blue-50 p-4 rounded-lg">
+                <div class="text-2xl font-bold text-blue-600">{{ total_assigned }}</div>
+                <div class="text-sm text-gray-600">Total Assigned</div>
+            </div>
+            <div class="bg-green-50 p-4 rounded-lg">
+                <div class="text-2xl font-bold text-green-600">{{ completed_count }}</div>
+                <div class="text-sm text-gray-600">Completed</div>
+            </div>
+            <div class="bg-yellow-50 p-4 rounded-lg">
+                <div class="text-2xl font-bold text-yellow-600">{{ total_assigned - completed_count }}</div>
+                <div class="text-sm text-gray-600">Pending</div>
+            </div>
+            <div class="bg-red-50 p-4 rounded-lg">
+                <div class="text-2xl font-bold text-red-600">{{ overdue_count }}</div>
+                <div class="text-sm text-gray-600">Overdue</div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- User Assignments -->
+    <div class="bg-white shadow rounded-lg overflow-hidden">
+        <div class="px-6 py-4 bg-gray-50 border-b border-gray-200">
+            <h3 class="text-lg font-semibold text-gray-900">User Assignments ({{ total_assigned }})</h3>
+        </div>
+        
+        {% if user_requirements %}
+        <div class="overflow-x-auto">
+            <table class="min-w-full divide-y divide-gray-200">
+                <thead class="bg-gray-50">
+                    <tr>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">User</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Type</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Deadline</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-200">
+                    {% for user_req in user_requirements %}
+                    <tr class="hover:bg-gray-50">
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            <div class="flex items-center">
+                                <div>
+                                    <div class="text-sm font-medium text-gray-900">
+                                        {{ user_req.user.first_name }} {{ user_req.user.last_name }}
+                                    </div>
+                                    <div class="text-sm text-gray-500">{{ user_req.user.email }}</div>
+                                </div>
+                            </div>
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium
+                                {% if user_req.user.is_parent %}bg-purple-100 text-purple-800{% else %}bg-blue-100 text-blue-800{% endif %}">
+                                {{ 'Judge' if user_req.user.is_parent else 'Child' }}
+                            </span>
+                        </td>
+                                                <td class="px-6 py-4 whitespace-nowrap">
+                            {% if user_req.complete %}
+                                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                                    ✓ Complete
+                                </span>
+                            {% else %}
+                                {% if user_req.deadline and user_req.deadline < now %}
+                                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
+                                        ⚠ Overdue
+                                    </span>
+                                {% else %}
+                                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
+                                        ⏳ Pending
+                                    </span>
+                                {% endif %}
+                            {% endif %}
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                            {% if user_req.deadline %}
+                                {{ user_req.deadline.strftime('%Y-%m-%d') }}
+                                {% if user_req.deadline < now and not user_req.complete %}
+                                    <span class="text-red-600 font-medium">(Overdue)</span>
+                                {% endif %}
+                            {% else %}
+                                <span class="text-gray-400">No deadline</span>
+                            {% endif %}
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                            <a href="{{ url_for('admin.user_detail', user_id=user_req.user.id) }}" 
+                               class="text-blue-600 hover:text-blue-900">View User</a>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="p-8 text-center">
+            <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197m13.5-9a2.5 2.5 0 11-5 0 2.5 2.5 0 015 0z"></path>
+            </svg>
+            <h3 class="mt-2 text-sm font-medium text-gray-900">No assignments</h3>
+            <p class="mt-1 text-sm text-gray-500">This requirement hasn't been assigned to any users yet.</p>
+            <div class="mt-6">
+                <a href="{{ url_for('admin.requirements') }}" 
+                   class="inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700">
+                    Assign to Users
+                </a>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

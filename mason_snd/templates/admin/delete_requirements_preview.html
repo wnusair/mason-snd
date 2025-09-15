@@ -1,0 +1,168 @@
+{% extends "admin/base.html" %}
+{% block title %}Confirm Requirements Deletion{% endblock %}
+{% block content %}
+<div class="py-8 px-4 sm:px-6 lg:px-8">
+    <div class="flex justify-between items-center mb-6">
+        <h1 class="text-3xl font-bold text-red-900">🗑️ Confirm Requirements Deletion</h1>
+        <a href="{{ url_for('admin.delete_requirements') }}" 
+           class="bg-gray-600 hover:bg-gray-700 text-white px-4 py-2 rounded-md text-sm font-medium transition">
+            ← Back to Selection
+        </a>
+    </div>
+    
+    <div class="bg-red-50 border-l-4 border-red-400 p-4 mb-8">
+        <div class="flex">
+            <div class="flex-shrink-0">
+                <svg class="h-5 w-5 text-red-400" viewBox="0 0 20 20" fill="currentColor">
+                    <path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd" />
+                </svg>
+            </div>
+            <div class="ml-3">
+                <h3 class="text-sm font-medium text-red-800">⚠️ FINAL WARNING</h3>
+                <div class="mt-2 text-sm text-red-700">
+                    <p><strong>This action cannot be undone!</strong></p>
+                    <p>You are about to permanently delete {{ previews|length }} requirement(s) and all associated user assignments.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="space-y-6 mb-8">
+        {% for preview in previews %}
+        <div class="bg-white shadow rounded-lg overflow-hidden">
+            <div class="px-6 py-4 bg-red-50 border-b border-red-200">
+                <h3 class="text-lg font-semibold text-red-900">{{ preview.requirement_body }}</h3>
+                <div class="mt-1 flex items-center space-x-4 text-sm">
+                    <span class="flex items-center">
+                        Status: 
+                        {% if preview.requirement_active %}
+                            <span class="ml-1 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                                Active
+                            </span>
+                        {% else %}
+                            <span class="ml-1 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
+                                Inactive
+                            </span>
+                        {% endif %}
+                    </span>
+                </div>
+            </div>
+            
+            <div class="p-6">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <!-- Deletion Summary -->
+                    <div>
+                        <h4 class="text-sm font-medium text-gray-900 mb-3">🗑️ What will be deleted:</h4>
+                        <div class="space-y-2 text-sm">
+                            <div class="flex justify-between">
+                                <span class="text-gray-600">User Assignments:</span>
+                                <span class="font-medium text-red-600">{{ preview.counts.User_Requirements }}</span>
+                            </div>
+                            <div class="flex justify-between border-t pt-2">
+                                <span class="font-medium text-gray-900">Total Records:</span>
+                                <span class="font-bold text-red-600">{{ preview.total_related + 1 }}</span>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Affected Users -->
+                    <div>
+                        <h4 class="text-sm font-medium text-gray-900 mb-3">👥 Affected Users ({{ preview.affected_users|length }}):</h4>
+                        {% if preview.affected_users %}
+                        <div class="max-h-40 overflow-y-auto space-y-2">
+                            {% for user in preview.affected_users %}
+                            <div class="text-sm bg-gray-50 p-2 rounded">
+                                <div class="font-medium text-gray-900">{{ user.name }}</div>
+                                <div class="text-gray-600">{{ user.email }}</div>
+                                <div class="flex items-center space-x-2 mt-1">
+                                    <span class="text-xs">
+                                        Status: 
+                                        {% if user.complete %}
+                                            <span class="text-green-600 font-medium">Complete</span>
+                                        {% else %}
+                                            <span class="text-orange-600 font-medium">Incomplete</span>
+                                        {% endif %}
+                                    </span>
+                                    {% if user.deadline %}
+                                    <span class="text-xs text-gray-500">
+                                        Deadline: {{ user.deadline.strftime('%Y-%m-%d') }}
+                                    </span>
+                                    {% endif %}
+                                </div>
+                            </div>
+                            {% endfor %}
+                        </div>
+                        {% else %}
+                        <p class="text-sm text-gray-500 italic">No users currently assigned to this requirement</p>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    
+    <!-- Summary Card -->
+    <div class="bg-red-100 border border-red-200 rounded-lg p-6 mb-8">
+        <h3 class="text-lg font-semibold text-red-900 mb-4">📊 Deletion Summary</h3>
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-4 text-center">
+            <div>
+                <div class="text-2xl font-bold text-red-600">{{ previews|length }}</div>
+                <div class="text-sm text-gray-600">Requirement{{ 's' if previews|length != 1 else '' }}</div>
+            </div>
+            <div>
+                <div class="text-2xl font-bold text-red-600">
+                    {% set total_assignments = previews|sum(attribute='counts.User_Requirements') %}
+                    {{ total_assignments }}
+                </div>
+                <div class="text-sm text-gray-600">User Assignment{{ 's' if total_assignments != 1 else '' }}</div>
+            </div>
+            <div>
+                <div class="text-2xl font-bold text-red-600">
+                    {% set total_users = previews|map(attribute='affected_users')|map('length')|sum %}
+                    {{ total_users }}
+                </div>
+                <div class="text-sm text-gray-600">Affected User{{ 's' if total_users != 1 else '' }}</div>
+            </div>
+            <div>
+                <div class="text-2xl font-bold text-red-600">
+                    {% set total_records = previews|sum(attribute='total_related') + previews|length %}
+                    {{ total_records }}
+                </div>
+                <div class="text-sm text-gray-600">Total Record{{ 's' if total_records != 1 else '' }}</div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Confirmation Form -->
+    <form method="post" class="bg-white shadow rounded-lg p-6">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+        <input type="hidden" name="action" value="confirm_delete">
+        {% for req_id in requirement_ids %}
+        <input type="hidden" name="requirement_ids" value="{{ req_id }}">
+        {% endfor %}
+        
+        <div class="flex items-center justify-between">
+            <div class="flex items-center">
+                <input type="checkbox" id="confirmCheck" required
+                       class="h-4 w-4 text-red-600 focus:ring-red-500 border-gray-300 rounded">
+                <label for="confirmCheck" class="ml-2 text-sm text-gray-900">
+                    I understand that this action cannot be undone and will permanently delete all selected requirements and their user assignments.
+                </label>
+            </div>
+            
+            <div class="flex space-x-3">
+                <a href="{{ url_for('admin.delete_requirements') }}" 
+                   class="bg-gray-300 hover:bg-gray-400 text-gray-800 px-6 py-2 rounded-md font-medium transition">
+                    Cancel
+                </a>
+                <button type="submit" 
+                        class="bg-red-600 hover:bg-red-700 text-white px-6 py-2 rounded-md font-medium transition"
+                        onclick="return confirm('Are you absolutely sure? This will permanently delete {{ previews|length }} requirement(s) and cannot be undone.')">
+                    🗑️ DELETE PERMANENTLY
+                </button>
+            </div>
+        </div>
+    </form>
+</div>
+{% endblock %}
