@@ -10,7 +10,7 @@ from .tournaments import (Tournament, Form_Fields, Form_Responses, Tournament_Si
                          Tournament_Partners)
 from .events import Event, User_Event, Effort_Score
 from .rosters import Roster, Roster_Judge, Roster_Competitors, Roster_Partners
-from .admin import User_Requirements, Popups
+from .admin import User_Requirements, Popups, Requirements
 from sqlalchemy.exc import IntegrityError
 from datetime import datetime
 import pytz
@@ -574,5 +574,100 @@ def get_event_deletion_preview(event_id):
     
     # Calculate total related records
     preview['total_related'] = sum(preview['counts'].values())
+    
+    return preview
+
+def delete_requirement_safely(requirement_id):
+    """
+    Safely delete a requirement and all its related user assignments.
+    Returns DeletionResult object with success status and details.
+    """
+    result = DeletionResult()
+    
+    try:
+        requirement = Requirements.query.get(requirement_id)
+        if not requirement:
+            result.add_error(f"Requirement with ID {requirement_id} not found")
+            return result
+        
+        requirement_body = requirement.body
+        
+        # Delete all user requirements that reference this requirement
+        user_requirements = User_Requirements.query.filter_by(requirement_id=requirement_id).all()
+        for ur in user_requirements:
+            db.session.delete(ur)
+        result.add_deleted('User_Requirements', len(user_requirements))
+        
+        # Delete the requirement itself
+        db.session.delete(requirement)
+        result.add_deleted('Requirements', 1)
+        
+        # Commit all changes
+        db.session.commit()
+        
+        return result
+        
+    except IntegrityError as e:
+        db.session.rollback()
+        result.add_error(f"Database integrity error when deleting requirement {requirement_id}: {str(e)}")
+        return result
+    except Exception as e:
+        db.session.rollback()
+        result.add_error(f"Unexpected error when deleting requirement {requirement_id}: {str(e)}")
+        return result
+
+def delete_multiple_requirements(requirement_ids):
+    """
+    Delete multiple requirements safely.
+    Returns DeletionResult object with aggregated results.
+    """
+    result = DeletionResult()
+    
+    for requirement_id in requirement_ids:
+        individual_result = delete_requirement_safely(requirement_id)
+        
+        if individual_result.success:
+            # Aggregate successful deletions
+            for model_name, count in individual_result.deleted_counts.items():
+                result.add_deleted(model_name, count)
+        else:
+            # Aggregate errors
+            for error in individual_result.errors:
+                result.add_error(error, requirement_id)
+    
+    return result
+
+def get_requirement_deletion_preview(requirement_id):
+    """
+    Get a preview of what would be deleted when deleting a requirement.
+    Returns a dictionary with counts of related records.
+    """
+    requirement = Requirements.query.get(requirement_id)
+    if not requirement:
+        return None
+    
+    preview = {
+        'requirement_body': requirement.body,
+        'requirement_active': requirement.active,
+        'counts': {}
+    }
+    
+    # Count user requirements that would be deleted
+    user_requirements = User_Requirements.query.filter_by(requirement_id=requirement_id).all()
+    preview['counts']['User_Requirements'] = len(user_requirements)
+    
+    # Get details about affected users
+    affected_users = []
+    for ur in user_requirements:
+        if ur.user:
+            affected_users.append({
+                'name': f"{ur.user.first_name} {ur.user.last_name}",
+                'email': ur.user.email,
+                'complete': ur.complete,
+                'deadline': ur.deadline
+            })
+    
+    preview['affected_users'] = affected_users
+    preview['total_related'] = len(user_requirements)
     
     return preview

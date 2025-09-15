@@ -2,34 +2,205 @@
 {% block title %}Requirements Management{% endblock %}
 {% block content %}
 <div class="py-8 px-4 sm:px-6 lg:px-8">
-    <h1 class="text-2xl font-bold text-gray-900 mb-6">Requirements Management</h1>
-    <form method="post">
-        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
-        <table class="min-w-full divide-y divide-gray-200 bg-white shadow rounded-lg">
-            <thead class="bg-gray-50">
-                <tr>
-                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Requirement</th>
-                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Active</th>
-                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
-                </tr>
-            </thead>
-            <tbody class="divide-y divide-gray-200">
-                {% for req in requirements %}
-                <tr>
-                    <td class="px-6 py-4 whitespace-nowrap">{{ req.body }}</td>
-                    <td class="px-6 py-4 whitespace-nowrap">
-                        <input type="checkbox" name="active_{{ req.id }}" {% if req.active %}checked{% endif %}>
-                    </td>
-                    <td class="px-6 py-4 whitespace-nowrap">
-                        <button type="submit" name="toggle" value="{{ req.id }}" class="text-blue-600 hover:underline">Toggle</button>
-                    </td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
-        <div class="mt-4">
-            <button type="submit" class="w-full py-2 px-4 bg-blue-600 text-white font-semibold rounded-md hover:bg-blue-700">Save All Changes</button>
+    <div class="flex justify-between items-center mb-6">
+        <h1 class="text-2xl font-bold text-gray-900">Requirements Management</h1>
+        <a href="{{ url_for('admin.delete_requirements') }}" 
+           class="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-md text-sm font-medium transition">
+            🗑️ Delete Requirements
+        </a>
+    </div>
+    
+    <!-- Create New Requirement -->
+    <div class="bg-white shadow rounded-lg p-6 mb-6">
+        <h2 class="text-lg font-semibold text-gray-900 mb-4">Create New Requirement</h2>
+        <form method="post" class="flex gap-4">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+            <input type="hidden" name="action" value="create_requirement">
+            <div class="flex-1">
+                <input type="text" name="requirement_body" 
+                       placeholder="Enter requirement description..."
+                       class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                       required>
+            </div>
+            <button type="submit" 
+                    class="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-md font-medium transition">
+                Create Requirement
+            </button>
+        </form>
+    </div>
+    
+    <!-- Assign Requirements -->
+    <div class="bg-white shadow rounded-lg p-6 mb-6">
+        <h2 class="text-lg font-semibold text-gray-900 mb-4">Assign Requirements</h2>
+        
+        <!-- Individual Assignment -->
+        <div class="border border-gray-200 rounded-lg p-4 mb-4">
+            <h3 class="text-md font-medium text-gray-900 mb-3">👤 Assign to Specific Users</h3>
+            <form method="post">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                <input type="hidden" name="action" value="assign_requirement">
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Select Requirement</label>
+                        <select name="requirement_id" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" required>
+                            <option value="">Choose a requirement...</option>
+                            {% for req in requirements %}
+                            <option value="{{ req.id }}">{{ req.body }} {% if not req.active %}(Inactive){% endif %}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Deadline (Optional)</label>
+                        <input type="date" name="deadline" 
+                               class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    </div>
+                    <div class="flex items-end">
+                        <button type="submit" 
+                                class="w-full bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-md font-medium transition">
+                            Assign to Selected
+                        </button>
+                    </div>
+                </div>
+                
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Select Users</label>
+                    <div class="border border-gray-300 rounded-md p-3 max-h-40 overflow-y-auto">
+                        <div class="flex items-center mb-2">
+                            <input type="checkbox" id="selectAll" class="mr-2">
+                            <label for="selectAll" class="text-sm font-medium text-gray-600">Select All</label>
+                        </div>
+                        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2">
+                            {% for user in all_users %}
+                            <label class="flex items-center">
+                                <input type="checkbox" name="selected_users" value="{{ user.id }}" class="user-checkbox mr-2">
+                                <span class="text-sm">{{ user.first_name }} {{ user.last_name }}
+                                    <span class="text-gray-500">({{ 'Judge' if user.is_parent else 'Child' }})</span>
+                                </span>
+                            </label>
+                            {% endfor %}
+                        </div>
+                    </div>
+                </div>
+            </form>
         </div>
-    </form>
+        
+        <!-- Group Assignment -->
+        <div class="border border-gray-200 rounded-lg p-4">
+            <h3 class="text-md font-medium text-gray-900 mb-3">👥 Assign to Groups</h3>
+            <form method="post">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                <input type="hidden" name="action" value="assign_to_group">
+                <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Select Requirement</label>
+                        <select name="requirement_id" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" required>
+                            <option value="">Choose a requirement...</option>
+                            {% for req in requirements %}
+                            <option value="{{ req.id }}">{{ req.body }} {% if not req.active %}(Inactive){% endif %}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Select Group</label>
+                        <select name="group_type" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" required>
+                            <option value="">Choose a group...</option>
+                            <option value="children">All Children ({{ children_count }} users)</option>
+                            <option value="judges">All Judges ({{ judges_count }} users)</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Deadline (Optional)</label>
+                        <input type="date" name="deadline" 
+                               class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    </div>
+                    <div class="flex items-end">
+                        <button type="submit" 
+                                class="w-full bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-md font-medium transition">
+                            Assign to Group
+                        </button>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+    
+    <!-- Existing Requirements -->
+    <div class="bg-white shadow rounded-lg overflow-hidden">
+        <div class="px-6 py-4 bg-gray-50 border-b border-gray-200">
+            <h2 class="text-lg font-semibold text-gray-900">Existing Requirements</h2>
+        </div>
+        
+        <form method="post">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+            <input type="hidden" name="action" value="toggle_active">
+            <table class="min-w-full divide-y divide-gray-200">
+                <thead class="bg-gray-50">
+                    <tr>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Requirement</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Active</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Assignments</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-200">
+                    {% for req in requirements %}
+                    <tr class="hover:bg-gray-50">
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            <div class="text-sm font-medium text-gray-900">{{ req.body }}</div>
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            <input type="checkbox" name="active_{{ req.id }}" {% if req.active %}checked{% endif %}
+                                   class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded">
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                                {{ req.requirement|length }} assigned
+                            </span>
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                            <a href="{{ url_for('admin.view_requirement_assignments', requirement_id=req.id) }}" 
+                               class="text-blue-600 hover:text-blue-900 mr-3">View Assignments</a>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            <div class="px-6 py-4 bg-gray-50">
+                <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-md font-medium transition">
+                    Save Active Status Changes
+                </button>
+            </div>
+        </form>
+    </div>
 </div>
+
+<script>
+// Select all checkbox functionality
+document.getElementById('selectAll').addEventListener('change', function() {
+    const checkboxes = document.querySelectorAll('.user-checkbox');
+    checkboxes.forEach(checkbox => {
+        checkbox.checked = this.checked;
+    });
+});
+
+// Update select all checkbox when individual checkboxes change
+document.querySelectorAll('.user-checkbox').forEach(checkbox => {
+    checkbox.addEventListener('change', function() {
+        const allCheckboxes = document.querySelectorAll('.user-checkbox');
+        const checkedCheckboxes = document.querySelectorAll('.user-checkbox:checked');
+        const selectAllCheckbox = document.getElementById('selectAll');
+        
+        if (checkedCheckboxes.length === allCheckboxes.length) {
+            selectAllCheckbox.checked = true;
+            selectAllCheckbox.indeterminate = false;
+        } else if (checkedCheckboxes.length === 0) {
+            selectAllCheckbox.checked = false;
+            selectAllCheckbox.indeterminate = false;
+        } else {
+            selectAllCheckbox.checked = false;
+            selectAllCheckbox.indeterminate = true;
+        }
+    });
+});
+</script>
 {% endblock %}

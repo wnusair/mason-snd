@@ -13,7 +13,8 @@ from mason_snd.models.metrics import MetricsSettings
 from mason_snd.models.deletion_utils import (
     delete_user_safely, delete_tournament_safely, delete_multiple_users,
     get_user_deletion_preview, get_tournament_deletion_preview,
-    delete_event_safely, delete_multiple_events, get_event_deletion_preview
+    delete_event_safely, delete_multiple_events, get_event_deletion_preview,
+    delete_requirement_safely, delete_multiple_requirements, get_requirement_deletion_preview
 )
 
 from werkzeug.security import generate_password_hash, check_password_hash
@@ -47,16 +48,143 @@ def requirements():
         flash('Restricted Access!!!!!')
         return redirect(url_for('profile.index', user_id=user_id))
 
-    requirements = Requirements.query.all()
     if request.method == 'POST':
-        # Toggle active status
-        for req in requirements:
-            active = request.form.get(f'active_{req.id}') == 'on'
-            req.active = active
-        db.session.commit()
-        flash('Requirements updated.', 'success')
+        action = request.form.get('action')
+        
+        if action == 'create_requirement':
+            # Create new requirement
+            requirement_body = request.form.get('requirement_body', '').strip()
+            if requirement_body:
+                new_requirement = Requirements(
+                    body=requirement_body,
+                    active=True
+                )
+                db.session.add(new_requirement)
+                db.session.commit()
+                flash(f'Requirement "{requirement_body}" created successfully.', 'success')
+            else:
+                flash('Please enter a requirement description.', 'error')
+                
+        elif action == 'assign_requirement':
+            # Assign requirement to selected users
+            requirement_id = request.form.get('requirement_id')
+            selected_users = request.form.getlist('selected_users')
+            deadline_str = request.form.get('deadline')
+            
+            if requirement_id and selected_users:
+                deadline = None
+                if deadline_str:
+                    try:
+                        deadline = datetime.strptime(deadline_str, '%Y-%m-%d')
+                        deadline = EST.localize(deadline)
+                    except ValueError:
+                        flash('Invalid deadline format.', 'error')
+                        return redirect(url_for('admin.requirements'))
+                
+                requirement = Requirements.query.get(requirement_id)
+                assigned_count = 0
+                
+                for user_id_str in selected_users:
+                    # Check if user already has this requirement
+                    existing = User_Requirements.query.filter_by(
+                        user_id=int(user_id_str),
+                        requirement_id=int(requirement_id)
+                    ).first()
+                    
+                    if not existing:
+                        user_req = User_Requirements(
+                            user_id=int(user_id_str),
+                            requirement_id=int(requirement_id),
+                            deadline=deadline
+                        )
+                        db.session.add(user_req)
+                        assigned_count += 1
+                
+                db.session.commit()
+                flash(f'Assigned requirement to {assigned_count} users.', 'success')
+            else:
+                flash('Please select a requirement and at least one user.', 'error')
+                
+        elif action == 'assign_to_group':
+            # Assign requirement to all users in a group (children or judges)
+            requirement_id = request.form.get('requirement_id')
+            group_type = request.form.get('group_type')
+            deadline_str = request.form.get('deadline')
+            
+            if requirement_id and group_type:
+                deadline = None
+                if deadline_str:
+                    try:
+                        deadline = datetime.strptime(deadline_str, '%Y-%m-%d')
+                        deadline = EST.localize(deadline)
+                    except ValueError:
+                        flash('Invalid deadline format.', 'error')
+                        return redirect(url_for('admin.requirements'))
+                
+                requirement = Requirements.query.get(requirement_id)
+                assigned_count = 0
+                
+                if group_type == 'children':
+                    # Get all users who are children (have is_parent=False and have a judge relationship)
+                    children = User.query.filter_by(is_parent=False).join(
+                        Judges, Judges.child_id == User.id
+                    ).all()
+                elif group_type == 'judges':
+                    # Get all users who are judges (have is_parent=True)
+                    children = User.query.filter_by(is_parent=True).all()
+                else:
+                    flash('Invalid group type.', 'error')
+                    return redirect(url_for('admin.requirements'))
+                
+                for user in children:
+                    # Check if user already has this requirement
+                    existing = User_Requirements.query.filter_by(
+                        user_id=user.id,
+                        requirement_id=int(requirement_id)
+                    ).first()
+                    
+                    if not existing:
+                        user_req = User_Requirements(
+                            user_id=user.id,
+                            requirement_id=int(requirement_id),
+                            deadline=deadline
+                        )
+                        db.session.add(user_req)
+                        assigned_count += 1
+                
+                db.session.commit()
+                flash(f'Assigned requirement to {assigned_count} {group_type}.', 'success')
+            else:
+                flash('Please select a requirement and group type.', 'error')
+                
+        else:
+            # Original toggle functionality
+            requirements = Requirements.query.all()
+            for req in requirements:
+                active = request.form.get(f'active_{req.id}') == 'on'
+                req.active = active
+            db.session.commit()
+            flash('Requirements updated.', 'success')
+            
         return redirect(url_for('admin.requirements'))
-    return render_template('admin/requirements.html', requirements=requirements)
+    
+    # GET request
+    requirements = Requirements.query.all()
+    
+    # Get all users for assignment
+    all_users = User.query.order_by(User.last_name, User.first_name).all()
+    
+    # Get children and judges counts for group assignment
+    children_count = User.query.filter_by(is_parent=False).join(
+        Judges, Judges.child_id == User.id
+    ).count()
+    judges_count = User.query.filter_by(is_parent=True).count()
+    
+    return render_template('admin/requirements.html', 
+                         requirements=requirements,
+                         all_users=all_users,
+                         children_count=children_count,
+                         judges_count=judges_count)
 
 
 # Enhanced popup sending: select users, set expiration
@@ -837,3 +965,83 @@ def delete_events():
     # GET request - show event selection interface
     events = Event.query.order_by(Event.event_name).all()
     return render_template('admin/delete_events.html', events=events)
+
+@admin_bp.route('/delete_requirements', methods=['GET', 'POST'])
+def delete_requirements():
+    """Requirements deletion interface"""
+    user_id = session.get('user_id')
+    if not user_id:
+        flash('Please log in to access this page.', 'error')
+        return redirect(url_for('auth.login'))
+        
+    user = User.query.filter_by(id=user_id).first()
+    if not user or user.role <= 1:
+        flash('Restricted Access!!!!!')
+        return redirect(url_for('profile.index', user_id=user_id))
+    
+    if request.method == 'POST':
+        action = request.form.get('action')
+        
+        if action == 'preview':
+            requirement_ids = request.form.getlist('requirement_ids')
+            if not requirement_ids:
+                flash('Please select at least one requirement to delete.', 'error')
+                return redirect(url_for('admin.delete_requirements'))
+            
+            # Get preview data for all selected requirements
+            previews = []
+            for req_id in requirement_ids:
+                preview = get_requirement_deletion_preview(int(req_id))
+                if preview:
+                    previews.append(preview)
+            
+            return render_template('admin/delete_requirements_preview.html', 
+                                 previews=previews, 
+                                 requirement_ids=requirement_ids)
+        
+        elif action == 'confirm_delete':
+            requirement_ids = request.form.getlist('requirement_ids')
+            result = delete_multiple_requirements([int(req_id) for req_id in requirement_ids])
+            
+            if result.success:
+                flash(f'Successfully deleted {len(requirement_ids)} requirements. {result.get_summary()}', 'success')
+            else:
+                flash(f'Deletion failed: {"; ".join(result.errors)}', 'error')
+            
+            return redirect(url_for('admin.delete_requirements'))
+    
+    # GET request - show requirement selection interface
+    requirements = Requirements.query.order_by(Requirements.body).all()
+    return render_template('admin/delete_requirements.html', requirements=requirements)
+
+@admin_bp.route('/view_requirement_assignments/<int:requirement_id>')
+def view_requirement_assignments(requirement_id):
+    """View all users assigned to a specific requirement"""
+    user_id = session.get('user_id')
+    if not user_id:
+        flash('Please log in to access this page.', 'error')
+        return redirect(url_for('auth.login'))
+        
+    user = User.query.filter_by(id=user_id).first()
+    if not user or user.role <= 1:
+        flash('Restricted Access!!!!!')
+        return redirect(url_for('profile.index', user_id=user_id))
+    
+    requirement = Requirements.query.get_or_404(requirement_id)
+    
+    # Get all user requirements for this requirement
+    user_requirements = User_Requirements.query.filter_by(requirement_id=requirement_id).all()
+    
+    # Get assignment statistics
+    total_assigned = len(user_requirements)
+    completed_count = sum(1 for ur in user_requirements if ur.complete)
+    overdue_count = sum(1 for ur in user_requirements 
+                       if ur.deadline and ur.deadline < datetime.now(EST) and not ur.complete)
+    
+    return render_template('admin/view_requirement_assignments.html',
+                         requirement=requirement,
+                         user_requirements=user_requirements,
+                         total_assigned=total_assigned,
+                         completed_count=completed_count,
+                         overdue_count=overdue_count,
+                         now=datetime.now(EST))
