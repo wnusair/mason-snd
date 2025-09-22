@@ -1,0 +1,471 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="csrf-token" content="{{ csrf_token() }}">
+    <title>Mason-SND Testing Dashboard</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        .test-card {
+            transition: transform 0.2s;
+        }
+        .test-card:hover {
+            transform: translateY(-2px);
+        }
+        .progress-custom {
+            height: 25px;
+        }
+        .test-result-success {
+            border-left: 5px solid #28a745;
+        }
+        .test-result-warning {
+            border-left: 5px solid #ffc107;
+        }
+        .test-result-danger {
+            border-left: 5px solid #dc3545;
+        }
+        .metric-card {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+        .spinner-custom {
+            width: 3rem;
+            height: 3rem;
+        }
+    </style>
+</head>
+<body class="bg-light">
+    <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
+        <div class="container">
+            <span class="navbar-brand">
+                <i class="fas fa-vial me-2"></i>
+                Mason-SND Testing Dashboard
+            </span>
+            <div class="navbar-nav ms-auto">
+                <a class="nav-link" href="#" onclick="location.reload()">
+                    <i class="fas fa-sync-alt me-1"></i>Refresh
+                </a>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container mt-4">
+        <!-- Header -->
+        <div class="row mb-4">
+            <div class="col">
+                <h1 class="display-6">
+                    <i class="fas fa-flask me-3"></i>
+                    Ultimate Testing Dashboard
+                </h1>
+                <p class="lead text-muted">
+                    Comprehensive testing suite for Mason-SND debate application
+                </p>
+            </div>
+        </div>
+
+        <!-- Quick Stats -->
+        <div class="row mb-4">
+            <div class="col-md-3">
+                <div class="card metric-card text-center">
+                    <div class="card-body">
+                        <i class="fas fa-code fa-2x mb-2"></i>
+                        <h4 class="card-title">30+</h4>
+                        <p class="card-text">Unit Tests</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card metric-card text-center">
+                    <div class="card-body">
+                        <i class="fas fa-route fa-2x mb-2"></i>
+                        <h4 class="card-title">80+</h4>
+                        <p class="card-text">Routes Tested</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card metric-card text-center">
+                    <div class="card-body">
+                        <i class="fas fa-database fa-2x mb-2"></i>
+                        <h4 class="card-title">100%</h4>
+                        <p class="card-text">DB Isolation</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card metric-card text-center">
+                    <div class="card-body">
+                        <i class="fas fa-shield-alt fa-2x mb-2"></i>
+                        <h4 class="card-title">Safe</h4>
+                        <p class="card-text">Production</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Test Categories -->
+        <div class="row">
+            <!-- Terminal Tests -->
+            <div class="col-lg-6 mb-4">
+                <div class="card h-100 test-card">
+                    <div class="card-header bg-primary text-white">
+                        <h5 class="card-title mb-0">
+                            <i class="fas fa-terminal me-2"></i>
+                            Terminal Unit Tests
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <p class="card-text">
+                            Run comprehensive unit tests for all critical routes and functions.
+                            Tests authentication, events, tournaments, metrics, and more.
+                        </p>
+                        
+                        <div class="row g-2 mb-3">
+                            <div class="col-6">
+                                <button class="btn btn-success w-100" onclick="runTests('all')">
+                                    <i class="fas fa-play me-1"></i>Run All Tests
+                                </button>
+                            </div>
+                            <div class="col-6">
+                                <div class="dropdown">
+                                    <button class="btn btn-outline-primary dropdown-toggle w-100" type="button" data-bs-toggle="dropdown">
+                                        <i class="fas fa-filter me-1"></i>Specific Tests
+                                    </button>
+                                    <ul class="dropdown-menu w-100">
+                                        <li><a class="dropdown-item" href="#" onclick="runTests('auth')">
+                                            <i class="fas fa-user-lock me-2"></i>Authentication
+                                        </a></li>
+                                        <li><a class="dropdown-item" href="#" onclick="runTests('events')">
+                                            <i class="fas fa-calendar me-2"></i>Events
+                                        </a></li>
+                                        <li><a class="dropdown-item" href="#" onclick="runTests('tournaments')">
+                                            <i class="fas fa-trophy me-2"></i>Tournaments
+                                        </a></li>
+                                        <li><a class="dropdown-item" href="#" onclick="runTests('metrics')">
+                                            <i class="fas fa-chart-bar me-2"></i>Metrics
+                                        </a></li>
+                                        <li><a class="dropdown-item" href="#" onclick="runTests('rosters')">
+                                            <i class="fas fa-list me-2"></i>Rosters
+                                        </a></li>
+                                        <li><a class="dropdown-item" href="#" onclick="runTests('admin')">
+                                            <i class="fas fa-cog me-2"></i>Admin
+                                        </a></li>
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div id="test-progress" class="d-none">
+                            <div class="progress progress-custom mb-2">
+                                <div id="progress-bar" class="progress-bar progress-bar-striped progress-bar-animated" 
+                                     role="progressbar" style="width: 0%"></div>
+                            </div>
+                            <small id="progress-text" class="text-muted">Preparing tests...</small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Mock Tournament Simulation -->
+            <div class="col-lg-6 mb-4">
+                <div class="card h-100 test-card">
+                    <div class="card-header bg-info text-white">
+                        <h5 class="card-title mb-0">
+                            <i class="fas fa-users me-2"></i>
+                            Mock Tournament Simulation
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <p class="card-text">
+                            Create complete mock tournament scenarios with users, events, 
+                            registrations, and scoring simulation.
+                        </p>
+                        
+                        <button class="btn btn-info w-100 mb-3" onclick="location.href='/test_dashboard/mock_tournament'">
+                            <i class="fas fa-play-circle me-1"></i>
+                            Launch Mock Tournament
+                        </button>
+                        
+                        <small class="text-muted">
+                            <i class="fas fa-info-circle me-1"></i>
+                            Includes user registration, judge assignment, event participation, 
+                            tournament creation, roster generation, and results simulation.
+                        </small>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="row">
+            <!-- Database Management -->
+            <div class="col-lg-6 mb-4">
+                <div class="card h-100 test-card">
+                    <div class="card-header bg-warning text-dark">
+                        <h5 class="card-title mb-0">
+                            <i class="fas fa-database me-2"></i>
+                            Database Management
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <p class="card-text">
+                            Manage test database isolation and cleanup. View existing test 
+                            databases and ensure proper cleanup.
+                        </p>
+                        
+                        <button class="btn btn-warning w-100 mb-2" onclick="location.href='/test_dashboard/database_manager'">
+                            <i class="fas fa-tools me-1"></i>
+                            Database Manager
+                        </button>
+                        
+                        <button class="btn btn-outline-danger w-100" onclick="cleanupDatabases()">
+                            <i class="fas fa-trash me-1"></i>
+                            Cleanup All Test DBs
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Coverage Report -->
+            <div class="col-lg-6 mb-4">
+                <div class="card h-100 test-card">
+                    <div class="card-header bg-secondary text-white">
+                        <h5 class="card-title mb-0">
+                            <i class="fas fa-chart-pie me-2"></i>
+                            Test Coverage
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <p class="card-text">
+                            View detailed test coverage reports and identify areas that 
+                            need additional testing.
+                        </p>
+                        
+                        <button class="btn btn-secondary w-100" onclick="location.href='/test_dashboard/coverage_report'">
+                            <i class="fas fa-chart-line me-1"></i>
+                            View Coverage Report
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Recent Test Results -->
+        <div class="row">
+            <div class="col">
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="mb-0">
+                            <i class="fas fa-history me-2"></i>
+                            Recent Test Results
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div id="recent-results">
+                            <p class="text-muted text-center py-3">
+                                <i class="fas fa-info-circle me-2"></i>
+                                No recent test results. Run some tests to see results here.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Test Results Modal -->
+    <div class="modal fade" id="testResultsModal" tabindex="-1">
+        <div class="modal-dialog modal-xl">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">
+                        <i class="fas fa-chart-bar me-2"></i>
+                        Test Results
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div id="modal-results-content">
+                        <!-- Results will be loaded here -->
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                    <button type="button" class="btn btn-primary" onclick="downloadResults()">
+                        <i class="fas fa-download me-1"></i>Download Report
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        let currentSessionId = null;
+        let pollInterval = null;
+
+        function runTests(testType) {
+            // Show progress
+            document.getElementById('test-progress').classList.remove('d-none');
+            document.getElementById('progress-bar').style.width = '0%';
+            document.getElementById('progress-text').textContent = 'Starting tests...';
+
+            // Start tests
+            fetch('/test_dashboard/run_tests', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
+                },
+                body: JSON.stringify({test_type: testType})
+            })
+            .then(response => response.json())
+            .then(data => {
+                currentSessionId = data.session_id;
+                pollTestStatus();
+            })
+            .catch(error => {
+                console.error('Error starting tests:', error);
+                document.getElementById('progress-text').textContent = 'Error starting tests';
+            });
+        }
+
+        function pollTestStatus() {
+            if (!currentSessionId) return;
+
+            pollInterval = setInterval(() => {
+                fetch(`/test_dashboard/test_status/${currentSessionId}`)
+                .then(response => response.json())
+                .then(data => {
+                    const progressBar = document.getElementById('progress-bar');
+                    const progressText = document.getElementById('progress-text');
+                    
+                    progressBar.style.width = data.progress + '%';
+                    progressText.textContent = `Progress: ${data.progress}%`;
+
+                    if (data.status === 'completed') {
+                        clearInterval(pollInterval);
+                        progressText.textContent = 'Tests completed!';
+                        showTestResults(data.results);
+                    } else if (data.status === 'error') {
+                        clearInterval(pollInterval);
+                        progressText.textContent = 'Test execution failed';
+                        progressBar.classList.add('bg-danger');
+                    }
+                })
+                .catch(error => {
+                    console.error('Error polling status:', error);
+                    clearInterval(pollInterval);
+                });
+            }, 1000);
+        }
+
+        function showTestResults(results) {
+            const modal = new bootstrap.Modal(document.getElementById('testResultsModal'));
+            const content = document.getElementById('modal-results-content');
+            
+            if (results.error) {
+                content.innerHTML = `
+                    <div class="alert alert-danger">
+                        <h5>Test Execution Error</h5>
+                        <p>${results.error}</p>
+                    </div>
+                `;
+            } else {
+                const successRate = results.summary.success_rate.toFixed(1);
+                const statusClass = successRate >= 90 ? 'success' : successRate >= 70 ? 'warning' : 'danger';
+                
+                content.innerHTML = `
+                    <div class="row mb-4">
+                        <div class="col-md-3">
+                            <div class="card text-center bg-primary text-white">
+                                <div class="card-body">
+                                    <h4>${results.summary.total}</h4>
+                                    <p class="mb-0">Total Tests</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="card text-center bg-success text-white">
+                                <div class="card-body">
+                                    <h4>${results.summary.passed}</h4>
+                                    <p class="mb-0">Passed</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="card text-center bg-danger text-white">
+                                <div class="card-body">
+                                    <h4>${results.summary.failed}</h4>
+                                    <p class="mb-0">Failed</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="card text-center bg-${statusClass} text-white">
+                                <div class="card-body">
+                                    <h4>${successRate}%</h4>
+                                    <p class="mb-0">Success Rate</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="card">
+                        <div class="card-header">
+                            <h6 class="mb-0">Detailed Results</h6>
+                        </div>
+                        <div class="card-body">
+                            ${results.details.map(detail => `
+                                <div class="mb-3 p-3 border rounded test-result-${detail.failed + detail.errors > 0 ? 'danger' : 'success'}">
+                                    <h6>${detail.class}</h6>
+                                    <p class="mb-1">
+                                        <span class="badge bg-success">${detail.passed} passed</span>
+                                        <span class="badge bg-danger">${detail.failed} failed</span>
+                                        <span class="badge bg-warning">${detail.errors} errors</span>
+                                    </p>
+                                    ${detail.failed > 0 || detail.errors > 0 ? `
+                                        <div class="mt-2">
+                                            <small class="text-muted">Issues found - check logs for details</small>
+                                        </div>
+                                    ` : ''}
+                                </div>
+                            `).join('')}
+                        </div>
+                    </div>
+                `;
+            }
+            
+            modal.show();
+            
+            // Hide progress
+            document.getElementById('test-progress').classList.add('d-none');
+        }
+
+        function cleanupDatabases() {
+            if (confirm('Are you sure you want to delete all test databases?')) {
+                fetch('/test_dashboard/cleanup_databases', {
+                    method: 'POST',
+                    headers: {
+                        'X-CSRFToken': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
+                    }
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        alert('Test databases cleaned up successfully!');
+                    } else {
+                        alert('Error cleaning up databases: ' + data.error);
+                    }
+                });
+            }
+        }
+
+        function downloadResults() {
+            // Implementation for downloading test results
+            alert('Download functionality coming soon!');
+        }
+    </script>
+</body>
+</html>

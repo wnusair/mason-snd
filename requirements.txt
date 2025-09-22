@@ -3,3 +3,7 @@ python-dotenv
 flask-migrate
 Flask-WTF
 pytz
+pytest
+pytest-flask
+faker
+coverage

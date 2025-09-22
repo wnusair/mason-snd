@@ -3,6 +3,9 @@ from flask import Blueprint, render_template, request, redirect, url_for, flash,
 from difflib import get_close_matches
 from datetime import datetime
 import random
+import pytz
+
+EST = pytz.timezone('US/Eastern')
 
 from mason_snd.extensions import db
 from mason_snd.models.auth import User, Judges
@@ -20,6 +23,15 @@ from mason_snd.models.deletion_utils import (
 from werkzeug.security import generate_password_hash, check_password_hash
 
 admin_bp = Blueprint('admin', __name__, template_folder='templates')
+
+# Import testing system components
+try:
+    from UNIT_TEST.master_controller import MasterTestController
+    from UNIT_TEST.final_verification import run_final_verification
+    from UNIT_TEST.production_safety import get_safety_guard
+    TESTING_AVAILABLE = True
+except ImportError:
+    TESTING_AVAILABLE = False
 
 @admin_bp.route('/')
 def index():
@@ -1045,3 +1057,263 @@ def view_requirement_assignments(requirement_id):
                          completed_count=completed_count,
                          overdue_count=overdue_count,
                          now=datetime.now(EST))
+
+
+# Testing System Integration Routes
+
+@admin_bp.route('/testing_suite')
+def testing_suite():
+    """Main testing suite dashboard for admins"""
+    user_id = session.get('user_id')
+    if not user_id:
+        flash('Please log in to access this page.', 'error')
+        return redirect(url_for('auth.login'))
+        
+    user = User.query.filter_by(id=user_id).first()
+    if not user or user.role <= 1:
+        flash('Restricted Access!!!!!')
+        return redirect(url_for('profile.index', user_id=user_id))
+    
+    if not TESTING_AVAILABLE:
+        flash('Testing system is not available. Please check installation.', 'error')
+        return redirect(url_for('admin.index'))
+    
+    # Get testing system status
+    try:
+        safety_guard = get_safety_guard()
+        safety_report = safety_guard.generate_safety_report()
+        
+        test_status = {
+            'safety_status': safety_report['safety_status'],
+            'production_protected': safety_report['production_database']['integrity_check']['safe'],
+            'test_resources': safety_report['test_resources']['total_test_resources']
+        }
+    except Exception as e:
+        test_status = {
+            'safety_status': 'ERROR',
+            'production_protected': False,
+            'test_resources': 0,
+            'error': str(e)
+        }
+    
+    return render_template('admin/testing_suite.html', 
+                         test_status=test_status,
+                         testing_available=TESTING_AVAILABLE)
+
+@admin_bp.route('/testing_suite/run_quick_test', methods=['POST'])
+def run_quick_test():
+    """Run quick test suite"""
+    user_id = session.get('user_id')
+    if not user_id:
+        flash('Please log in to access this page.', 'error')
+        return redirect(url_for('auth.login'))
+        
+    user = User.query.filter_by(id=user_id).first()
+    if not user or user.role <= 1:
+        flash('Restricted Access!!!!!')
+        return redirect(url_for('profile.index', user_id=user_id))
+    
+    if not TESTING_AVAILABLE:
+        flash('Testing system is not available.', 'error')
+        return redirect(url_for('admin.testing_suite'))
+    
+    try:
+        # Run quick test
+        controller = MasterTestController()
+        
+        quick_config = {
+            'num_users': 5,
+            'num_events': 2,
+            'num_tournaments': 1,
+            'run_unit_tests': True,
+            'run_simulation': True,
+            'run_roster_tests': True,
+            'run_metrics_tests': True,
+            'cleanup_after': True
+        }
+        
+        results = controller.run_comprehensive_test_suite(quick_config)
+        
+        if results.get('overall_success', False):
+            flash('✅ Quick test completed successfully! All systems operational.', 'success')
+        else:
+            flash('⚠️ Quick test completed with issues. Check test results for details.', 'warning')
+        
+        # Store results in session for display
+        session['last_test_results'] = {
+            'timestamp': datetime.now().isoformat(),
+            'overall_success': results.get('overall_success', False),
+            'duration': results.get('duration', 0),
+            'test_summary': results.get('test_results', {}).get('report', {}).get('summary', {})
+        }
+        
+    except Exception as e:
+        flash(f'❌ Test execution failed: {str(e)}', 'error')
+    
+    return redirect(url_for('admin.testing_suite'))
+
+@admin_bp.route('/testing_suite/run_full_test', methods=['POST'])
+def run_full_test():
+    """Run full test suite"""
+    user_id = session.get('user_id')
+    if not user_id:
+        flash('Please log in to access this page.', 'error')
+        return redirect(url_for('auth.login'))
+        
+    user = User.query.filter_by(id=user_id).first()
+    if not user or user.role <= 1:
+        flash('Restricted Access!!!!!')
+        return redirect(url_for('profile.index', user_id=user_id))
+    
+    if not TESTING_AVAILABLE:
+        flash('Testing system is not available.', 'error')
+        return redirect(url_for('admin.testing_suite'))
+    
+    try:
+        # Run full test suite
+        controller = MasterTestController()
+        
+        full_config = {
+            'num_users': 30,
+            'num_events': 5,
+            'num_tournaments': 3,
+            'run_unit_tests': True,
+            'run_simulation': True,
+            'run_roster_tests': True,
+            'run_metrics_tests': True,
+            'cleanup_after': True
+        }
+        
+        results = controller.run_comprehensive_test_suite(full_config)
+        
+        if results.get('overall_success', False):
+            flash('✅ Full test suite completed successfully! System is production-ready.', 'success')
+        else:
+            flash('⚠️ Full test suite completed with issues. Review detailed results.', 'warning')
+        
+        # Store results in session for display
+        session['last_test_results'] = {
+            'timestamp': datetime.now().isoformat(),
+            'overall_success': results.get('overall_success', False),
+            'duration': results.get('duration', 0),
+            'test_summary': results.get('test_results', {}).get('report', {}).get('summary', {}),
+            'detailed_results': results.get('test_results', {})
+        }
+        
+    except Exception as e:
+        flash(f'❌ Full test execution failed: {str(e)}', 'error')
+    
+    return redirect(url_for('admin.testing_suite'))
+
+@admin_bp.route('/testing_suite/verify_system', methods=['POST'])
+def verify_system():
+    """Run system verification"""
+    user_id = session.get('user_id')
+    if not user_id:
+        flash('Please log in to access this page.', 'error')
+        return redirect(url_for('auth.login'))
+        
+    user = User.query.filter_by(id=user_id).first()
+    if not user or user.role <= 1:
+        flash('Restricted Access!!!!!')
+        return redirect(url_for('profile.index', user_id=user_id))
+    
+    if not TESTING_AVAILABLE:
+        flash('Testing system is not available.', 'error')
+        return redirect(url_for('admin.testing_suite'))
+    
+    try:
+        # Run system verification
+        verification_results = run_final_verification()
+        
+        success_rate = 0
+        if verification_results.get('tests'):
+            total_tests = len(verification_results['tests'])
+            successful_tests = sum(1 for test in verification_results['tests'].values() 
+                                 if test.get('success', False))
+            success_rate = (successful_tests / total_tests) * 100 if total_tests > 0 else 0
+        
+        if success_rate >= 90:
+            flash(f'✅ System verification passed! Success rate: {success_rate:.1f}%', 'success')
+        elif success_rate >= 70:
+            flash(f'⚠️ System verification completed with warnings. Success rate: {success_rate:.1f}%', 'warning')
+        else:
+            flash(f'❌ System verification failed. Success rate: {success_rate:.1f}%', 'error')
+        
+        # Store verification results
+        session['last_verification_results'] = {
+            'timestamp': datetime.now().isoformat(),
+            'success_rate': success_rate,
+            'overall_success': verification_results.get('overall_success', False),
+            'tests': verification_results.get('tests', {}),
+            'recommendations': verification_results.get('recommendations', [])
+        }
+        
+    except Exception as e:
+        flash(f'❌ System verification failed: {str(e)}', 'error')
+    
+    return redirect(url_for('admin.testing_suite'))
+
+@admin_bp.route('/testing_suite/cleanup', methods=['POST'])
+def cleanup_test_data():
+    """Emergency cleanup of all test data"""
+    user_id = session.get('user_id')
+    if not user_id:
+        flash('Please log in to access this page.', 'error')
+        return redirect(url_for('auth.login'))
+        
+    user = User.query.filter_by(id=user_id).first()
+    if not user or user.role <= 1:
+        flash('Restricted Access!!!!!')
+        return redirect(url_for('profile.index', user_id=user_id))
+    
+    if not TESTING_AVAILABLE:
+        flash('Testing system is not available.', 'error')
+        return redirect(url_for('admin.testing_suite'))
+    
+    try:
+        # Perform emergency cleanup
+        safety_guard = get_safety_guard()
+        cleanup_results = safety_guard.emergency_cleanup()
+        
+        total_cleaned = cleanup_results.get('test_databases_removed', 0) + cleanup_results.get('temp_directories_removed', 0)
+        
+        if cleanup_results.get('errors'):
+            flash(f'⚠️ Cleanup completed with {len(cleanup_results["errors"])} errors. {total_cleaned} items cleaned.', 'warning')
+        else:
+            flash(f'✅ Emergency cleanup completed successfully. {total_cleaned} test resources removed.', 'success')
+        
+        # Store cleanup results
+        session['last_cleanup_results'] = {
+            'timestamp': datetime.now().isoformat(),
+            'items_cleaned': total_cleaned,
+            'errors': cleanup_results.get('errors', [])
+        }
+        
+    except Exception as e:
+        flash(f'❌ Emergency cleanup failed: {str(e)}', 'error')
+    
+    return redirect(url_for('admin.testing_suite'))
+
+@admin_bp.route('/testing_suite/results')
+def test_results():
+    """View detailed test results"""
+    user_id = session.get('user_id')
+    if not user_id:
+        flash('Please log in to access this page.', 'error')
+        return redirect(url_for('auth.login'))
+        
+    user = User.query.filter_by(id=user_id).first()
+    if not user or user.role <= 1:
+        flash('Restricted Access!!!!!')
+        return redirect(url_for('profile.index', user_id=user_id))
+    
+    # Get results from session
+    test_results = session.get('last_test_results')
+    verification_results = session.get('last_verification_results')
+    cleanup_results = session.get('last_cleanup_results')
+    
+    return render_template('admin/test_results.html',
+                         test_results=test_results,
+                         verification_results=verification_results,
+                         cleanup_results=cleanup_results)

@@ -1,0 +1,234 @@
+{% extends "admin/base.html" %}
+{% block title %}Test Results{% endblock %}
+{% block content %}
+<div class="py-8 px-4 sm:px-6 lg:px-8">
+    <div class="flex items-center justify-between mb-6">
+        <h1 class="text-3xl font-bold text-gray-900">📊 Test Results</h1>
+        <a href="{{ url_for('admin.testing_suite') }}" class="text-blue-600 hover:text-blue-800">← Back to Testing Suite</a>
+    </div>
+
+    <!-- Latest Test Results -->
+    {% if test_results %}
+        <div class="bg-white shadow rounded-lg p-6 mb-6">
+            <h2 class="text-xl font-semibold text-gray-800 mb-4">🧪 Latest Test Execution</h2>
+            
+            <!-- Summary Cards -->
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+                <div class="bg-{{ 'green' if test_results.overall_success else 'red' }}-50 p-4 rounded-lg border border-{{ 'green' if test_results.overall_success else 'red' }}-200">
+                    <div class="text-center">
+                        <div class="text-3xl mb-2">{{ '✅' if test_results.overall_success else '❌' }}</div>
+                        <div class="text-sm font-medium text-{{ 'green' if test_results.overall_success else 'red' }}-800">
+                            {{ 'PASSED' if test_results.overall_success else 'FAILED' }}
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="bg-blue-50 p-4 rounded-lg border border-blue-200">
+                    <div class="text-center">
+                        <div class="text-2xl font-bold text-blue-600">{{ "%.1f"|format(test_results.duration) }}s</div>
+                        <div class="text-sm text-blue-700">Duration</div>
+                    </div>
+                </div>
+                
+                {% if test_results.test_summary %}
+                    <div class="bg-green-50 p-4 rounded-lg border border-green-200">
+                        <div class="text-center">
+                            <div class="text-2xl font-bold text-green-600">{{ test_results.test_summary.passed_tests or 0 }}</div>
+                            <div class="text-sm text-green-700">Tests Passed</div>
+                        </div>
+                    </div>
+                    
+                    <div class="bg-purple-50 p-4 rounded-lg border border-purple-200">
+                        <div class="text-center">
+                            <div class="text-2xl font-bold text-purple-600">{{ "%.1f"|format(test_results.test_summary.overall_success_rate or 0) }}%</div>
+                            <div class="text-sm text-purple-700">Success Rate</div>
+                        </div>
+                    </div>
+                {% endif %}
+            </div>
+            
+            <!-- Detailed Results -->
+            {% if test_results.test_summary %}
+                <div class="bg-gray-50 p-4 rounded-lg">
+                    <h3 class="text-lg font-medium text-gray-800 mb-3">Test Summary</h3>
+                    <div class="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                        <div>
+                            <span class="font-medium">Total Tests:</span>
+                            <span class="text-gray-600">{{ test_results.test_summary.total_tests or 0 }}</span>
+                        </div>
+                        <div>
+                            <span class="font-medium">Passed:</span>
+                            <span class="text-green-600">{{ test_results.test_summary.passed_tests or 0 }}</span>
+                        </div>
+                        <div>
+                            <span class="font-medium">Failed:</span>
+                            <span class="text-red-600">{{ test_results.test_summary.failed_tests or 0 }}</span>
+                        </div>
+                        <div>
+                            <span class="font-medium">Success Rate:</span>
+                            <span class="text-purple-600">{{ "%.1f"|format(test_results.test_summary.overall_success_rate or 0) }}%</span>
+                        </div>
+                    </div>
+                </div>
+            {% endif %}
+            
+            <!-- Detailed Test Results -->
+            {% if test_results.detailed_results %}
+                <div class="mt-6">
+                    <h3 class="text-lg font-medium text-gray-800 mb-3">Detailed Results</h3>
+                    <div class="space-y-4">
+                        {% for category, results in test_results.detailed_results.items() %}
+                            {% if category != 'report' %}
+                                <div class="border border-gray-200 rounded-lg p-4">
+                                    <h4 class="font-medium text-gray-700 mb-2">{{ category|title|replace('_', ' ') }}</h4>
+                                    {% if results.workflow_results %}
+                                        <div class="text-sm">
+                                            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium {{ 'bg-green-100 text-green-800' if results.workflow_results.overall_success else 'bg-red-100 text-red-800' }}">
+                                                {{ 'SUCCESS' if results.workflow_results.overall_success else 'FAILED' }}
+                                            </span>
+                                        </div>
+                                    {% elif results.summary %}
+                                        <div class="text-sm text-gray-600">
+                                            Success Rate: {{ "%.1f"|format(results.summary.success_rate or 0) }}% 
+                                            ({{ results.summary.passed or 0 }}/{{ results.summary.total or 0 }})
+                                        </div>
+                                    {% endif %}
+                                </div>
+                            {% endif %}
+                        {% endfor %}
+                    </div>
+                </div>
+            {% endif %}
+            
+            <div class="mt-4 text-sm text-gray-500">
+                Executed: {{ test_results.timestamp }}
+            </div>
+        </div>
+    {% endif %}
+
+    <!-- System Verification Results -->
+    {% if verification_results %}
+        <div class="bg-white shadow rounded-lg p-6 mb-6">
+            <h2 class="text-xl font-semibold text-gray-800 mb-4">✅ System Verification</h2>
+            
+            <!-- Verification Summary -->
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                <div class="bg-{{ 'green' if verification_results.overall_success else 'red' }}-50 p-4 rounded-lg border border-{{ 'green' if verification_results.overall_success else 'red' }}-200">
+                    <div class="text-center">
+                        <div class="text-2xl font-bold text-{{ 'green' if verification_results.overall_success else 'red' }}-600">
+                            {{ '✅' if verification_results.overall_success else '❌' }}
+                        </div>
+                        <div class="text-sm text-{{ 'green' if verification_results.overall_success else 'red' }}-700">
+                            {{ 'VERIFIED' if verification_results.overall_success else 'ISSUES FOUND' }}
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="bg-blue-50 p-4 rounded-lg border border-blue-200">
+                    <div class="text-center">
+                        <div class="text-2xl font-bold text-blue-600">{{ "%.1f"|format(verification_results.success_rate) }}%</div>
+                        <div class="text-sm text-blue-700">Success Rate</div>
+                    </div>
+                </div>
+                
+                <div class="bg-purple-50 p-4 rounded-lg border border-purple-200">
+                    <div class="text-center">
+                        <div class="text-2xl font-bold text-purple-600">{{ verification_results.tests|length }}</div>
+                        <div class="text-sm text-purple-700">Components Tested</div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Component Status -->
+            <div class="mb-6">
+                <h3 class="text-lg font-medium text-gray-800 mb-3">Component Status</h3>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    {% for component, result in verification_results.tests.items() %}
+                        <div class="flex items-center justify-between p-3 border border-gray-200 rounded-lg">
+                            <span class="text-sm font-medium text-gray-700">{{ component|title|replace('_', ' ') }}</span>
+                            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium {{ 'bg-green-100 text-green-800' if result.success else 'bg-red-100 text-red-800' }}">
+                                {{ '✅ PASS' if result.success else '❌ FAIL' }}
+                            </span>
+                        </div>
+                    {% endfor %}
+                </div>
+            </div>
+            
+            <!-- Recommendations -->
+            {% if verification_results.recommendations %}
+                <div class="bg-blue-50 p-4 rounded-lg">
+                    <h3 class="text-lg font-medium text-blue-800 mb-3">💡 Recommendations</h3>
+                    <ul class="space-y-2 text-sm text-blue-700">
+                        {% for recommendation in verification_results.recommendations %}
+                            <li class="flex items-start">
+                                <span class="mr-2">•</span>
+                                <span>{{ recommendation }}</span>
+                            </li>
+                        {% endfor %}
+                    </ul>
+                </div>
+            {% endif %}
+            
+            <div class="mt-4 text-sm text-gray-500">
+                Verified: {{ verification_results.timestamp }}
+            </div>
+        </div>
+    {% endif %}
+
+    <!-- Cleanup Results -->
+    {% if cleanup_results %}
+        <div class="bg-white shadow rounded-lg p-6 mb-6">
+            <h2 class="text-xl font-semibold text-gray-800 mb-4">🧹 Cleanup Results</h2>
+            
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                <div class="bg-green-50 p-4 rounded-lg border border-green-200">
+                    <div class="text-center">
+                        <div class="text-2xl font-bold text-green-600">{{ cleanup_results.items_cleaned }}</div>
+                        <div class="text-sm text-green-700">Items Cleaned</div>
+                    </div>
+                </div>
+                
+                <div class="bg-{{ 'red' if cleanup_results.errors else 'green' }}-50 p-4 rounded-lg border border-{{ 'red' if cleanup_results.errors else 'green' }}-200">
+                    <div class="text-center">
+                        <div class="text-2xl font-bold text-{{ 'red' if cleanup_results.errors else 'green' }}-600">
+                            {{ cleanup_results.errors|length if cleanup_results.errors else '0' }}
+                        </div>
+                        <div class="text-sm text-{{ 'red' if cleanup_results.errors else 'green' }}-700">Errors</div>
+                    </div>
+                </div>
+            </div>
+            
+            {% if cleanup_results.errors %}
+                <div class="bg-red-50 p-4 rounded-lg border border-red-200">
+                    <h3 class="text-lg font-medium text-red-800 mb-3">⚠️ Cleanup Errors</h3>
+                    <ul class="space-y-1 text-sm text-red-700">
+                        {% for error in cleanup_results.errors %}
+                            <li>• {{ error }}</li>
+                        {% endfor %}
+                    </ul>
+                </div>
+            {% endif %}
+            
+            <div class="mt-4 text-sm text-gray-500">
+                Cleaned: {{ cleanup_results.timestamp }}
+            </div>
+        </div>
+    {% endif %}
+
+    <!-- No Results Message -->
+    {% if not test_results and not verification_results and not cleanup_results %}
+        <div class="bg-white shadow rounded-lg p-6 text-center">
+            <div class="text-gray-500 mb-4">
+                <svg class="mx-auto h-12 w-12" fill="none" stroke="currentColor" viewBox="0 0 48 48">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17v-2a4 4 0 014-4h22a4 4 0 014 4v2M9 17v12a4 4 0 004 4h22a4 4 0 004-4V17M9 17h30m-22 8h14"/>
+                </svg>
+            </div>
+            <h3 class="text-lg font-medium text-gray-900 mb-2">No Test Results Available</h3>
+            <p class="text-gray-500 mb-4">Run some tests from the Testing Suite to see results here.</p>
+            <a href="{{ url_for('admin.testing_suite') }}" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 transition">
+                Go to Testing Suite
+            </a>
+        </div>
+    {% endif %}
+</div>
+{% endblock %}

@@ -1,0 +1,168 @@
+{% extends "metrics/base.html" %}
+
+{% block title %}My Ranking{% endblock %}
+
+{% block content %}
+<div class="px-4 sm:px-6 lg:px-8">
+    <!-- Header -->
+    <div class="sm:flex sm:items-center mb-8">
+        <div class="sm:flex-auto">
+            <h1 class="text-2xl font-bold text-gray-900">My Ranking</h1>
+            <p class="mt-1 text-sm text-gray-500">Your position in the overall standings</p>
+        </div>
+        <div class="mt-4 sm:mt-0 sm:ml-16 sm:flex-none space-x-2">
+            <a href="{{ url_for('metrics.my_metrics') }}" class="inline-flex items-center justify-center rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50">
+                ← Back to Dashboard
+            </a>
+            <a href="{{ url_for('metrics.my_performance_trends') }}" class="inline-flex items-center justify-center rounded-md border border-transparent bg-[color:var(--color-primary-600)] px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-[color:var(--color-primary-700)]">
+                📈 View Trends
+            </a>
+        </div>
+    </div>
+
+    <!-- Overall Ranking -->
+    <div class="bg-white shadow rounded-lg mb-8">
+        <div class="px-6 py-6">
+            <div class="text-center">
+                <div class="text-6xl mb-4">
+                    {% if ranking_data.rank == 1 %}🥇
+                    {% elif ranking_data.rank == 2 %}🥈
+                    {% elif ranking_data.rank == 3 %}🥉
+                    {% else %}🏆
+                    {% endif %}
+                </div>
+                <h2 class="text-3xl font-bold text-gray-900">Rank #{{ ranking_data.rank }}</h2>
+                <p class="text-lg text-gray-600 mb-4">out of {{ ranking_data.total_active_users }} active competitors</p>
+                
+                <div class="bg-gray-200 rounded-full h-4 mb-4 max-w-md mx-auto">
+                    <div class="bg-[color:var(--color-primary-600)] h-4 rounded-full" style="width: {{ ranking_data.percentile }}%"></div>
+                </div>
+                <p class="text-sm text-gray-500">{{ ranking_data.percentile }}th percentile</p>
+                
+                <div class="mt-6 grid grid-cols-1 sm:grid-cols-3 gap-4 max-w-md mx-auto">
+                    <div class="bg-gray-50 rounded-lg p-4">
+                        <div class="text-sm text-gray-500">Weighted Score</div>
+                        <div class="text-lg font-semibold text-gray-900">{{ ranking_data.weighted_score }}</div>
+                    </div>
+                    <div class="bg-red-50 rounded-lg p-4">
+                        <div class="text-sm text-red-600">Above Me</div>
+                        <div class="text-lg font-semibold text-red-700">{{ ranking_data.users_above_me }}</div>
+                    </div>
+                    <div class="bg-green-50 rounded-lg p-4">
+                        <div class="text-sm text-green-600">Below Me</div>
+                        <div class="text-lg font-semibold text-green-700">{{ ranking_data.users_below_me }}</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Performance Change -->
+    {% if ranking_data.performance_change %}
+    <div class="bg-white shadow rounded-lg mb-8">
+        <div class="px-6 py-4 border-b border-gray-200">
+            <h3 class="text-lg font-medium text-gray-900">Recent Performance Trend</h3>
+            <p class="text-sm text-gray-500">Comparing last 3 months vs previous 3 months</p>
+        </div>
+        <div class="px-6 py-6">
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-6">
+                <div class="text-center">
+                    <div class="text-2xl font-bold text-blue-600">{{ ranking_data.performance_change.recent_avg }}</div>
+                    <div class="text-sm text-gray-500">Recent Average (pts)</div>
+                    <div class="text-xs text-gray-400">Last 3 months</div>
+                </div>
+                <div class="text-center">
+                    <div class="text-2xl font-bold text-gray-600">{{ ranking_data.performance_change.older_avg }}</div>
+                    <div class="text-sm text-gray-500">Previous Average (pts)</div>
+                    <div class="text-xs text-gray-400">Previous 3 months</div>
+                </div>
+                <div class="text-center">
+                    {% if ranking_data.performance_change.change > 0 %}
+                    <div class="text-2xl font-bold text-green-600">+{{ ranking_data.performance_change.change }}</div>
+                    <div class="text-sm text-green-600">
+                        <svg class="inline h-4 w-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"></path>
+                        </svg>
+                        +{{ ranking_data.performance_change.change_percent }}%
+                    </div>
+                    {% elif ranking_data.performance_change.change < 0 %}
+                    <div class="text-2xl font-bold text-red-600">{{ ranking_data.performance_change.change }}</div>
+                    <div class="text-sm text-red-600">
+                        <svg class="inline h-4 w-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 17h8m0 0V9m0 8l-8-8-4 4-6-6"></path>
+                        </svg>
+                        {{ ranking_data.performance_change.change_percent }}%
+                    </div>
+                    {% else %}
+                    <div class="text-2xl font-bold text-gray-600">{{ ranking_data.performance_change.change }}</div>
+                    <div class="text-sm text-gray-600">No change</div>
+                    {% endif %}
+                    <div class="text-xs text-gray-400">Point change</div>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Event-specific Rankings -->
+    {% if event_rankings %}
+    <div class="bg-white shadow rounded-lg mb-8">
+        <div class="px-6 py-4 border-b border-gray-200">
+            <h3 class="text-lg font-medium text-gray-900">Rankings by Event</h3>
+            <p class="text-sm text-gray-500">Your position within each event category</p>
+        </div>
+        <div class="px-6 py-4">
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {% for event_ranking in event_rankings %}
+                <div class="border border-gray-200 rounded-lg p-4">
+                    <div class="flex items-center justify-between mb-3">
+                        <h4 class="text-sm font-medium text-gray-900">
+                            {{ event_ranking.event.event_emoji or '🎯' }} {{ event_ranking.event.event_name }}
+                        </h4>
+                        {% if event_ranking.rank == 1 %}
+                        <span class="text-lg">🥇</span>
+                        {% elif event_ranking.rank == 2 %}
+                        <span class="text-lg">🥈</span>
+                        {% elif event_ranking.rank == 3 %}
+                        <span class="text-lg">🥉</span>
+                        {% endif %}
+                    </div>
+                    
+                    <div class="text-center">
+                        <div class="text-2xl font-bold text-gray-900">#{{ event_ranking.rank }}</div>
+                        <div class="text-sm text-gray-500">of {{ event_ranking.total_in_event }}</div>
+                        
+                        <div class="mt-2 bg-gray-200 rounded-full h-2">
+                            <div class="bg-[color:var(--color-primary-600)] h-2 rounded-full" style="width: {{ event_ranking.percentile }}%"></div>
+                        </div>
+                        <div class="text-xs text-gray-500 mt-1">{{ event_ranking.percentile }}th percentile</div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Ranking Explanation -->
+    {% if settings %}
+    <div class="bg-blue-50 border border-blue-200 rounded-lg p-6">
+        <div class="flex">
+            <div class="flex-shrink-0">
+                <svg class="h-5 w-5 text-blue-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                    <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd" />
+                </svg>
+            </div>
+            <div class="ml-3">
+                <h3 class="text-sm font-medium text-blue-800">How Rankings Work</h3>
+                <div class="mt-2 text-sm text-blue-700">
+                    <p class="mb-2">Rankings are based on your weighted score, calculated as:</p>
+                    <p class="font-medium">{{ (settings.tournament_weight * 100)|int }}% Tournament Points + {{ (settings.effort_weight * 100)|int }}% Effort Points</p>
+                    <p class="mt-2">Only active competitors (those with at least one tournament performance or effort score) are included in rankings.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

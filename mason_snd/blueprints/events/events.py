@@ -69,8 +69,8 @@ def edit_event(event_id):
         flash('Event not found', 'error')
         return redirect(url_for('events.index'))
 
-    # Ensure the logged-in user is the owner of the event
-    if event.owner_id != user_id:
+    # Ensure the logged-in user is either the owner of the event or an admin (role >= 2)
+    if not (event.owner_id == user_id or (user and user.role >= 2)):
         flash('You are not authorized to edit this event', 'error')
         return redirect(url_for('events.index'))
 
@@ -119,14 +119,17 @@ def manage_members(event_id):
         flash('You must be logged in to manage members.', 'error')
         return redirect(url_for('auth.login'))
 
+    # Get the logged-in user
+    user = User.query.filter_by(id=user_id).first()
+
     # Fetch the event
     event = Event.query.get(event_id)
     if not event:
         flash('Event not found.', 'error')
         return redirect(url_for('events.index'))
 
-    # Ensure the logged-in user is the owner of the event
-    if event.owner_id != user_id:
+    # Ensure the logged-in user is either the owner of the event or an admin (role >= 2)
+    if not (event.owner_id == user_id or (user and user.role >= 2)):
         flash('You are not authorized to manage this event.', 'error')
         return redirect(url_for('events.index'))
 

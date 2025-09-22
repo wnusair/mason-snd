@@ -1,0 +1,438 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Results - Mason-SND Testing Dashboard</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: 2.2rem;
+            margin-bottom: 10px;
+            font-weight: 300;
+        }
+
+        .main-content {
+            padding: 40px;
+        }
+
+        .breadcrumb {
+            margin-bottom: 30px;
+            color: #718096;
+        }
+
+        .breadcrumb a {
+            color: #4facfe;
+            text-decoration: none;
+        }
+
+        .breadcrumb a:hover {
+            text-decoration: underline;
+        }
+
+        .summary-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 20px;
+            margin-bottom: 40px;
+        }
+
+        .summary-card {
+            background: #f7fafc;
+            border-radius: 12px;
+            padding: 20px;
+            text-align: center;
+            border-left: 4px solid #4facfe;
+        }
+
+        .summary-card.passed {
+            border-left-color: #38a169;
+        }
+
+        .summary-card.failed {
+            border-left-color: #e53e3e;
+        }
+
+        .summary-card.errors {
+            border-left-color: #d69e2e;
+        }
+
+        .summary-number {
+            font-size: 2.5rem;
+            font-weight: bold;
+            margin-bottom: 8px;
+        }
+
+        .summary-label {
+            color: #718096;
+            font-size: 0.9rem;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .test-details {
+            background: white;
+            border: 1px solid #e2e8f0;
+            border-radius: 12px;
+            overflow: hidden;
+            margin-bottom: 30px;
+        }
+
+        .test-class {
+            background: #f7fafc;
+            border-bottom: 1px solid #e2e8f0;
+            padding: 20px;
+            font-weight: 600;
+            color: #2d3748;
+            font-size: 1.2rem;
+        }
+
+        .test-item {
+            padding: 15px 20px;
+            border-bottom: 1px solid #f1f5f9;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .test-item:last-child {
+            border-bottom: none;
+        }
+
+        .test-name {
+            font-weight: 500;
+            color: #2d3748;
+        }
+
+        .test-status {
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .test-status.passed {
+            background: #c6f6d5;
+            color: #22543d;
+        }
+
+        .test-status.failed {
+            background: #fed7d7;
+            color: #742a2a;
+        }
+
+        .test-status.error {
+            background: #faf089;
+            color: #744210;
+        }
+
+        .error-details {
+            background: #fed7d7;
+            border-left: 4px solid #e53e3e;
+            padding: 15px;
+            margin-top: 10px;
+            border-radius: 6px;
+        }
+
+        .error-message {
+            font-family: monospace;
+            font-size: 0.9rem;
+            color: #742a2a;
+            white-space: pre-wrap;
+        }
+
+        .test-metadata {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+            padding: 20px;
+            background: #f7fafc;
+            border-radius: 12px;
+        }
+
+        .metadata-item {
+            text-align: center;
+        }
+
+        .metadata-label {
+            color: #718096;
+            font-size: 0.9rem;
+            margin-bottom: 5px;
+        }
+
+        .metadata-value {
+            font-weight: 600;
+            color: #2d3748;
+            font-size: 1.1rem;
+        }
+
+        .btn {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 8px;
+            text-decoration: none;
+            display: inline-block;
+            font-weight: 500;
+            transition: all 0.3s ease;
+            margin-right: 10px;
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+        }
+
+        .btn-secondary {
+            background: #e2e8f0;
+            color: #4a5568;
+        }
+
+        .btn-secondary:hover {
+            background: #cbd5e0;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+
+        .actions {
+            text-align: center;
+            margin-top: 40px;
+            padding-top: 30px;
+            border-top: 1px solid #e2e8f0;
+        }
+
+        .no-tests {
+            text-align: center;
+            padding: 60px 20px;
+            color: #718096;
+        }
+
+        .no-tests .icon {
+            font-size: 4rem;
+            margin-bottom: 20px;
+            display: block;
+        }
+
+        @media (max-width: 768px) {
+            .header h1 {
+                font-size: 1.8rem;
+            }
+            
+            .main-content {
+                padding: 20px;
+            }
+            
+            .summary-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+            
+            .test-metadata {
+                grid-template-columns: 1fr;
+            }
+            
+            .test-item {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 10px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>📋 Test Results</h1>
+            <p>Detailed test execution results and metrics</p>
+        </div>
+
+        <div class="main-content">
+            <div class="breadcrumb">
+                <a href="/test_dashboard/">🧪 Testing Dashboard</a> > Test Results
+            </div>
+
+            {% if session_data and session_data.results %}
+                <!-- Test Metadata -->
+                <div class="test-metadata">
+                    <div class="metadata-item">
+                        <div class="metadata-label">Test Type</div>
+                        <div class="metadata-value">{{ session_data.test_type | title }}</div>
+                    </div>
+                    <div class="metadata-item">
+                        <div class="metadata-label">Started</div>
+                        <div class="metadata-value">{{ session_data.start_time.strftime('%H:%M:%S') }}</div>
+                    </div>
+                    <div class="metadata-item">
+                        <div class="metadata-label">Duration</div>
+                        <div class="metadata-value">
+                            {% if session_data.results.timestamp %}
+                                {{ ((session_data.results.timestamp | from_iso) - session_data.start_time).total_seconds() | round(1) }}s
+                            {% else %}
+                                N/A
+                            {% endif %}
+                        </div>
+                    </div>
+                    <div class="metadata-item">
+                        <div class="metadata-label">Session ID</div>
+                        <div class="metadata-value">{{ session_id[:8] }}...</div>
+                    </div>
+                </div>
+
+                {% if session_data.results.error %}
+                    <!-- Error Display -->
+                    <div class="error-details">
+                        <strong>Test Execution Error:</strong>
+                        <div class="error-message">{{ session_data.results.error }}</div>
+                    </div>
+                {% else %}
+                    <!-- Summary Cards -->
+                    <div class="summary-grid">
+                        <div class="summary-card">
+                            <div class="summary-number">{{ session_data.results.summary.total }}</div>
+                            <div class="summary-label">Total Tests</div>
+                        </div>
+                        <div class="summary-card passed">
+                            <div class="summary-number">{{ session_data.results.summary.passed }}</div>
+                            <div class="summary-label">Passed</div>
+                        </div>
+                        <div class="summary-card failed">
+                            <div class="summary-number">{{ session_data.results.summary.failed }}</div>
+                            <div class="summary-label">Failed</div>
+                        </div>
+                        <div class="summary-card errors">
+                            <div class="summary-number">{{ session_data.results.summary.errors }}</div>
+                            <div class="summary-label">Errors</div>
+                        </div>
+                        <div class="summary-card">
+                            <div class="summary-number">{{ "%.1f" | format(session_data.results.summary.success_rate) }}%</div>
+                            <div class="summary-label">Success Rate</div>
+                        </div>
+                    </div>
+
+                    <!-- Test Details -->
+                    {% if session_data.results.details %}
+                        {% for test_class in session_data.results.details %}
+                            <div class="test-details">
+                                <div class="test-class">
+                                    {{ test_class.class | replace('Test', '') | replace('Routes', ' Routes') | replace('Auth', 'Authentication') }}
+                                    <span style="float: right; font-size: 0.9rem; font-weight: normal; color: #718096;">
+                                        {{ test_class.passed + test_class.failed + test_class.errors }} tests
+                                    </span>
+                                </div>
+
+                                <!-- Generate test items based on summary -->
+                                {% for i in range(test_class.passed) %}
+                                    <div class="test-item">
+                                        <div class="test-name">Test {{ loop.index }} - Passed</div>
+                                        <div class="test-status passed">Passed</div>
+                                    </div>
+                                {% endfor %}
+
+                                {% if test_class.failures %}
+                                    {% for failure in test_class.failures %}
+                                        <div class="test-item">
+                                            <div style="width: 100%;">
+                                                <div class="test-name">{{ failure[0] | string | replace('test_', '') | replace('_', ' ') | title }}</div>
+                                                <div class="error-details">
+                                                    <div class="error-message">{{ failure[1] }}</div>
+                                                </div>
+                                            </div>
+                                            <div class="test-status failed">Failed</div>
+                                        </div>
+                                    {% endfor %}
+                                {% endif %}
+
+                                {% if test_class.errors %}
+                                    {% for error in test_class.errors %}
+                                        <div class="test-item">
+                                            <div style="width: 100%;">
+                                                <div class="test-name">{{ error[0] | string | replace('test_', '') | replace('_', ' ') | title }}</div>
+                                                <div class="error-details">
+                                                    <div class="error-message">{{ error[1] }}</div>
+                                                </div>
+                                            </div>
+                                            <div class="test-status error">Error</div>
+                                        </div>
+                                    {% endfor %}
+                                {% endif %}
+                            </div>
+                        {% endfor %}
+                    {% endif %}
+                {% endif %}
+            {% else %}
+                <!-- No Test Data -->
+                <div class="no-tests">
+                    <span class="icon">❌</span>
+                    <h3>No test results available</h3>
+                    <p>The test session may have expired or the results were not found.</p>
+                </div>
+            {% endif %}
+
+            <!-- Actions -->
+            <div class="actions">
+                <a href="/test_dashboard/" class="btn">🧪 Back to Dashboard</a>
+                <a href="/test_dashboard/coverage_report" class="btn btn-secondary">📊 View Coverage</a>
+                {% if session_id %}
+                    <a href="/test_dashboard/test_results/{{ session_id }}" class="btn btn-secondary">🔄 Refresh Results</a>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Auto-refresh if test is still running
+        document.addEventListener('DOMContentLoaded', function() {
+            const sessionId = '{{ session_id }}';
+            const status = '{{ session_data.status if session_data else "unknown" }}';
+            
+            if (status === 'running' && sessionId) {
+                // Check status every 2 seconds
+                const interval = setInterval(() => {
+                    fetch(`/test_dashboard/test_status/${sessionId}`)
+                        .then(response => response.json())
+                        .then(data => {
+                            if (data.status === 'completed' || data.status === 'error') {
+                                clearInterval(interval);
+                                window.location.reload();
+                            }
+                        })
+                        .catch(error => {
+                            console.error('Error checking test status:', error);
+                            clearInterval(interval);
+                        });
+                }, 2000);
+            }
+        });
+    </script>
+</body>
+</html>

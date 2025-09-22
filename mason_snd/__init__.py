@@ -37,6 +37,21 @@ def create_app():
     app.register_blueprint(rosters_bp, url_prefix='/rosters')
     app.register_blueprint(main_bp, url_prefix='/')
 
+    # If the environment requests testing integration, enable it here so
+    # the testing dashboard and CLI commands are registered on app startup.
+    # Start Flask with: ENABLE_TESTING=True flask run
+    if os.getenv('ENABLE_TESTING', '').lower() in ('1', 'true', 'yes'):
+        app.config['ENABLE_TESTING'] = True
+        # Optionally expose TESTING flag for other code paths
+        app.config['TESTING'] = True
+        try:
+            # Import and integrate the testing system (registers /test_dashboard)
+            from UNIT_TEST.integration import integrate_testing_with_app
+            integrated = integrate_testing_with_app(app)
+            app.logger.info(f"Testing integration enabled: {integrated}")
+        except Exception as e:
+            app.logger.error(f"Failed to integrate testing system: {e}")
+
     with app.app_context():
         db.create_all()
 

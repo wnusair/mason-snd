@@ -1,0 +1,540 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🧪 Mason-SND Testing Dashboard</title>
+    <meta name="csrf-token" content="{{ csrf_token() }}">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+            font-weight: 300;
+        }
+
+        .header p {
+            opacity: 0.9;
+            font-size: 1.1rem;
+        }
+
+        .main-content {
+            padding: 40px;
+        }
+
+        .nav-cards {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 25px;
+            margin-bottom: 40px;
+        }
+
+        .nav-card {
+            background: white;
+            border: 2px solid #e2e8f0;
+            border-radius: 12px;
+            padding: 25px;
+            text-align: center;
+            transition: all 0.3s ease;
+            cursor: pointer;
+            text-decoration: none;
+            color: inherit;
+        }
+
+        .nav-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+            border-color: #4facfe;
+        }
+
+        .nav-card .icon {
+            font-size: 3rem;
+            margin-bottom: 15px;
+            display: block;
+        }
+
+        .nav-card h3 {
+            color: #2d3748;
+            margin-bottom: 10px;
+            font-size: 1.3rem;
+        }
+
+        .nav-card p {
+            color: #718096;
+            font-size: 0.95rem;
+            line-height: 1.5;
+        }
+
+        .test-runner {
+            background: #f7fafc;
+            border-radius: 12px;
+            padding: 30px;
+            margin-top: 30px;
+        }
+
+        .test-runner h2 {
+            color: #2d3748;
+            margin-bottom: 20px;
+            font-size: 1.8rem;
+        }
+
+        .test-controls {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 15px;
+            margin-bottom: 30px;
+        }
+
+        .test-btn {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 15px 20px;
+            border-radius: 8px;
+            font-size: 0.95rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .test-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+        }
+
+        .test-btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+
+        .progress-container {
+            margin: 30px 0;
+            display: none;
+        }
+
+        .progress-bar {
+            width: 100%;
+            height: 10px;
+            background: #e2e8f0;
+            border-radius: 5px;
+            overflow: hidden;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #4facfe 0%, #00f2fe 100%);
+            width: 0%;
+            transition: width 0.3s ease;
+        }
+
+        .progress-text {
+            text-align: center;
+            margin-top: 10px;
+            color: #4a5568;
+        }
+
+        .results-container {
+            margin-top: 30px;
+            display: none;
+        }
+
+        .results-summary {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+
+        .result-card {
+            background: white;
+            border-radius: 8px;
+            padding: 20px;
+            text-align: center;
+            border-left: 4px solid #4facfe;
+        }
+
+        .result-card.passed {
+            border-left-color: #38a169;
+        }
+
+        .result-card.failed {
+            border-left-color: #e53e3e;
+        }
+
+        .result-card.errors {
+            border-left-color: #d69e2e;
+        }
+
+        .result-number {
+            font-size: 2rem;
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+
+        .result-label {
+            color: #718096;
+            font-size: 0.9rem;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .alert {
+            padding: 15px;
+            border-radius: 8px;
+            margin: 20px 0;
+            border-left: 4px solid;
+        }
+
+        .alert.success {
+            background: #f0fff4;
+            border-left-color: #38a169;
+            color: #2f855a;
+        }
+
+        .alert.error {
+            background: #fed7d7;
+            border-left-color: #e53e3e;
+            color: #c53030;
+        }
+
+        .alert.info {
+            background: #ebf8ff;
+            border-left-color: #3182ce;
+            color: #2c5282;
+        }
+
+        .btn-secondary {
+            background: #e2e8f0;
+            color: #4a5568;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 6px;
+            font-size: 0.9rem;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-decoration: none;
+            display: inline-block;
+        }
+
+        .btn-secondary:hover {
+            background: #cbd5e0;
+        }
+
+        @media (max-width: 768px) {
+            .header h1 {
+                font-size: 2rem;
+            }
+            
+            .main-content {
+                padding: 20px;
+            }
+            
+            .nav-cards {
+                grid-template-columns: 1fr;
+            }
+            
+            .test-controls {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🧪 Mason-SND Testing Dashboard</h1>
+            <p>Comprehensive testing and development tools for the Mason Speech & Debate platform</p>
+        </div>
+
+        <div class="main-content">
+            <!-- Navigation Cards -->
+            <div class="nav-cards">
+                <a href="/test_dashboard/mock_tournament" class="nav-card">
+                    <span class="icon">🏆</span>
+                    <h3>Mock Tournament</h3>
+                    <p>Simulate complete tournament scenarios with realistic data and user interactions</p>
+                </a>
+                
+                <a href="/test_dashboard/database_manager" class="nav-card">
+                    <span class="icon">🗄️</span>
+                    <h3>Database Manager</h3>
+                    <p>Manage test databases, clean up data, and monitor database health</p>
+                </a>
+                
+                <a href="/test_dashboard/coverage_report" class="nav-card">
+                    <span class="icon">📊</span>
+                    <h3>Coverage Reports</h3>
+                    <p>View detailed test coverage metrics and identify untested code paths</p>
+                </a>
+            </div>
+
+            <!-- Test Runner Section -->
+            <div class="test-runner">
+                <h2>🚀 Test Suite Runner</h2>
+                <p style="color: #718096; margin-bottom: 25px;">Run comprehensive tests to validate application functionality</p>
+
+                <div class="test-controls">
+                    <button class="test-btn" onclick="runTests('all')" id="run-all-btn">
+                        All Tests
+                    </button>
+                    <button class="test-btn" onclick="runTests('auth')" id="run-auth-btn">
+                        Authentication
+                    </button>
+                    <button class="test-btn" onclick="runTests('events')" id="run-events-btn">
+                        Events
+                    </button>
+                    <button class="test-btn" onclick="runTests('tournaments')" id="run-tournaments-btn">
+                        Tournaments
+                    </button>
+                    <button class="test-btn" onclick="runTests('profile')" id="run-profile-btn">
+                        Profile
+                    </button>
+                    <button class="test-btn" onclick="runTests('metrics')" id="run-metrics-btn">
+                        Metrics
+                    </button>
+                    <button class="test-btn" onclick="runTests('rosters')" id="run-rosters-btn">
+                        Rosters
+                    </button>
+                    <button class="test-btn" onclick="runTests('admin')" id="run-admin-btn">
+                        Admin
+                    </button>
+                </div>
+
+                <!-- Progress Indicator -->
+                <div class="progress-container" id="progress-container">
+                    <div class="progress-bar">
+                        <div class="progress-fill" id="progress-fill"></div>
+                    </div>
+                    <div class="progress-text" id="progress-text">Running tests...</div>
+                </div>
+
+                <!-- Results Container -->
+                <div class="results-container" id="results-container">
+                    <div class="results-summary" id="results-summary"></div>
+                    <div id="results-details"></div>
+                    <div style="margin-top: 20px;">
+                        <a href="#" class="btn-secondary" id="view-details-btn" style="display: none;">View Detailed Results</a>
+                    </div>
+                </div>
+
+                <!-- Status Messages -->
+                <div id="message-container"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let currentSessionId = null;
+        let pollInterval = null;
+
+        function showMessage(message, type = 'info') {
+            const container = document.getElementById('message-container');
+            const alert = document.createElement('div');
+            alert.className = `alert ${type}`;
+            alert.textContent = message;
+            container.innerHTML = '';
+            container.appendChild(alert);
+            
+            setTimeout(() => {
+                if (alert.parentNode) {
+                    alert.parentNode.removeChild(alert);
+                }
+            }, 5000);
+        }
+
+        function disableAllButtons() {
+            const buttons = document.querySelectorAll('.test-btn');
+            buttons.forEach(btn => btn.disabled = true);
+        }
+
+        function enableAllButtons() {
+            const buttons = document.querySelectorAll('.test-btn');
+            buttons.forEach(btn => btn.disabled = false);
+        }
+
+        function showProgress() {
+            document.getElementById('progress-container').style.display = 'block';
+            document.getElementById('results-container').style.display = 'none';
+        }
+
+        function hideProgress() {
+            document.getElementById('progress-container').style.display = 'none';
+        }
+
+        function updateProgress(percentage, text) {
+            document.getElementById('progress-fill').style.width = percentage + '%';
+            document.getElementById('progress-text').textContent = text;
+        }
+
+        function displayResults(results) {
+            const container = document.getElementById('results-container');
+            const summary = document.getElementById('results-summary');
+            const details = document.getElementById('results-details');
+            
+            if (results.error) {
+                showMessage(`Test execution failed: ${results.error}`, 'error');
+                return;
+            }
+
+            // Clear previous results
+            summary.innerHTML = '';
+            details.innerHTML = '';
+
+            // Create summary cards
+            const summaryData = results.summary;
+            const cards = [
+                { label: 'Total', value: summaryData.total, class: 'total' },
+                { label: 'Passed', value: summaryData.passed, class: 'passed' },
+                { label: 'Failed', value: summaryData.failed, class: 'failed' },
+                { label: 'Errors', value: summaryData.errors, class: 'errors' }
+            ];
+
+            cards.forEach(card => {
+                const cardEl = document.createElement('div');
+                cardEl.className = `result-card ${card.class}`;
+                cardEl.innerHTML = `
+                    <div class="result-number">${card.value}</div>
+                    <div class="result-label">${card.label}</div>
+                `;
+                summary.appendChild(cardEl);
+            });
+
+            // Success rate
+            const successRate = summaryData.success_rate || 0;
+            const rateCard = document.createElement('div');
+            rateCard.className = 'result-card';
+            rateCard.innerHTML = `
+                <div class="result-number">${successRate.toFixed(1)}%</div>
+                <div class="result-label">Success Rate</div>
+            `;
+            summary.appendChild(rateCard);
+
+            // Show results container
+            container.style.display = 'block';
+
+            // Show success/failure message
+            if (summaryData.failed === 0 && summaryData.errors === 0) {
+                showMessage('All tests passed successfully! ✅', 'success');
+            } else {
+                showMessage(`Tests completed with ${summaryData.failed} failures and ${summaryData.errors} errors`, 'error');
+            }
+
+            // Update view details button
+            const viewBtn = document.getElementById('view-details-btn');
+            viewBtn.style.display = 'inline-block';
+            viewBtn.href = `/test_dashboard/test_results/${currentSessionId}`;
+        }
+
+        function pollTestStatus() {
+            if (!currentSessionId) return;
+
+            fetch(`/test_dashboard/test_status/${currentSessionId}`)
+                .then(response => response.json())
+                .then(data => {
+                    updateProgress(data.progress, `Running tests... ${data.progress}%`);
+                    
+                    if (data.status === 'completed') {
+                        clearInterval(pollInterval);
+                        hideProgress();
+                        enableAllButtons();
+                        displayResults(data.results);
+                        currentSessionId = null;
+                    } else if (data.status === 'error') {
+                        clearInterval(pollInterval);
+                        hideProgress();
+                        enableAllButtons();
+                        showMessage('Test execution failed', 'error');
+                        currentSessionId = null;
+                    }
+                })
+                .catch(error => {
+                    console.error('Error polling test status:', error);
+                    clearInterval(pollInterval);
+                    hideProgress();
+                    enableAllButtons();
+                    showMessage('Error checking test status', 'error');
+                    currentSessionId = null;
+                });
+        }
+
+        function runTests(testType) {
+            if (currentSessionId) {
+                showMessage('Tests are already running. Please wait...', 'info');
+                return;
+            }
+
+            disableAllButtons();
+            showProgress();
+            updateProgress(0, 'Initializing tests...');
+
+            const csrfToken = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
+
+            fetch('/test_dashboard/run_tests', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': csrfToken
+                },
+                body: JSON.stringify({
+                    test_type: testType
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.error) {
+                    throw new Error(data.error);
+                }
+                
+                currentSessionId = data.session_id;
+                showMessage(`Started ${testType} tests...`, 'info');
+                
+                // Start polling for status
+                pollInterval = setInterval(pollTestStatus, 1000);
+            })
+            .catch(error => {
+                console.error('Error starting tests:', error);
+                hideProgress();
+                enableAllButtons();
+                showMessage(`Failed to start tests: ${error.message}`, 'error');
+            });
+        }
+
+        // Initialize page
+        document.addEventListener('DOMContentLoaded', function() {
+            showMessage('Testing dashboard loaded. Select a test suite to run.', 'info');
+        });
+    </script>
+</body>
+</html>
