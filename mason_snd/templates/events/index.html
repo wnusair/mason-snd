@@ -11,7 +11,7 @@
         </div>
         <div class="mt-4 sm:mt-0 sm:ml-16 sm:flex-none space-x-2">
             
-            {% if user.role < 2 %}
+            {% if user.role == 2 %}
             <a href="{{ url_for('events.download_all_events_stats') }}" class="inline-flex items-center justify-center rounded-md border border-transparent bg-gray-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 sm:w-auto">
                 Download Stats
             </a>
@@ -54,7 +54,7 @@
             {% if event.owner_id == user.id or user.role >= 2 %}
             <div class="px-4 py-4 sm:px-6 bg-gray-50">
                 <div class="flex items-center justify-end space-x-3">
-                    {% if event.owner_id == user.id %}
+                    {% if event.owner_id == user.id or user.role >= 2 %}
                     <a href="{{ url_for('events.edit_event', event_id=event.id) }}" class="text-sm font-medium text-gray-600 hover:text-gray-900">Edit</a>
                     <a href="{{ url_for('events.manage_members', event_id=event.id) }}" class="text-sm font-medium text-gray-600 hover:text-gray-900">Manage Members</a>
                     {% endif %}

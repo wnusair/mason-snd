@@ -93,6 +93,7 @@
                 {% endif %}
                 {# My Profile link before auth links #}
                 {% if session.get('user_id') %}
+                    <a href="{{ url_for('metrics.my_metrics') }}" class="px-3 py-2 text-sm font-medium text-gray-700 hover:text-[color:var(--color-primary-600)]">My Performance</a>
                     <a href="{{ url_for('profile.index', user_id=session.get('user_id')) }}" class="px-3 py-2 text-sm font-medium text-gray-700 hover:text-[color:var(--color-primary-600)]">My Profile</a>
                     <a href="{{ url_for('auth.logout') }}" class="px-3 py-2 text-sm font-medium text-gray-700 hover:text-[color:var(--color-primary-600)]">Logout</a>
                 {% else %}
@@ -129,6 +130,7 @@
                     <a href="{{ url_for('admin.index') }}" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">Admin</a>
                 {% endif %}
                 {% if session.get('user_id') %}
+                    <a href="{{ url_for('metrics.my_metrics') }}" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">My Performance</a>
                     <a href="{{ url_for('profile.index', user_id=session.get('user_id')) }}" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">My Profile</a>
                     <a href="{{ url_for('auth.logout') }}" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">Logout</a>
                 {% else %}

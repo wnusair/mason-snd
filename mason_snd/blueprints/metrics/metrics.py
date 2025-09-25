@@ -1398,6 +1398,327 @@ def download_tournaments():
         mimetype="text/csv",
         headers={"Content-disposition": "attachment; filename=tournaments_overview.csv"})
 
+# USER-FACING METRICS ROUTES
+# Routes accessible to all logged-in users to view their own metrics
+
+@metrics_bp.route('/my_metrics')
+def my_metrics():
+    """User's personal metrics dashboard"""
+    user_id = session.get('user_id')
+    if not user_id:
+        flash("Log in first!")
+        return redirect(url_for('auth.login'))
+    
+    user = User.query.get_or_404(user_id)
+    tournament_weight, effort_weight = get_point_weights()
+    
+    # Get user's tournament performances
+    performances = Tournament_Performance.query.filter_by(user_id=user_id)\
+        .join(Tournament).order_by(Tournament.date.desc()).all()
+    
+    # Calculate basic stats
+    total_tournaments = len(performances)
+    total_tournament_points = user.tournament_points or 0
+    total_effort_points = user.effort_points or 0
+    total_points = total_tournament_points + total_effort_points
+    weighted_points = total_tournament_points * tournament_weight + total_effort_points * effort_weight
+    total_bids = sum(1 for p in performances if p.bid)
+    
+    # Performance statistics
+    if performances:
+        points_list = [p.points or 0 for p in performances]
+        avg_points = sum(points_list) / len(points_list)
+        best_performance = max(points_list)
+        recent_avg = sum(points_list[:5]) / min(5, len(points_list))  # Last 5 tournaments
+        bid_rate = (total_bids / total_tournaments * 100) if total_tournaments > 0 else 0
+    else:
+        avg_points = best_performance = recent_avg = bid_rate = 0
+    
+    # Calculate user ranking (without revealing other users' data)
+    # Count users with higher weighted points
+    users_with_tournament_points = db.session.query(User.id).join(Tournament_Performance).distinct().subquery()
+    users_with_effort_points = db.session.query(User.id).join(Effort_Score, User.id == Effort_Score.user_id).distinct().subquery()
+    
+    all_active_users = User.query.filter(
+        or_(
+            User.id.in_(db.session.query(users_with_tournament_points.c.id)),
+            User.id.in_(db.session.query(users_with_effort_points.c.id))
+        )
+    ).all()
+    
+    user_rank = 1
+    total_active_users = len(all_active_users)
+    for other_user in all_active_users:
+        other_weighted = (other_user.tournament_points or 0) * tournament_weight + (other_user.effort_points or 0) * effort_weight
+        if other_weighted > weighted_points:
+            user_rank += 1
+    
+    # Recent tournaments (last 6 months)
+    six_months_ago = datetime.now(EST) - timedelta(days=180)
+    recent_performances = []
+    for p in performances:
+        tournament_date = p.tournament.date
+        if tournament_date.tzinfo is None:
+            tournament_date = EST.localize(tournament_date)
+        if tournament_date >= six_months_ago:
+            recent_performances.append(p)
+    
+    # Event breakdown
+    from mason_snd.models.events import User_Event
+    user_events = User_Event.query.filter_by(user_id=user_id, active=True).all()
+    event_stats = []
+    
+    for ue in user_events:
+        event = ue.event
+        event_performances = [p for p in performances if any(
+            signup.event_id == event.id for signup in Tournament_Signups.query.filter_by(
+                user_id=user_id, tournament_id=p.tournament_id, is_going=True
+            ).all()
+        )]
+        
+        if event_performances:
+            event_points = [p.points or 0 for p in event_performances]
+            event_bids = sum(1 for p in event_performances if p.bid)
+            event_stats.append({
+                'event': event,
+                'tournaments': len(event_performances),
+                'avg_points': sum(event_points) / len(event_points),
+                'total_points': sum(event_points),
+                'bids': event_bids,
+                'bid_rate': (event_bids / len(event_performances) * 100) if event_performances else 0
+            })
+    
+    event_stats.sort(key=lambda x: x['avg_points'], reverse=True)
+    
+    stats = {
+        'total_tournaments': total_tournaments,
+        'total_points': total_points,
+        'tournament_points': total_tournament_points,
+        'effort_points': total_effort_points,
+        'weighted_points': round(weighted_points, 2),
+        'total_bids': total_bids,
+        'avg_points': round(avg_points, 2),
+        'best_performance': best_performance,
+        'recent_avg': round(recent_avg, 2),
+        'bid_rate': round(bid_rate, 1),
+        'rank': user_rank,
+        'total_active_users': total_active_users,
+        'recent_tournaments': len(recent_performances)
+    }
+    
+    return render_template('metrics/user_dashboard.html',
+                         user=user,
+                         stats=stats,
+                         performances=performances[:10],  # Show last 10 tournaments
+                         event_stats=event_stats,
+                         settings=MetricsSettings.query.first())
+
+@metrics_bp.route('/my_performance_trends')
+def my_performance_trends():
+    """User's performance trends over time"""
+    user_id = session.get('user_id')
+    if not user_id:
+        flash("Log in first!")
+        return redirect(url_for('auth.login'))
+    
+    user = User.query.get_or_404(user_id)
+    
+    # Get user's tournament performances in chronological order
+    performances = Tournament_Performance.query.filter_by(user_id=user_id)\
+        .join(Tournament).order_by(Tournament.date).all()
+    
+    # Prepare data for charts
+    chart_data = []
+    cumulative_points = 0
+    
+    for p in performances:
+        points = p.points or 0
+        cumulative_points += points
+        tournament_date = p.tournament.date
+        if tournament_date.tzinfo is None:
+            tournament_date = EST.localize(tournament_date)
+        chart_data.append({
+            'tournament': p.tournament.name,
+            'date': tournament_date.strftime('%Y-%m-%d'),
+            'points': points,
+            'cumulative_points': cumulative_points,
+            'bid': p.bid,
+            'rank': p.rank,
+            'stage': p.stage
+        })
+    
+    # Weekly performance analysis
+    weekly_data = {}
+    for p in performances:
+        # Get week start date and handle timezone
+        tournament_date = p.tournament.date
+        if tournament_date.tzinfo is None:
+            tournament_date = EST.localize(tournament_date)
+        week_start = tournament_date - timedelta(days=tournament_date.weekday())
+        week_key = week_start.strftime('%Y-%m-%d')
+        
+        if week_key not in weekly_data:
+            weekly_data[week_key] = {'tournaments': 0, 'total_points': 0, 'bids': 0}
+        
+        weekly_data[week_key]['tournaments'] += 1
+        weekly_data[week_key]['total_points'] += p.points or 0
+        weekly_data[week_key]['bids'] += 1 if p.bid else 0
+    
+    # Calculate moving averages (5-tournament rolling average)
+    moving_averages = []
+    for i in range(len(chart_data)):
+        start_idx = max(0, i - 4)
+        avg_points = sum(d['points'] for d in chart_data[start_idx:i+1]) / (i - start_idx + 1)
+        moving_averages.append(round(avg_points, 2))
+    
+    # Performance trend analysis
+    trend_analysis = {}
+    if len(chart_data) >= 3:
+        recent_tournaments = chart_data[-3:]
+        older_tournaments = chart_data[:-3] if len(chart_data) > 3 else chart_data[:1]
+        
+        recent_avg = sum(t['points'] for t in recent_tournaments) / len(recent_tournaments)
+        older_avg = sum(t['points'] for t in older_tournaments) / len(older_tournaments)
+        
+        if recent_avg > older_avg * 1.1:
+            trend_analysis['direction'] = 'improving'
+            trend_analysis['percentage'] = round(((recent_avg - older_avg) / older_avg) * 100, 1)
+        elif recent_avg < older_avg * 0.9:
+            trend_analysis['direction'] = 'declining'  
+            trend_analysis['percentage'] = round(((older_avg - recent_avg) / older_avg) * 100, 1)
+        else:
+            trend_analysis['direction'] = 'stable'
+            trend_analysis['percentage'] = 0
+    
+    # Chart data for JavaScript
+    chart_labels = [d['tournament'][:20] + '...' if len(d['tournament']) > 20 else d['tournament'] for d in chart_data]
+    chart_points = [d['points'] for d in chart_data]
+    chart_cumulative = [d['cumulative_points'] for d in chart_data]
+    
+    return render_template('metrics/user_trends.html',
+                         user=user,
+                         chart_data=chart_data,
+                         weekly_data=sorted(weekly_data.items()),
+                         trend_analysis=trend_analysis,
+                         moving_averages=moving_averages,
+                         chart_labels=json.dumps(chart_labels),
+                         chart_points=json.dumps(chart_points),
+                         chart_cumulative=json.dumps(chart_cumulative),
+                         chart_moving_avg=json.dumps(moving_averages))
+
+@metrics_bp.route('/my_ranking')
+def my_ranking():
+    """User's ranking information (without revealing others' data)"""
+    user_id = session.get('user_id')
+    if not user_id:
+        flash("Log in first!")
+        return redirect(url_for('auth.login'))
+    
+    user = User.query.get_or_404(user_id)
+    tournament_weight, effort_weight = get_point_weights()
+    
+    # Calculate user's weighted score
+    user_weighted_score = (user.tournament_points or 0) * tournament_weight + (user.effort_points or 0) * effort_weight
+    
+    # Get all users with some activity for ranking
+    users_with_tournament_points = db.session.query(User.id).join(Tournament_Performance).distinct().subquery()
+    users_with_effort_points = db.session.query(User.id).join(Effort_Score, User.id == Effort_Score.user_id).distinct().subquery()
+    
+    all_active_users = User.query.filter(
+        or_(
+            User.id.in_(db.session.query(users_with_tournament_points.c.id)),
+            User.id.in_(db.session.query(users_with_effort_points.c.id))
+        )
+    ).all()
+    
+    # Calculate ranking
+    user_rank = 1
+    total_active_users = len(all_active_users)
+    users_above_me = 0
+    users_below_me = 0
+    
+    for other_user in all_active_users:
+        other_weighted = (other_user.tournament_points or 0) * tournament_weight + (other_user.effort_points or 0) * effort_weight
+        if other_weighted > user_weighted_score:
+            user_rank += 1
+            users_above_me += 1
+        elif other_weighted < user_weighted_score:
+            users_below_me += 1
+    
+    # Calculate percentile
+    percentile = round(((total_active_users - user_rank + 1) / total_active_users) * 100, 1) if total_active_users > 0 else 0
+    
+    # Event-specific rankings
+    from mason_snd.models.events import User_Event
+    user_events = User_Event.query.filter_by(user_id=user_id, active=True).all()
+    event_rankings = []
+    
+    for ue in user_events:
+        event = ue.event
+        # Get all active users in this event
+        event_user_ids = [ue.user_id for ue in User_Event.query.filter_by(event_id=event.id, active=True).all()]
+        event_users = User.query.filter(User.id.in_(event_user_ids)).all()
+        
+        if len(event_users) > 1:  # Only show ranking if there are other users in the event
+            # Calculate user's rank in this event
+            event_rank = 1
+            for other_user in event_users:
+                other_weighted = (other_user.tournament_points or 0) * tournament_weight + (other_user.effort_points or 0) * effort_weight
+                if other_weighted > user_weighted_score:
+                    event_rank += 1
+            
+            event_percentile = round(((len(event_users) - event_rank + 1) / len(event_users)) * 100, 1)
+            
+            event_rankings.append({
+                'event': event,
+                'rank': event_rank,
+                'total_in_event': len(event_users),
+                'percentile': event_percentile
+            })
+    
+    # Recent performance comparison (last 3 months vs previous 3 months)
+    three_months_ago = datetime.now(EST) - timedelta(days=90)
+    six_months_ago = datetime.now(EST) - timedelta(days=180)
+    
+    recent_performances = []
+    older_performances = []
+    
+    for p in Tournament_Performance.query.filter_by(user_id=user_id).join(Tournament).all():
+        tournament_date = p.tournament.date
+        if tournament_date.tzinfo is None:
+            tournament_date = EST.localize(tournament_date)
+        
+        if tournament_date >= three_months_ago:
+            recent_performances.append(p)
+        elif tournament_date >= six_months_ago:
+            older_performances.append(p)
+    
+    recent_avg = sum(p.points or 0 for p in recent_performances) / len(recent_performances) if recent_performances else 0
+    older_avg = sum(p.points or 0 for p in older_performances) / len(older_performances) if older_performances else 0
+    
+    performance_change = {
+        'recent_avg': round(recent_avg, 2),
+        'older_avg': round(older_avg, 2),
+        'change': round(recent_avg - older_avg, 2) if older_avg > 0 else 0,
+        'change_percent': round(((recent_avg - older_avg) / older_avg) * 100, 1) if older_avg > 0 else 0
+    }
+    
+    ranking_data = {
+        'rank': user_rank,
+        'total_active_users': total_active_users,
+        'percentile': percentile,
+        'users_above_me': users_above_me,
+        'users_below_me': users_below_me,
+        'weighted_score': round(user_weighted_score, 2),
+        'performance_change': performance_change
+    }
+    
+    return render_template('metrics/user_ranking.html',
+                         user=user,
+                         ranking_data=ranking_data,
+                         event_rankings=event_rankings,
+                         settings=MetricsSettings.query.first())
+
 @metrics_bp.route('/download_user_metrics_for_tournament/<int:tournament_id>')
 def download_user_metrics_for_tournament(tournament_id):
     user_id = session.get('user_id')
