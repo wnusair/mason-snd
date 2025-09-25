@@ -180,23 +180,35 @@ class TestDatabaseManager:
     
     def list_test_databases(self):
         """List all existing test databases"""
-        test_db_dir = os.path.join(os.path.dirname(__file__), 'test_databases')
-        if not os.path.exists(test_db_dir):
-            return []
-        
         test_dbs = []
-        for filename in os.listdir(test_db_dir):
-            if filename.startswith('test_db_') and filename.endswith('.sqlite3'):
-                file_path = os.path.join(test_db_dir, filename)
-                stat = os.stat(file_path)
-                test_dbs.append({
-                    'name': filename,
-                    'path': file_path,
-                    'size': stat.st_size,
-                    'created': datetime.fromtimestamp(stat.st_ctime)
-                })
         
-        return sorted(test_dbs, key=lambda x: x['created'], reverse=True)
+        # Check the safety guard's test resources
+        try:
+            safety_report = self.safety_guard.generate_safety_report()
+            test_resources = safety_report.get('test_resources', {})
+            
+            # Get databases from safety guard
+            if 'test_databases' in test_resources:
+                for db_info in test_resources['test_databases']:
+                    test_dbs.append(db_info['name'])
+            
+            # Also check temporary directories for active test databases
+            import tempfile
+            temp_dir = tempfile.gettempdir()
+            
+            for item in os.listdir(temp_dir):
+                if item.startswith('mason_test_'):
+                    test_dir = os.path.join(temp_dir, item)
+                    if os.path.isdir(test_dir):
+                        for db_file in os.listdir(test_dir):
+                            if db_file.endswith('.db'):
+                                test_dbs.append(db_file)
+                                
+        except Exception as e:
+            print(f"Error listing test databases: {e}")
+            
+        # Remove duplicates and return
+        return list(set(test_dbs))
 
 class TestAppConfig:
     """Configuration manager for test environment"""

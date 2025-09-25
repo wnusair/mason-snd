@@ -1,0 +1,873 @@
+{% extends "admin/base.html" %}
+{% block title %}Testing Dashboard{% endblock %}
+{% block content %}
+<div class="py-8 px-4 sm:px-6 lg:px-8">
+    <div class="max-w-7xl mx-auto">
+        <!-- Header -->
+        <div class="mb-8">
+            <h1 class="text-3xl font-bold text-gray-900 mb-2">🧪 Testing Dashboard</h1>
+            <p class="text-gray-600">Comprehensive testing and simulation tools for Mason Speech & Debate</p>
+        </div>
+
+        <!-- Quick Status Cards -->
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+            <div class="bg-white p-6 rounded-lg shadow border-l-4 border-green-500">
+                <div class="text-sm font-medium text-green-600 uppercase tracking-wide">Production Safety</div>
+                <div class="mt-2 text-3xl font-bold text-gray-900" id="safety-status">✅ Safe</div>
+            </div>
+            <div class="bg-white p-6 rounded-lg shadow border-l-4 border-blue-500">
+                <div class="text-sm font-medium text-blue-600 uppercase tracking-wide">Test Databases</div>
+                <div class="mt-2 text-3xl font-bold text-gray-900" id="test-db-count">0</div>
+            </div>
+            <div class="bg-white p-6 rounded-lg shadow border-l-4 border-purple-500">
+                <div class="text-sm font-medium text-purple-600 uppercase tracking-wide">Last Test Run</div>
+                <div class="mt-2 text-lg font-bold text-gray-900" id="last-test-time">Never</div>
+            </div>
+            <div class="bg-white p-6 rounded-lg shadow border-l-4 border-orange-500">
+                <div class="text-sm font-medium text-orange-600 uppercase tracking-wide">Success Rate</div>
+                <div class="mt-2 text-3xl font-bold text-gray-900" id="success-rate">---%</div>
+            </div>
+        </div>
+
+        <!-- Main Testing Sections -->
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
+            <!-- Unit Testing Panel -->
+            <div class="bg-white shadow rounded-lg p-6">
+                <div class="flex items-center justify-between mb-4">
+                    <h2 class="text-xl font-semibold text-gray-900">🔧 Unit Tests</h2>
+                    <span class="px-2 py-1 text-xs font-medium bg-green-100 text-green-800 rounded-full">Live</span>
+                </div>
+                <p class="text-gray-600 mb-6">Run automated tests to verify core functionality</p>
+                
+                <div class="grid grid-cols-2 gap-3 mb-6">
+                    <button onclick="runUnitTests('all')" class="btn-test bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-md transition duration-150 ease-in-out">
+                        All Tests
+                    </button>
+                    <button onclick="runUnitTests('auth')" class="btn-test bg-gray-600 hover:bg-gray-700 text-white font-medium py-2 px-4 rounded-md transition duration-150 ease-in-out">
+                        Authentication
+                    </button>
+                    <button onclick="runUnitTests('events')" class="btn-test bg-gray-600 hover:bg-gray-700 text-white font-medium py-2 px-4 rounded-md transition duration-150 ease-in-out">
+                        Events
+                    </button>
+                    <button onclick="runUnitTests('tournaments')" class="btn-test bg-gray-600 hover:bg-gray-700 text-white font-medium py-2 px-4 rounded-md transition duration-150 ease-in-out">
+                        Tournaments
+                    </button>
+                </div>
+
+                <!-- Test Progress -->
+                <div id="test-progress" class="hidden mb-4">
+                    <div class="w-full bg-gray-200 rounded-full h-2.5">
+                        <div id="test-progress-bar" class="bg-blue-600 h-2.5 rounded-full transition-all duration-300" style="width: 0%"></div>
+                    </div>
+                    <p id="test-progress-text" class="text-sm text-gray-600 mt-2">Running tests...</p>
+                </div>
+
+                <!-- Test Results Summary -->
+                <div id="test-results" class="hidden">
+                    <div class="grid grid-cols-4 gap-2 text-center">
+                        <div class="bg-gray-50 p-2 rounded">
+                            <div id="total-tests" class="text-lg font-bold text-gray-900">0</div>
+                            <div class="text-xs text-gray-500">Total</div>
+                        </div>
+                        <div class="bg-green-50 p-2 rounded">
+                            <div id="passed-tests" class="text-lg font-bold text-green-600">0</div>
+                            <div class="text-xs text-gray-500">Passed</div>
+                        </div>
+                        <div class="bg-red-50 p-2 rounded">
+                            <div id="failed-tests" class="text-lg font-bold text-red-600">0</div>
+                            <div class="text-xs text-gray-500">Failed</div>
+                        </div>
+                        <div class="bg-yellow-50 p-2 rounded">
+                            <div id="error-tests" class="text-lg font-bold text-yellow-600">0</div>
+                            <div class="text-xs text-gray-500">Errors</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Simulation Panel -->
+            <div class="bg-white shadow rounded-lg p-6">
+                <div class="flex items-center justify-between mb-4">
+                    <h2 class="text-xl font-semibold text-gray-900">🏆 Tournament Simulation</h2>
+                    <span class="px-2 py-1 text-xs font-medium bg-orange-100 text-orange-800 rounded-full">Beta</span>
+                </div>
+                <p class="text-gray-600 mb-6">Create and simulate complete tournament scenarios</p>
+                
+                <!-- Simulation Configuration -->
+                <div class="space-y-4 mb-6">
+                    <div class="grid grid-cols-3 gap-3">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Users</label>
+                            <input type="number" id="sim-users" value="30" min="5" max="100" class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Events</label>
+                            <input type="number" id="sim-events" value="5" min="1" max="20" class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Tournaments</label>
+                            <input type="number" id="sim-tournaments" value="2" min="1" max="10" class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500">
+                        </div>
+                    </div>
+                    
+                    <!-- Quick Presets -->
+                    <div class="flex space-x-2">
+                        <button onclick="setSimulationPreset('small')" class="flex-1 px-3 py-2 text-xs font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-md transition duration-150 ease-in-out">
+                            Small (15/3/1)
+                        </button>
+                        <button onclick="setSimulationPreset('medium')" class="flex-1 px-3 py-2 text-xs font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-md transition duration-150 ease-in-out">
+                            Medium (30/5/2)
+                        </button>
+                        <button onclick="setSimulationPreset('large')" class="flex-1 px-3 py-2 text-xs font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-md transition duration-150 ease-in-out">
+                            Large (60/8/3)
+                        </button>
+                    </div>
+                </div>
+
+                <button onclick="startSimulation()" id="start-simulation" class="w-full bg-orange-600 hover:bg-orange-700 text-white font-medium py-3 px-4 rounded-md transition duration-150 ease-in-out">
+                    🚀 Start Tournament Simulation
+                </button>
+
+                <!-- Simulation Progress -->
+                <div id="simulation-progress" class="hidden mt-4">
+                    <div class="w-full bg-gray-200 rounded-full h-2.5">
+                        <div id="simulation-progress-bar" class="bg-orange-600 h-2.5 rounded-full transition-all duration-300" style="width: 0%"></div>
+                    </div>
+                    <p id="simulation-progress-text" class="text-sm text-gray-600 mt-2">Initializing simulation...</p>
+                </div>
+
+                <!-- Simulation Results -->
+                <div id="simulation-results" class="hidden mt-4">
+                    <div class="grid grid-cols-2 gap-2 text-center">
+                        <div class="bg-blue-50 p-2 rounded">
+                            <div id="sim-users-created" class="text-lg font-bold text-blue-600">0</div>
+                            <div class="text-xs text-gray-500">Users Created</div>
+                        </div>
+                        <div class="bg-green-50 p-2 rounded">
+                            <div id="sim-events-created" class="text-lg font-bold text-green-600">0</div>
+                            <div class="text-xs text-gray-500">Events Created</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Advanced Simulation Features -->
+        <div class="bg-white shadow rounded-lg p-6 mb-8">
+            <h2 class="text-xl font-semibold text-gray-900 mb-4">🎯 Advanced Simulation Features</h2>
+            <p class="text-gray-600 mb-6">Complete workflow simulation as outlined in your requirements</p>
+            
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                <button onclick="startWorkflowSimulation('full')" class="flex flex-col items-center p-4 border-2 border-gray-200 rounded-lg hover:border-blue-500 hover:bg-blue-50 transition duration-150 ease-in-out">
+                    <div class="text-2xl mb-2">🎭</div>
+                    <div class="text-sm font-medium text-gray-900">Full Workflow</div>
+                    <div class="text-xs text-gray-500 text-center">Complete simulation from user creation to metrics</div>
+                </button>
+                
+                <button onclick="startWorkflowSimulation('events')" class="flex flex-col items-center p-4 border-2 border-gray-200 rounded-lg hover:border-green-500 hover:bg-green-50 transition duration-150 ease-in-out">
+                    <div class="text-2xl mb-2">📅</div>
+                    <div class="text-sm font-medium text-gray-900">Event Creation</div>
+                    <div class="text-xs text-gray-500 text-center">Create events and simulate user joining/leaving</div>
+                </button>
+                
+                <button onclick="startWorkflowSimulation('rosters')" class="flex flex-col items-center p-4 border-2 border-gray-200 rounded-lg hover:border-purple-500 hover:bg-purple-50 transition duration-150 ease-in-out">
+                    <div class="text-2xl mb-2">📊</div>
+                    <div class="text-sm font-medium text-gray-900">Roster Testing</div>
+                    <div class="text-xs text-gray-500 text-center">Download/upload roster functionality</div>
+                </button>
+                
+                <button onclick="startWorkflowSimulation('metrics')" class="flex flex-col items-center p-4 border-2 border-gray-200 rounded-lg hover:border-orange-500 hover:bg-orange-50 transition duration-150 ease-in-out">
+                    <div class="text-2xl mb-2">📈</div>
+                    <div class="text-sm font-medium text-gray-900">Metrics Dashboard</div>
+                    <div class="text-xs text-gray-500 text-center">Test metrics overview and user views</div>
+                </button>
+            </div>
+
+            <!-- Workflow Progress -->
+            <div id="workflow-progress" class="hidden mt-6">
+                <div class="w-full bg-gray-200 rounded-full h-3">
+                    <div id="workflow-progress-bar" class="bg-gradient-to-r from-blue-500 to-purple-600 h-3 rounded-full transition-all duration-500" style="width: 0%"></div>
+                </div>
+                <div class="flex justify-between items-center mt-2">
+                    <p id="workflow-progress-text" class="text-sm text-gray-600">Initializing workflow...</p>
+                    <span id="workflow-step" class="text-xs text-gray-500">Step 1/8</span>
+                </div>
+            </div>
+
+            <!-- Workflow Results -->
+            <div id="workflow-results" class="hidden mt-6">
+                <div class="bg-gray-50 rounded-lg p-4">
+                    <h3 class="text-lg font-medium text-gray-900 mb-3">Workflow Results</h3>
+                    <div id="workflow-summary" class="space-y-2"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Database Management & Cleanup -->
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+            <!-- Database Management -->
+            <div class="bg-white shadow rounded-lg p-6">
+                <h2 class="text-xl font-semibold text-gray-900 mb-4">🗄️ Database Management</h2>
+                <p class="text-gray-600 mb-6">Manage test databases and ensure production safety</p>
+                
+                <div class="space-y-3">
+                    <button onclick="listTestDatabases()" class="w-full bg-gray-600 hover:bg-gray-700 text-white font-medium py-2 px-4 rounded-md transition duration-150 ease-in-out">
+                        📋 List Test Databases
+                    </button>
+                    <button onclick="createTestSnapshot()" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-md transition duration-150 ease-in-out">
+                        📸 Create Test Snapshot
+                    </button>
+                    <button onclick="cleanupTestData()" class="w-full bg-red-600 hover:bg-red-700 text-white font-medium py-2 px-4 rounded-md transition duration-150 ease-in-out">
+                        🗑️ Emergency Cleanup
+                    </button>
+                </div>
+
+                <div id="database-info" class="mt-4 hidden">
+                    <div class="bg-gray-50 rounded-lg p-3">
+                        <h4 class="font-medium text-gray-900 mb-2">Database Status</h4>
+                        <div id="database-list" class="text-sm text-gray-600"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- System Verification -->
+            <div class="bg-white shadow rounded-lg p-6">
+                <h2 class="text-xl font-semibold text-gray-900 mb-4">✅ System Verification</h2>
+                <p class="text-gray-600 mb-6">Verify system integrity and production readiness</p>
+                
+                <div class="space-y-3">
+                    <button onclick="runQuickVerification()" class="w-full bg-green-600 hover:bg-green-700 text-white font-medium py-2 px-4 rounded-md transition duration-150 ease-in-out">
+                        ⚡ Quick Verification
+                    </button>
+                    <button onclick="runFullVerification()" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-md transition duration-150 ease-in-out">
+                        🔍 Full System Check
+                    </button>
+                    <button onclick="generateReport()" class="w-full bg-purple-600 hover:bg-purple-700 text-white font-medium py-2 px-4 rounded-md transition duration-150 ease-in-out">
+                        📊 Generate Report
+                    </button>
+                </div>
+
+                <div id="verification-results" class="mt-4 hidden">
+                    <div class="bg-gray-50 rounded-lg p-3">
+                        <h4 class="font-medium text-gray-900 mb-2">Verification Status</h4>
+                        <div id="verification-summary" class="text-sm text-gray-600"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Activity Log -->
+        <div class="mt-8 bg-white shadow rounded-lg p-6">
+            <h2 class="text-xl font-semibold text-gray-900 mb-4">📝 Activity Log</h2>
+            <div id="activity-log" class="space-y-2 max-h-64 overflow-y-auto">
+                <div class="text-sm text-gray-500 italic">No recent activity</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Success/Error Messages -->
+<div id="flash-messages" class="fixed top-4 right-4 z-50 space-y-2"></div>
+
+<script>
+// Global variables
+let currentSessionId = null;
+let currentWorkflowId = null;
+let pollInterval = null;
+
+// CSRF Token
+const csrfToken = '{{ csrf_token() }}';
+
+// Utility Functions
+function showMessage(message, type = 'info') {
+    const container = document.getElementById('flash-messages');
+    const alert = document.createElement('div');
+    
+    const bgColor = type === 'success' ? 'bg-green-100 border-green-500 text-green-700' :
+                   type === 'error' ? 'bg-red-100 border-red-500 text-red-700' :
+                   type === 'warning' ? 'bg-yellow-100 border-yellow-500 text-yellow-700' :
+                   'bg-blue-100 border-blue-500 text-blue-700';
+    
+    alert.className = `border-l-4 p-4 rounded-md shadow-lg ${bgColor} max-w-sm`;
+    alert.innerHTML = `
+        <div class="flex">
+            <div class="flex-1">
+                <p class="text-sm font-medium">${message}</p>
+            </div>
+            <div class="ml-4">
+                <button onclick="this.parentElement.parentElement.parentElement.remove()" class="inline-flex text-gray-400 hover:text-gray-600">
+                    <span class="sr-only">Close</span>
+                    <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                        <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"></path>
+                    </svg>
+                </button>
+            </div>
+        </div>
+    `;
+    
+    container.appendChild(alert);
+    
+    // Auto-remove after 5 seconds
+    setTimeout(() => {
+        if (alert.parentNode) {
+            alert.parentNode.removeChild(alert);
+        }
+    }, 5000);
+    
+    // Add to activity log
+    addToActivityLog(message, type);
+}
+
+function addToActivityLog(message, type = 'info') {
+    const log = document.getElementById('activity-log');
+    const timestamp = new Date().toLocaleTimeString();
+    
+    const logEntry = document.createElement('div');
+    logEntry.className = 'text-sm text-gray-600 border-l-2 border-gray-200 pl-3';
+    logEntry.innerHTML = `<span class="text-gray-400">${timestamp}</span> - ${message}`;
+    
+    // Remove the "No recent activity" message if it exists
+    const noActivity = log.querySelector('.italic');
+    if (noActivity) {
+        noActivity.remove();
+    }
+    
+    log.insertBefore(logEntry, log.firstChild);
+    
+    // Keep only last 10 entries
+    while (log.children.length > 10) {
+        log.removeChild(log.lastChild);
+    }
+}
+
+function disableTestButtons() {
+    document.querySelectorAll('.btn-test').forEach(btn => btn.disabled = true);
+}
+
+function enableTestButtons() {
+    document.querySelectorAll('.btn-test').forEach(btn => btn.disabled = false);
+}
+
+// Unit Testing Functions
+function runUnitTests(testType) {
+    if (currentSessionId) {
+        showMessage('Tests are already running. Please wait...', 'warning');
+        return;
+    }
+    
+    disableTestButtons();
+    showTestProgress();
+    updateTestProgress(0, 'Initializing tests...');
+    
+    fetch('/admin/testing/run_tests', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': csrfToken
+        },
+        body: JSON.stringify({ test_type: testType })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.error) {
+            throw new Error(data.error);
+        }
+        
+        currentSessionId = data.session_id;
+        showMessage(`Started ${testType} tests...`, 'info');
+        
+        // Start polling for status
+        pollInterval = setInterval(pollTestStatus, 1000);
+    })
+    .catch(error => {
+        hideTestProgress();
+        enableTestButtons();
+        showMessage(`Failed to start tests: ${error.message}`, 'error');
+    });
+}
+
+function showTestProgress() {
+    document.getElementById('test-progress').classList.remove('hidden');
+    document.getElementById('test-results').classList.add('hidden');
+}
+
+function hideTestProgress() {
+    document.getElementById('test-progress').classList.add('hidden');
+}
+
+function updateTestProgress(percentage, text) {
+    document.getElementById('test-progress-bar').style.width = percentage + '%';
+    document.getElementById('test-progress-text').textContent = text;
+}
+
+function pollTestStatus() {
+    if (!currentSessionId) return;
+    
+    fetch(`/admin/testing/test_status/${currentSessionId}`)
+        .then(response => response.json())
+        .then(data => {
+            updateTestProgress(data.progress, `Running tests... ${data.progress}%`);
+            
+            if (data.status === 'completed') {
+                clearInterval(pollInterval);
+                hideTestProgress();
+                enableTestButtons();
+                displayTestResults(data.results);
+                currentSessionId = null;
+            } else if (data.status === 'error') {
+                clearInterval(pollInterval);
+                hideTestProgress();
+                enableTestButtons();
+                showMessage('Test execution failed', 'error');
+                currentSessionId = null;
+            }
+        })
+        .catch(error => {
+            clearInterval(pollInterval);
+            hideTestProgress();
+            enableTestButtons();
+            showMessage('Error checking test status', 'error');
+            currentSessionId = null;
+        });
+}
+
+function displayTestResults(results) {
+    if (results.error) {
+        showMessage(`Test execution failed: ${results.error}`, 'error');
+        return;
+    }
+    
+    const summary = results.summary;
+    document.getElementById('total-tests').textContent = summary.total || 0;
+    document.getElementById('passed-tests').textContent = summary.passed || 0;
+    document.getElementById('failed-tests').textContent = summary.failed || 0;
+    document.getElementById('error-tests').textContent = summary.errors || 0;
+    
+    document.getElementById('test-results').classList.remove('hidden');
+    
+    // Update success rate
+    const successRate = summary.total > 0 ? ((summary.passed / summary.total) * 100).toFixed(1) : 0;
+    document.getElementById('success-rate').textContent = successRate + '%';
+    
+    if (summary.failed === 0 && summary.errors === 0) {
+        showMessage('All tests passed successfully! ✅', 'success');
+    } else {
+        showMessage(`Tests completed with ${summary.failed} failures and ${summary.errors} errors`, 'error');
+    }
+}
+
+// Simulation Functions
+function setSimulationPreset(preset) {
+    const presets = {
+        small: { users: 15, events: 3, tournaments: 1 },
+        medium: { users: 30, events: 5, tournaments: 2 },
+        large: { users: 60, events: 8, tournaments: 3 }
+    };
+    
+    const config = presets[preset];
+    document.getElementById('sim-users').value = config.users;
+    document.getElementById('sim-events').value = config.events;
+    document.getElementById('sim-tournaments').value = config.tournaments;
+    
+    showMessage(`Applied ${preset} preset configuration`, 'info');
+}
+
+function startSimulation() {
+    const users = parseInt(document.getElementById('sim-users').value);
+    const events = parseInt(document.getElementById('sim-events').value);
+    const tournaments = parseInt(document.getElementById('sim-tournaments').value);
+    
+    if (users < 5 || events < 1 || tournaments < 1) {
+        showMessage('Please ensure all values are within valid ranges', 'error');
+        return;
+    }
+    
+    document.getElementById('start-simulation').disabled = true;
+    showSimulationProgress();
+    updateSimulationProgress(0, 'Initializing simulation...');
+    
+    fetch('/admin/testing/start_simulation', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': csrfToken
+        },
+        body: JSON.stringify({
+            num_users: users,
+            num_events: events,
+            num_tournaments: tournaments
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.error) {
+            throw new Error(data.error);
+        }
+        
+        currentSessionId = data.session_id;
+        showMessage('Tournament simulation started...', 'info');
+        
+        // Start polling for status
+        pollInterval = setInterval(pollSimulationStatus, 1000);
+    })
+    .catch(error => {
+        hideSimulationProgress();
+        document.getElementById('start-simulation').disabled = false;
+        showMessage(`Failed to start simulation: ${error.message}`, 'error');
+    });
+}
+
+function showSimulationProgress() {
+    document.getElementById('simulation-progress').classList.remove('hidden');
+    document.getElementById('simulation-results').classList.add('hidden');
+}
+
+function hideSimulationProgress() {
+    document.getElementById('simulation-progress').classList.add('hidden');
+    document.getElementById('start-simulation').disabled = false;
+}
+
+function updateSimulationProgress(percentage, text) {
+    document.getElementById('simulation-progress-bar').style.width = percentage + '%';
+    document.getElementById('simulation-progress-text').textContent = text;
+}
+
+function pollSimulationStatus() {
+    if (!currentSessionId) return;
+    
+    fetch(`/admin/testing/simulation_status/${currentSessionId}`)
+        .then(response => response.json())
+        .then(data => {
+            updateSimulationProgress(data.progress, `Running simulation... ${data.progress}%`);
+            
+            if (data.status === 'completed') {
+                clearInterval(pollInterval);
+                hideSimulationProgress();
+                displaySimulationResults(data.results);
+                currentSessionId = null;
+            } else if (data.status === 'error') {
+                clearInterval(pollInterval);
+                hideSimulationProgress();
+                showMessage('Simulation failed', 'error');
+                currentSessionId = null;
+            }
+        })
+        .catch(error => {
+            clearInterval(pollInterval);
+            hideSimulationProgress();
+            showMessage('Error checking simulation status', 'error');
+            currentSessionId = null;
+        });
+}
+
+function displaySimulationResults(results) {
+    if (results.error) {
+        showMessage(`Simulation failed: ${results.error}`, 'error');
+        return;
+    }
+    
+    const summary = results.summary;
+    document.getElementById('sim-users-created').textContent = summary.users_created || 0;
+    document.getElementById('sim-events-created').textContent = summary.events_created || 0;
+    
+    document.getElementById('simulation-results').classList.remove('hidden');
+    showMessage('Tournament simulation completed successfully! ✅', 'success');
+}
+
+// Workflow Simulation Functions
+function startWorkflowSimulation(type) {
+    if (currentWorkflowId) {
+        showMessage('Workflow simulation is already running. Please wait...', 'warning');
+        return;
+    }
+    
+    showWorkflowProgress();
+    updateWorkflowProgress(0, 'Initializing workflow simulation...', '1/8');
+    
+    fetch('/admin/testing/start_workflow', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': csrfToken
+        },
+        body: JSON.stringify({ workflow_type: type })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.error) {
+            throw new Error(data.error);
+        }
+        
+        currentWorkflowId = data.workflow_id;
+        showMessage(`Started ${type} workflow simulation...`, 'info');
+        
+        // Start polling for workflow status
+        pollInterval = setInterval(pollWorkflowStatus, 1500);
+    })
+    .catch(error => {
+        hideWorkflowProgress();
+        showMessage(`Failed to start workflow: ${error.message}`, 'error');
+    });
+}
+
+function showWorkflowProgress() {
+    document.getElementById('workflow-progress').classList.remove('hidden');
+    document.getElementById('workflow-results').classList.add('hidden');
+}
+
+function hideWorkflowProgress() {
+    document.getElementById('workflow-progress').classList.add('hidden');
+}
+
+function updateWorkflowProgress(percentage, text, step) {
+    document.getElementById('workflow-progress-bar').style.width = percentage + '%';
+    document.getElementById('workflow-progress-text').textContent = text;
+    document.getElementById('workflow-step').textContent = step;
+}
+
+function pollWorkflowStatus() {
+    if (!currentWorkflowId) return;
+    
+    fetch(`/admin/testing/workflow_status/${currentWorkflowId}`)
+        .then(response => response.json())
+        .then(data => {
+            updateWorkflowProgress(data.progress, data.current_step, `Step ${data.step}/8`);
+            
+            if (data.status === 'completed') {
+                clearInterval(pollInterval);
+                hideWorkflowProgress();
+                displayWorkflowResults(data.results);
+                currentWorkflowId = null;
+            } else if (data.status === 'error') {
+                clearInterval(pollInterval);
+                hideWorkflowProgress();
+                showMessage('Workflow simulation failed', 'error');
+                currentWorkflowId = null;
+            }
+        })
+        .catch(error => {
+            clearInterval(pollInterval);
+            hideWorkflowProgress();
+            showMessage('Error checking workflow status', 'error');
+            currentWorkflowId = null;
+        });
+}
+
+function displayWorkflowResults(results) {
+    if (results.error) {
+        showMessage(`Workflow failed: ${results.error}`, 'error');
+        return;
+    }
+    
+    const summaryDiv = document.getElementById('workflow-summary');
+    summaryDiv.innerHTML = '';
+    
+    // Display workflow summary
+    Object.entries(results.summary || {}).forEach(([key, value]) => {
+        const item = document.createElement('div');
+        item.className = 'flex justify-between text-sm';
+        item.innerHTML = `<span class="text-gray-600">${key}:</span><span class="font-medium">${value}</span>`;
+        summaryDiv.appendChild(item);
+    });
+    
+    document.getElementById('workflow-results').classList.remove('hidden');
+    showMessage('Workflow simulation completed successfully! ✅', 'success');
+}
+
+// Database Management Functions
+function listTestDatabases() {
+    fetch('/admin/testing/list_databases')
+        .then(response => response.json())
+        .then(data => {
+            const infoDiv = document.getElementById('database-info');
+            const listDiv = document.getElementById('database-list');
+            
+            if (data.databases && data.databases.length > 0) {
+                listDiv.innerHTML = data.databases.map(db => `<div class="py-1">${db}</div>`).join('');
+            } else {
+                listDiv.innerHTML = '<div class="py-1 italic">No test databases found</div>';
+            }
+            
+            infoDiv.classList.remove('hidden');
+            document.getElementById('test-db-count').textContent = data.databases ? data.databases.length : 0;
+            showMessage(`Found ${data.databases ? data.databases.length : 0} test databases`, 'info');
+        })
+        .catch(error => {
+            showMessage('Failed to list databases', 'error');
+        });
+}
+
+function createTestSnapshot() {
+    fetch('/admin/testing/create_snapshot', {
+        method: 'POST',
+        headers: {
+            'X-CSRFToken': csrfToken
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            showMessage('Test snapshot created successfully', 'success');
+        } else {
+            showMessage('Failed to create snapshot', 'error');
+        }
+    })
+    .catch(error => {
+        showMessage('Failed to create snapshot', 'error');
+    });
+}
+
+function cleanupTestData() {
+    if (!confirm('Are you sure you want to clean up all test data? This action cannot be undone.')) {
+        return;
+    }
+    
+    fetch('/admin/testing/cleanup', {
+        method: 'POST',
+        headers: {
+            'X-CSRFToken': csrfToken
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            showMessage('Test data cleaned up successfully', 'success');
+            document.getElementById('test-db-count').textContent = '0';
+            document.getElementById('database-info').classList.add('hidden');
+        } else {
+            showMessage('Failed to cleanup test data', 'error');
+        }
+    })
+    .catch(error => {
+        showMessage('Failed to cleanup test data', 'error');
+    });
+}
+
+// System Verification Functions
+function runQuickVerification() {
+    showMessage('Running quick system verification...', 'info');
+    
+    fetch('/admin/testing/quick_verification', {
+        method: 'POST',
+        headers: {
+            'X-CSRFToken': csrfToken
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        displayVerificationResults(data);
+        if (data.success_rate >= 90) {
+            showMessage(`Quick verification passed! Success rate: ${data.success_rate}%`, 'success');
+        } else {
+            showMessage(`Verification completed with warnings. Success rate: ${data.success_rate}%`, 'warning');
+        }
+    })
+    .catch(error => {
+        showMessage('Verification failed', 'error');
+    });
+}
+
+function runFullVerification() {
+    showMessage('Running full system verification...', 'info');
+    
+    fetch('/admin/testing/full_verification', {
+        method: 'POST',
+        headers: {
+            'X-CSRFToken': csrfToken
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        displayVerificationResults(data);
+        if (data.success_rate >= 95) {
+            showMessage(`Full verification passed! Success rate: ${data.success_rate}%`, 'success');
+        } else {
+            showMessage(`Verification completed with issues. Success rate: ${data.success_rate}%`, 'warning');
+        }
+    })
+    .catch(error => {
+        showMessage('Verification failed', 'error');
+    });
+}
+
+function displayVerificationResults(data) {
+    const resultsDiv = document.getElementById('verification-results');
+    const summaryDiv = document.getElementById('verification-summary');
+    
+    summaryDiv.innerHTML = `
+        <div class="flex justify-between text-sm">
+            <span class="text-gray-600">Success Rate:</span>
+            <span class="font-medium">${data.success_rate || 0}%</span>
+        </div>
+        <div class="flex justify-between text-sm">
+            <span class="text-gray-600">Tests Run:</span>
+            <span class="font-medium">${data.tests_run || 0}</span>
+        </div>
+        <div class="flex justify-between text-sm">
+            <span class="text-gray-600">Issues Found:</span>
+            <span class="font-medium">${data.issues_found || 0}</span>
+        </div>
+    `;
+    
+    resultsDiv.classList.remove('hidden');
+}
+
+function generateReport() {
+    fetch('/admin/testing/generate_report', {
+        method: 'POST',
+        headers: {
+            'X-CSRFToken': csrfToken
+        }
+    })
+    .then(response => {
+        if (response.headers.get('content-type') === 'application/pdf') {
+            return response.blob();
+        } else {
+            return response.json();
+        }
+    })
+    .then(data => {
+        if (data instanceof Blob) {
+            // Download PDF report
+            const url = window.URL.createObjectURL(data);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `testing-report-${new Date().toISOString().split('T')[0]}.pdf`;
+            a.click();
+            window.URL.revokeObjectURL(url);
+            showMessage('Testing report downloaded successfully', 'success');
+        } else if (data.success) {
+            showMessage('Testing report generated successfully', 'success');
+        } else {
+            showMessage('Failed to generate report', 'error');
+        }
+    })
+    .catch(error => {
+        showMessage('Failed to generate report', 'error');
+    });
+}
+
+// Initialize dashboard
+document.addEventListener('DOMContentLoaded', function() {
+    showMessage('Testing dashboard loaded successfully', 'info');
+    
+    // Load initial status
+    fetch('/admin/testing/status')
+        .then(response => response.json())
+        .then(data => {
+            if (data.safety_status) {
+                document.getElementById('safety-status').textContent = data.safety_status === 'SAFE' ? '✅ Safe' : '⚠️ Warning';
+            }
+            if (data.test_db_count !== undefined) {
+                document.getElementById('test-db-count').textContent = data.test_db_count;
+            }
+            if (data.last_test_time) {
+                document.getElementById('last-test-time').textContent = data.last_test_time;
+            }
+        })
+        .catch(error => {
+            console.error('Failed to load initial status:', error);
+        });
+});
+</script>
+{% endblock %}
