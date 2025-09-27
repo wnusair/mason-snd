@@ -13,7 +13,7 @@
                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Type</th>
                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Participants</th>
-                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Current Leader</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Current Leaders</th>
                 </tr>
             </thead>
             <tbody class="bg-white divide-y divide-gray-200">
@@ -56,11 +56,15 @@
                     </td>
 
                     <td class="px-6 py-4 whitespace-nowrap">
-                        {% if event.owner %}
-                        <div class="text-sm font-medium text-gray-900 capitalize">{{ event.owner.first_name }} {{ event.owner.last_name }}</div>
-                        <div class="text-sm text-gray-500">{{ event.owner.email }}</div>
+                        {% if event.leader_users %}
+                        <div class="space-y-1">
+                            {% for leader in event.leader_users %}
+                            <div class="text-sm font-medium text-gray-900 capitalize">{{ leader.first_name }} {{ leader.last_name }}</div>
+                            {% if not loop.last %}<div class="text-xs text-gray-400">•</div>{% endif %}
+                            {% endfor %}
+                        </div>
                         {% else %}
-                        <span class="text-sm text-gray-400 italic">No leader assigned</span>
+                        <span class="text-sm text-gray-400 italic">No leaders assigned</span>
                         {% endif %}
                     </td>
                 </tr>

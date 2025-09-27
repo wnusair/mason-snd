@@ -17,6 +17,23 @@ class Event(db.Model):
     event_type = db.Column(db.Integer) # 0 = speech, 1 = LD, 2 = PF
     is_partner_event = db.Column(db.Boolean, default=False) # True if event requires partners
 
+    # Relationship to multiple leaders
+    leaders = db.relationship('Event_Leader', back_populates='event')
+
+    @property
+    def leader_users(self):
+        """Get all leader users for this event"""
+        return [leader.user for leader in self.leaders]
+
+class Event_Leader(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    
+    event_id = db.Column(db.Integer, db.ForeignKey('event.id'))
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'))
+    
+    event = db.relationship('Event', back_populates='leaders')
+    user = db.relationship('User', foreign_keys=[user_id], backref='event_leaderships')
+
 class User_Event(db.Model):
     id = db.Column(db.Integer, primary_key=True)
 

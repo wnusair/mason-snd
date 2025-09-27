@@ -36,25 +36,30 @@
                     <p class="mt-1 text-sm text-gray-900">{{ event.event_description or 'No description available' }}</p>
                 </div>
                 <div class="md:col-span-2">
-                    <label class="block text-sm font-medium text-gray-700">Current Leader</label>
-                    {% if event.owner %}
-                    <div class="mt-1 flex items-center justify-between">
-                        <div>
-                            <span class="text-sm font-medium text-gray-900 capitalize">{{ event.owner.first_name }} {{ event.owner.last_name }}</span>
-                            <span class="text-sm text-gray-500 ml-2">({{ event.owner.email }})</span>
+                    <label class="block text-sm font-medium text-gray-700">Current Leaders</label>
+                    {% if event.leader_users %}
+                    <div class="mt-1 space-y-2">
+                        {% for leader in event.leader_users %}
+                        <div class="flex items-center justify-between p-2 border border-gray-200 rounded-lg">
+                            <div>
+                                <span class="text-sm font-medium text-gray-900 capitalize">{{ leader.first_name }} {{ leader.last_name }}</span>
+                                <span class="text-sm text-gray-500 ml-2">({{ leader.email }})</span>
+                            </div>
+                            <form method="post" class="inline">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+                                <input type="hidden" name="action" value="remove_leader" />
+                                <input type="hidden" name="leader_id" value="{{ leader.id }}" />
+                                <button type="submit" 
+                                        onclick="return confirm('Are you sure you want to remove this leader?')"
+                                        class="text-red-600 hover:text-red-900 text-sm font-medium">
+                                    Remove
+                                </button>
+                            </form>
                         </div>
-                        <form method="post" class="inline">
-                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
-                            <input type="hidden" name="action" value="remove_leader" />
-                            <button type="submit" 
-                                    onclick="return confirm('Are you sure you want to remove the current leader?')"
-                                    class="text-red-600 hover:text-red-900 text-sm font-medium">
-                                Remove Leader
-                            </button>
-                        </form>
+                        {% endfor %}
                     </div>
                     {% else %}
-                    <span class="mt-1 text-sm text-gray-400 italic">No leader currently assigned</span>
+                    <span class="mt-1 text-sm text-gray-400 italic">No leaders currently assigned</span>
                     {% endif %}
                 </div>
             </div>
@@ -93,7 +98,7 @@
             <h2 class="text-lg font-medium text-gray-900 mb-4">Search Results</h2>
             <form method="post">
                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
-                <input type="hidden" name="action" value="assign_leader" />
+                <input type="hidden" name="action" value="add_leader" />
                 
                 <div class="space-y-3">
                     {% for user, name in search_results %}
@@ -143,7 +148,7 @@
                 <div class="mt-6 flex space-x-3">
                     <button type="submit" 
                             class="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
-                        Assign as Event Leader
+                        Add as Event Leader
                     </button>
                 </div>
             </form>

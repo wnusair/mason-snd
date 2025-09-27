@@ -10,7 +10,7 @@ EST = pytz.timezone('US/Eastern')
 from mason_snd.extensions import db
 from mason_snd.models.auth import User, Judges
 from mason_snd.models.admin import User_Requirements, Requirements, Popups
-from mason_snd.models.events import User_Event, Event
+from mason_snd.models.events import User_Event, Event, Event_Leader
 from mason_snd.models.tournaments import Tournament_Performance, Tournament, Tournament_Signups
 from mason_snd.models.metrics import MetricsSettings
 from mason_snd.models.deletion_utils import (
@@ -408,7 +408,7 @@ def events_management():
     return render_template('admin/events_management.html', events=events, event_stats=event_stats)
 
 
-# Change event leader
+# Manage event leaders
 @admin_bp.route('/change_event_leader/<int:event_id>', methods=['GET', 'POST'])
 def change_event_leader(event_id):
     user_id = session.get('user_id')
@@ -452,36 +452,43 @@ def change_event_leader(event_id):
                                  search_query=search_query,
                                  search_results=search_results)
         
-        elif action == 'assign_leader':
-            # Assign new leader
+        elif action == 'add_leader':
+            # Add new leader
             new_leader_id = request.form.get('new_leader_id')
             if new_leader_id:
-                old_leader = User.query.get(event.owner_id) if event.owner_id else None
                 new_leader = User.query.get(new_leader_id)
                 
                 if new_leader:
-                    event.owner_id = new_leader_id
-                    db.session.commit()
-                    
-                    old_leader_name = f"{old_leader.first_name} {old_leader.last_name}" if old_leader else "None"
-                    new_leader_name = f"{new_leader.first_name} {new_leader.last_name}"
-                    
-                    flash(f'Event leader changed from {old_leader_name} to {new_leader_name}', 'success')
-                    return redirect(url_for('admin.events_management'))
+                    # Check if already a leader
+                    existing = Event_Leader.query.filter_by(event_id=event_id, user_id=new_leader_id).first()
+                    if existing:
+                        flash(f'{new_leader.first_name} {new_leader.last_name} is already an event leader', 'warning')
+                    else:
+                        event_leader = Event_Leader(event_id=event_id, user_id=new_leader_id)
+                        db.session.add(event_leader)
+                        db.session.commit()
+                        flash(f'Added {new_leader.first_name} {new_leader.last_name} as event leader', 'success')
+                        return redirect(url_for('admin.change_event_leader', event_id=event_id))
                 else:
                     flash('Selected user not found', 'error')
             else:
-                flash('Please select a new leader', 'error')
+                flash('Please select a user to add as leader', 'error')
         
         elif action == 'remove_leader':
-            # Remove current leader
-            old_leader = User.query.get(event.owner_id) if event.owner_id else None
-            event.owner_id = None
-            db.session.commit()
-            
-            old_leader_name = f"{old_leader.first_name} {old_leader.last_name}" if old_leader else "None"
-            flash(f'Removed {old_leader_name} as event leader', 'success')
-            return redirect(url_for('admin.events_management'))
+            # Remove a leader
+            leader_id = request.form.get('leader_id')
+            if leader_id:
+                event_leader = Event_Leader.query.filter_by(event_id=event_id, user_id=leader_id).first()
+                if event_leader:
+                    leader_user = event_leader.user
+                    db.session.delete(event_leader)
+                    db.session.commit()
+                    flash(f'Removed {leader_user.first_name} {leader_user.last_name} as event leader', 'success')
+                    return redirect(url_for('admin.change_event_leader', event_id=event_id))
+                else:
+                    flash('Event leader not found', 'error')
+            else:
+                flash('Please select a leader to remove', 'error')
     
     return render_template('admin/change_event_leader.html', event=event)
 
