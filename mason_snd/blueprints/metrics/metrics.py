@@ -7,6 +7,7 @@ from datetime import datetime, timedelta
 from collections import defaultdict, Counter
 
 from flask import Blueprint, render_template, request, redirect, url_for, flash, session, Response, jsonify
+from mason_snd.utils.race_protection import prevent_race_condition
 
 from mason_snd.extensions import db
 from mason_snd.models.auth import User
@@ -1267,6 +1268,7 @@ def events_overview():
                          next_direction=lambda col: next_direction(col, sort, direction))
 
 @metrics_bp.route('/settings', methods=['GET', 'POST'])
+@prevent_race_condition('metrics_settings', min_interval=1.0, redirect_on_duplicate=lambda uid, form: redirect(url_for('metrics.settings')))
 def settings():
     user_id = session.get('user_id')
     user = User.query.filter_by(id=user_id).first()

@@ -12,12 +12,12 @@ from mason_snd.models.tournaments import Tournament, Tournament_Performance, Tou
 from mason_snd.models.events import Event, User_Event, Effort_Score
 from mason_snd.models.metrics import MetricsSettings
 from mason_snd.blueprints.metrics.metrics import get_point_weights
+from mason_snd.utils.race_protection import prevent_race_condition
 
 # Create a new Roster entry
 from mason_snd.models.rosters import Roster, Roster_Competitors, Roster_Judge
 from mason_snd.models.tournaments import Tournament_Judges
 from datetime import datetime
-
 from sqlalchemy import asc, desc, func
 
 from datetime import datetime
@@ -981,6 +981,7 @@ def download_roster(roster_id):
                      mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
 
 @rosters_bp.route('/rename_roster/<int:roster_id>', methods=['GET', 'POST'])
+@prevent_race_condition('rename_roster', min_interval=1.0, redirect_on_duplicate=lambda uid, form: redirect(url_for('rosters.view_roster', roster_id=request.view_args.get('roster_id'))))
 def rename_roster(roster_id):
     """Rename a roster"""
     user_id = session.get('user_id')
@@ -1040,6 +1041,7 @@ def delete_roster(roster_id):
     return redirect(url_for('rosters.index'))
 
 @rosters_bp.route('/upload_roster', methods=['GET', 'POST'])
+@prevent_race_condition('upload_roster', min_interval=2.0, redirect_on_duplicate=lambda uid, form: redirect(url_for('rosters.index')))
 def upload_roster():
     """Upload an Excel file to create a new roster"""
     user_id = session.get('user_id')

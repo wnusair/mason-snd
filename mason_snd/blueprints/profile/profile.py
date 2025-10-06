@@ -6,6 +6,7 @@ from mason_snd.models.admin import User_Requirements, Requirements, Popups
 from mason_snd.models.rosters import Roster
 from mason_snd.models.tournaments import Tournament
 from mason_snd.models.events import Event
+from mason_snd.utils.race_protection import prevent_race_condition
 from datetime import datetime
 import pytz
 
@@ -137,6 +138,7 @@ def index(user_id):
     )
 
 @profile_bp.route('/update', methods=['GET', 'POST'])
+@prevent_race_condition('update_profile', min_interval=1.0, redirect_on_duplicate=lambda uid, form: redirect(url_for('profile.index', user_id=uid.replace('ip_', '') if not uid.startswith('ip_') else session.get('user_id'))))
 def update():
     if not session.get('user_id'):
         return redirect(url_for('auth.login'))
@@ -292,6 +294,7 @@ def update():
     return render_template('profile/update.html', user=user, current_user=user)
 
 @profile_bp.route('/add_judge', methods=['POST', 'GET'])
+@prevent_race_condition('add_judge', min_interval=1.0, redirect_on_duplicate=lambda uid, form: redirect(url_for('profile.index', user_id=session.get('user_id'))))
 def add_judge():
     user_id = session.get('user_id')
     user = User.query.filter_by(id=user_id).first()
@@ -350,6 +353,7 @@ def add_judge():
 
 
 @profile_bp.route('/add_child', methods=['POST', 'GET'])
+@prevent_race_condition('add_child', min_interval=1.0, redirect_on_duplicate=lambda uid, form: redirect(url_for('profile.index', user_id=session.get('user_id'))))
 def add_child():
     user_id = session.get('user_id')
     user = User.query.filter_by(id=user_id).first()

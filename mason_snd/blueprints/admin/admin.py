@@ -19,6 +19,7 @@ from mason_snd.models.deletion_utils import (
     delete_event_safely, delete_multiple_events, get_event_deletion_preview,
     delete_requirement_safely, delete_multiple_requirements, get_requirement_deletion_preview
 )
+from mason_snd.utils.race_protection import prevent_race_condition
 
 from werkzeug.security import generate_password_hash, check_password_hash
 
@@ -49,6 +50,7 @@ def index():
 
 # Requirements management page
 @admin_bp.route('/requirements', methods=['GET', 'POST'])
+@prevent_race_condition('admin_requirements', min_interval=1.0, redirect_on_duplicate=lambda uid, form: redirect(url_for('admin.requirements')))
 def requirements():
     user_id = session.get('user_id')
     if not user_id:
@@ -201,6 +203,7 @@ def requirements():
 
 # Enhanced popup sending: select users, set expiration
 @admin_bp.route('/add_popup', methods=['POST', 'GET'])
+@prevent_race_condition('add_popup', min_interval=1.0, redirect_on_duplicate=lambda uid, form: redirect(url_for('admin.index')))
 def add_popup():
     user_id = session.get('user_id')
     if not user_id:
@@ -242,6 +245,7 @@ def add_popup():
 
 # Admin view of user details
 @admin_bp.route('/user/<int:user_id>', methods=['GET', 'POST'])
+@prevent_race_condition('admin_user_detail', min_interval=1.0, redirect_on_duplicate=lambda uid, form: redirect(url_for('admin.search')))
 def user_detail(user_id):
     user = User.query.get_or_404(user_id)
     user_events = User_Event.query.filter_by(user_id=user_id).all()
@@ -362,6 +366,7 @@ def search():
 
 # Quick add drop penalty from search page
 @admin_bp.route('/add_drop/<int:user_id>', methods=['POST'])
+@prevent_race_condition('add_drop', min_interval=0.5, redirect_on_duplicate=lambda uid, form: redirect(url_for('admin.search')))
 def add_drop(user_id):
     admin_user_id = session.get('user_id')
     if not admin_user_id:
@@ -410,6 +415,7 @@ def events_management():
 
 # Manage event leaders
 @admin_bp.route('/change_event_leader/<int:event_id>', methods=['GET', 'POST'])
+@prevent_race_condition('change_event_leader', min_interval=1.0, redirect_on_duplicate=lambda uid, form: redirect(url_for('admin.index')))
 def change_event_leader(event_id):
     user_id = session.get('user_id')
     if not user_id:
@@ -902,6 +908,7 @@ def delete_tournaments():
     return render_template('admin/delete_tournaments.html', tournaments=tournaments)
 
 @admin_bp.route('/delete_user/<int:user_id>', methods=['POST'])
+@prevent_race_condition('delete_single_user', min_interval=1.0, redirect_on_duplicate=lambda uid, form: redirect(url_for('admin.search')))
 def delete_single_user(user_id):
     """Quick delete for a single user (from user detail page)"""
     current_user_id = session.get('user_id')

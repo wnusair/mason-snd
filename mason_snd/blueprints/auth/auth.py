@@ -5,6 +5,7 @@ from mason_snd.models.auth import User, Judges
 from mason_snd.models.admin import User_Requirements, Requirements
 from mason_snd.models.events import User_Event
 from mason_snd.models.tournaments import Tournament_Judges, Tournaments_Attended, Tournament, Tournament_Performance
+from mason_snd.utils.race_protection import prevent_race_condition
 
 from werkzeug.security import generate_password_hash, check_password_hash
 import datetime
@@ -317,6 +318,7 @@ def create_or_update_judge_relationship(judge_id, child_id):
         print(f"Judge relationship already exists: judge_id={judge_id}, child_id={child_id}")
 
 @auth_bp.route('/register', methods=['GET', 'POST'])
+@prevent_race_condition('registration', min_interval=2.0, redirect_on_duplicate=lambda uid, form: redirect(url_for('auth.login')))
 def register():
     if request.method == 'POST':
         first_name = request.form.get('first_name')

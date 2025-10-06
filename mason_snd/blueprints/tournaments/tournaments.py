@@ -4,6 +4,7 @@ from mason_snd.extensions import db
 from mason_snd.models.auth import User, Judges
 from mason_snd.models.tournaments import Tournament, Tournament_Performance, Tournaments_Attended, Form_Responses, Form_Fields, Tournament_Signups, Tournament_Judges
 from mason_snd.models.events import User_Event, Event
+from mason_snd.utils.race_protection import prevent_race_condition
 
 from werkzeug.security import generate_password_hash, check_password_hash
 
@@ -55,6 +56,7 @@ def index():
 from datetime import datetime
 
 @tournaments_bp.route('/add_tournament', methods=['POST', 'GET'])
+@prevent_race_condition('add_tournament', min_interval=2.0, redirect_on_duplicate=lambda uid, form: redirect(url_for('tournaments.index')))
 def add_tournament():
     user_id = session.get('user_id')
     if not user_id:
@@ -112,6 +114,7 @@ def add_tournament():
     return render_template("tournaments/add_tournament.html")
 
 @tournaments_bp.route('/add_form', methods=['GET', 'POST'])
+@prevent_race_condition('add_form', min_interval=1.5, redirect_on_duplicate=lambda uid, form: redirect(url_for('tournaments.index')))
 def add_form():
     user_id = session.get('user_id')
     if not user_id:
@@ -158,6 +161,7 @@ def add_form():
     return render_template("tournaments/add_form.html", tournaments=tournaments)
 
 @tournaments_bp.route('/signup', methods=['GET', 'POST'])
+@prevent_race_condition('tournament_signup', min_interval=1.5, redirect_on_duplicate=lambda uid, form: redirect(url_for('tournaments.index')))
 def signup():
     tournaments = Tournament.query.all()
 
@@ -304,6 +308,7 @@ def signup():
         )
 
 @tournaments_bp.route('/bringing_judge/<int:tournament_id>', methods=['POST', 'GET'])
+@prevent_race_condition('bringing_judge', min_interval=1.0, redirect_on_duplicate=lambda uid, form: redirect(url_for('tournaments.index')))
 def bringing_judge(tournament_id):
     user_id = session.get('user_id')
 
@@ -369,6 +374,7 @@ def delete_tournament(tournament_id):
     return redirect(url_for('tournaments.index'))
 
 @tournaments_bp.route('/judge_requests', methods=['POST', 'GET'])
+@prevent_race_condition('judge_requests', min_interval=1.0, redirect_on_duplicate=lambda uid, form: redirect(url_for('tournaments.index')))
 def judge_requests():
     user_id = session.get('user_id')
     user = User.query.filter_by(id=user_id).first()
@@ -446,6 +452,7 @@ def my_tournaments():
     return render_template('tournaments/my_tournaments.html', my_tournaments=my_tournaments_data, now=now, user=user)
 
 @tournaments_bp.route('/submit_results/<int:tournament_id>', methods=['GET', 'POST'])
+@prevent_race_condition('submit_results', min_interval=2.0, redirect_on_duplicate=lambda uid, form: redirect(url_for('tournaments.view_results', tournament_id=request.view_args.get('tournament_id'))))
 def submit_results(tournament_id):
     user_id = session.get('user_id')
     if not user_id:
@@ -523,6 +530,7 @@ def view_results(tournament_id):
     return render_template('tournaments/view_results.html', tournament=tournament, performance_data=performance_data)
 
 @tournaments_bp.route('/tournament_results/<int:tournament_id>', methods=['GET', 'POST'])
+@prevent_race_condition('tournament_results', min_interval=2.0, redirect_on_duplicate=lambda uid, form: redirect(url_for('tournaments.view_results', tournament_id=request.view_args.get('tournament_id'))))
 def tournament_results(tournament_id):
     user_id = session.get('user_id')
     if not user_id:

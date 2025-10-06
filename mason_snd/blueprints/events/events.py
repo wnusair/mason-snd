@@ -7,6 +7,7 @@ from mason_snd.extensions import db
 from mason_snd.models.events import Event, User_Event, Effort_Score
 from mason_snd.models.auth import User
 from mason_snd.models.metrics import MetricsSettings
+from mason_snd.utils.race_protection import prevent_race_condition
 
 from werkzeug.security import generate_password_hash, check_password_hash
 
@@ -36,6 +37,7 @@ def index():
     return render_template('events/index.html', events=events, user=user, user_events=user_events)
 
 @events_bp.route('/leave_event/<int:event_id>', methods=['POST'])
+@prevent_race_condition('leave_event', min_interval=0.5, redirect_on_duplicate=lambda uid, form: redirect(url_for('events.index')))
 def leave_event(event_id):
     user_id = session.get('user_id')
     if not user_id:
@@ -54,6 +56,7 @@ def leave_event(event_id):
     return redirect(url_for('events.index'))
     
 @events_bp.route('/edit_event/<int:event_id>', methods=['GET', 'POST'])
+@prevent_race_condition('edit_event', min_interval=1.0, redirect_on_duplicate=lambda uid, form: redirect(url_for('events.index')))
 def edit_event(event_id):
     user_id = session.get('user_id')
     if not user_id:
@@ -112,6 +115,7 @@ def edit_event(event_id):
 
 
 @events_bp.route('/manage_members/<int:event_id>', methods=['POST', 'GET'])
+@prevent_race_condition('manage_members', min_interval=1.0, redirect_on_duplicate=lambda uid, form: redirect(url_for('events.index')))
 def manage_members(event_id):
     # Check if the user is logged in
     user_id = session.get('user_id')
@@ -233,6 +237,7 @@ def manage_members(event_id):
     )
 
 @events_bp.route('/join_event/<int:event_id>', methods=['POST'])
+@prevent_race_condition('join_event', min_interval=0.5, redirect_on_duplicate=lambda uid, form: redirect(url_for('events.index')))
 def join_event(event_id):
     user_id = session.get('user_id')
     if not user_id:
@@ -263,6 +268,7 @@ def join_event(event_id):
     
 
 @events_bp.route('/add_event', methods=['POST', 'GET'])
+@prevent_race_condition('add_event', min_interval=1.5, redirect_on_duplicate=lambda uid, form: redirect(url_for('events.index')))
 def add_event():
     user_id = session.get('user_id')
     user = User.query.filter_by(id=user_id).first()
@@ -317,6 +323,7 @@ def add_event():
     return render_template('events/add_event.html')
 
 @events_bp.route('/delete_event/<int:event_id>', methods=['POST'])
+@prevent_race_condition('delete_event', min_interval=1.0, redirect_on_duplicate=lambda uid, form: redirect(url_for('events.index')))
 def delete_event(event_id):
     user_id = session.get('user_id')
     user = User.query.filter_by(id=user_id).first()
