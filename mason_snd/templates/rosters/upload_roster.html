@@ -2,44 +2,178 @@
 {% block title %}Upload Roster{% endblock %}
 {% block content %}
 <div class="min-h-full flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
-    <div class="max-w-lg w-full space-y-8">
+    <div class="max-w-4xl w-full space-y-8">
         <div>
             <h2 class="mt-6 text-center text-3xl font-extrabold text-gray-900">
                 Upload Roster
             </h2>
+            <p class="mt-2 text-center text-sm text-gray-600">
+                Create a new roster or update an existing one from an Excel file
+            </p>
         </div>
-        <div class="bg-blue-50 border-l-4 border-blue-400 p-4">
+        
+        <!-- Instructions Panel -->
+        <div class="bg-gradient-to-r from-blue-50 to-indigo-50 border-l-4 border-blue-400 p-6 rounded-r-lg">
             <div class="flex">
                 <div class="flex-shrink-0">
-                    <svg class="h-5 w-5 text-blue-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                    <svg class="h-6 w-6 text-blue-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
                         <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd" />
                     </svg>
                 </div>
-                <div class="ml-3">
-                    <p class="text-sm text-blue-700">
-                        Upload an Excel file (.xlsx) with sheets named "Judges", "Rank View", and optionally event-specific sheets.
-                    </p>
+                <div class="ml-3 flex-1">
+                    <h3 class="text-sm font-medium text-blue-800">How to use this feature</h3>
+                    <div class="mt-2 text-sm text-blue-700 space-y-2">
+                        <p><strong>Download → Edit → Upload Workflow:</strong></p>
+                        <ol class="list-decimal list-inside space-y-1 ml-2">
+                            <li>Download an existing roster as Excel from the roster view page</li>
+                            <li>Edit competitor and judge <strong>names</strong> as needed</li>
+                            <li>Upload the modified file here (select "Update Existing Roster")</li>
+                            <li>The system will automatically match users and update the roster</li>
+                        </ol>
+                        
+                        <div class="mt-3 pt-3 border-t border-blue-200">
+                            <p><strong>What you can edit:</strong></p>
+                            <ul class="list-disc list-inside ml-2 space-y-1">
+                                <li><strong>Names</strong> - Change competitor or judge names</li>
+                                <li><strong>Add/Remove rows</strong> - Add new competitors or judges, or delete rows</li>
+                                <li><strong>Reorder</strong> - Change the ranking order</li>
+                            </ul>
+                        </div>
+                        
+                        <div class="mt-3 pt-3 border-t border-blue-200">
+                            <p><strong>How matching works:</strong></p>
+                            <ul class="list-disc list-inside ml-2 space-y-1">
+                                <li>User ID columns (shaded blue) are used for matching when present</li>
+                                <li>If you change a name but keep the User ID, it finds the right person by ID</li>
+                                <li>If you delete the User ID, it will try to match by the name</li>
+                                <li>Event ID and other metadata is automatically updated</li>
+                            </ul>
+                        </div>
+                        
+                        <div class="mt-3 pt-3 border-t border-blue-200 bg-yellow-50 -mx-4 px-4 py-2 rounded">
+                            <p class="text-yellow-800"><strong>⚠️ Important:</strong> The "Rank View" sheet is the primary source for competitors. Make sure to edit this sheet for competitor changes.</p>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
+
         <form class="mt-8 space-y-6" method="POST" enctype="multipart/form-data">
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
-            <div class="rounded-md shadow-sm bg-white p-6 space-y-4">
-                <div>
-                    <label for="roster_name" class="block text-sm font-medium text-gray-700">Roster Name</label>
-                    <input type="text" name="roster_name" id="roster_name" required placeholder="e.g., Princeton Classic Roster" class="mt-1 w-full rounded-md border-gray-300 shadow-sm focus:border-[color:var(--color-primary-500)] focus:ring-[color:var(--color-primary-500)] sm:text-sm">
+            <div class="rounded-md shadow-sm bg-white p-6 space-y-6">
+                
+                <!-- Upload Mode Selection -->
+                <div class="border-b border-gray-200 pb-4">
+                    <label class="block text-sm font-medium text-gray-700 mb-3">Upload Mode</label>
+                    <div class="space-y-2">
+                        <div class="flex items-center">
+                            <input id="mode-new" name="upload_mode" type="radio" value="new" checked class="focus:ring-indigo-500 h-4 w-4 text-indigo-600 border-gray-300">
+                            <label for="mode-new" class="ml-3 block text-sm font-medium text-gray-700">
+                                Create New Roster
+                            </label>
+                        </div>
+                        <div class="flex items-center">
+                            <input id="mode-update" name="upload_mode" type="radio" value="update" class="focus:ring-indigo-500 h-4 w-4 text-indigo-600 border-gray-300">
+                            <label for="mode-update" class="ml-3 block text-sm font-medium text-gray-700">
+                                Update Existing Roster
+                            </label>
+                        </div>
+                    </div>
                 </div>
+
+                <!-- Roster Selection (shown when update mode selected) -->
+                <div id="roster-select-container" style="display: none;">
+                    <label for="roster_id" class="block text-sm font-medium text-gray-700">Select Roster to Update</label>
+                    <select name="roster_id" id="roster_id" class="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md">
+                        <option value="">-- Select a roster --</option>
+                        {% for roster in rosters %}
+                        <option value="{{ roster.id }}">{{ roster.name }} ({{ roster.date_made.strftime('%Y-%m-%d') if roster.date_made else 'N/A' }})</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <!-- Roster Name -->
+                <div id="roster-name-container">
+                    <label for="roster_name" class="block text-sm font-medium text-gray-700">Roster Name</label>
+                    <input type="text" name="roster_name" id="roster_name" placeholder="e.g., Princeton Classic Roster" class="mt-1 w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
+                    <p class="mt-1 text-sm text-gray-500">Leave blank when updating to keep existing name</p>
+                </div>
+
+                <!-- File Upload -->
                 <div>
-                    <label for="file" class="block text-sm font-medium text-gray-700">Select Excel File</label>
-                    <input type="file" name="file" id="file" required accept=".xlsx" class="mt-1 block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-[color:var(--color-primary-50)] file:text-[color:var(--color-primary-700)] hover:file:bg-[color:var(--color-primary-100)]">
+                    <label for="file" class="block text-sm font-medium text-gray-700">Select Excel File (.xlsx)</label>
+                    <div class="mt-1 flex justify-center px-6 pt-5 pb-6 border-2 border-gray-300 border-dashed rounded-md hover:border-indigo-400 transition-colors">
+                        <div class="space-y-1 text-center">
+                            <svg class="mx-auto h-12 w-12 text-gray-400" stroke="currentColor" fill="none" viewBox="0 0 48 48" aria-hidden="true">
+                                <path d="M28 8H12a4 4 0 00-4 4v20m32-12v8m0 0v8a4 4 0 01-4 4H12a4 4 0 01-4-4v-4m32-4l-3.172-3.172a4 4 0 00-5.656 0L28 28M8 32l9.172-9.172a4 4 0 015.656 0L28 28m0 0l4 4m4-24h8m-4-4v8m-12 4h.02" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+                            </svg>
+                            <div class="flex text-sm text-gray-600">
+                                <label for="file" class="relative cursor-pointer bg-white rounded-md font-medium text-indigo-600 hover:text-indigo-500 focus-within:outline-none focus-within:ring-2 focus-within:ring-offset-2 focus-within:ring-indigo-500">
+                                    <span>Upload a file</span>
+                                    <input id="file" name="file" type="file" required accept=".xlsx" class="sr-only">
+                                </label>
+                                <p class="pl-1">or drag and drop</p>
+                            </div>
+                            <p class="text-xs text-gray-500">Excel files (.xlsx) only</p>
+                        </div>
+                    </div>
                 </div>
             </div>
-            <div>
-                <button type="submit" class="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-[color:var(--color-primary-600)] hover:bg-[color:var(--color-primary-700)] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[color:var(--color-primary-500)]">
+
+            <div class="flex space-x-3">
+                <button type="submit" class="flex-1 group relative flex justify-center py-3 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-colors">
+                    <svg class="h-5 w-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                    </svg>
                     Upload Roster
                 </button>
+                <a href="{{ url_for('rosters.index') }}" class="flex-initial group relative flex justify-center py-3 px-4 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-colors">
+                    Cancel
+                </a>
             </div>
         </form>
     </div>
 </div>
+
+<script>
+// Toggle roster selection based on upload mode
+document.addEventListener('DOMContentLoaded', function() {
+    const modeNew = document.getElementById('mode-new');
+    const modeUpdate = document.getElementById('mode-update');
+    const rosterSelectContainer = document.getElementById('roster-select-container');
+    const rosterNameContainer = document.getElementById('roster-name-container');
+    const rosterNameInput = document.getElementById('roster_name');
+    const rosterIdSelect = document.getElementById('roster_id');
+    
+    function updateFormFields() {
+        if (modeUpdate.checked) {
+            rosterSelectContainer.style.display = 'block';
+            rosterNameInput.required = false;
+        } else {
+            rosterSelectContainer.style.display = 'none';
+            rosterIdSelect.value = '';
+            rosterNameInput.required = true;
+        }
+    }
+    
+    modeNew.addEventListener('change', updateFormFields);
+    modeUpdate.addEventListener('change', updateFormFields);
+    
+    // File input preview
+    const fileInput = document.getElementById('file');
+    fileInput.addEventListener('change', function(e) {
+        const fileName = e.target.files[0]?.name;
+        if (fileName) {
+            const label = document.querySelector('label[for="file"] span');
+            label.textContent = fileName;
+        }
+    });
+});
+</script>
+
+<style>
+.border-dashed {
+    background-image: url("data:image/svg+xml,%3csvg width='100%25' height='100%25' xmlns='http://www.w3.org/2000/svg'%3e%3crect width='100%25' height='100%25' fill='none' stroke='%23E5E7EB' stroke-width='3' stroke-dasharray='6%2c 14' stroke-dashoffset='0' stroke-linecap='square'/%3e%3c/svg%3e");
+}
+</style>
 {% endblock %}

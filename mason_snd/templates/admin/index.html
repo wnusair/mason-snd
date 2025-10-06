@@ -20,6 +20,10 @@
 			<div class="text-xl font-semibold text-gray-800 mb-2">Events Management</div>
 			<div class="text-gray-500">Manage event leaders and settings</div>
 		</a>
+		<a href="{{ url_for('admin.download_all_signups') }}" class="bg-white shadow rounded-lg p-6 hover:shadow-lg transition border-2 border-indigo-200">
+			<div class="text-xl font-semibold text-indigo-800 mb-2">📥 Download All Signups</div>
+			<div class="text-indigo-600">Export all tournament signups as Excel file</div>
+		</a>
 		<a href="{{ url_for('admin.test_data') }}" class="bg-white shadow rounded-lg p-6 hover:shadow-lg transition border-2 border-blue-200">
 			<div class="text-xl font-semibold text-blue-800 mb-2">🧪 Test Data</div>
 			<div class="text-blue-600">Create test users for development</div>

@@ -1,7 +1,8 @@
 
-from flask import Blueprint, render_template, request, redirect, url_for, flash, session, jsonify
+from flask import Blueprint, render_template, request, redirect, url_for, flash, session, jsonify, send_file
 from difflib import get_close_matches
 from datetime import datetime
+from io import BytesIO
 import random
 import pytz
 
@@ -22,6 +23,14 @@ from mason_snd.models.deletion_utils import (
 from mason_snd.utils.race_protection import prevent_race_condition
 
 from werkzeug.security import generate_password_hash, check_password_hash
+
+# Excel export functionality
+try:
+    import pandas as pd
+    import openpyxl
+except ImportError:
+    pd = None
+    openpyxl = None
 
 admin_bp = Blueprint('admin', __name__, template_folder='templates')
 
@@ -1071,6 +1080,137 @@ def view_requirement_assignments(requirement_id):
                          completed_count=completed_count,
                          overdue_count=overdue_count,
                          now=datetime.now(EST))
+
+
+# Download All Signups Route
+
+@admin_bp.route('/download_all_signups')
+def download_all_signups():
+    """Download all tournament signups as an Excel file with headers"""
+    user_id = session.get('user_id')
+    
+    if not user_id:
+        flash("Log In First")
+        return redirect(url_for('auth.login'))
+    
+    user = User.query.filter_by(id=user_id).first()
+    if not user or user.role < 2:
+        flash("You are not authorized to access this page")
+        return redirect(url_for('main.index'))
+    
+    if pd is None or openpyxl is None:
+        flash("Excel functionality not available. Please install pandas and openpyxl.")
+        return redirect(url_for('admin.index'))
+    
+    # Get all signups with related data
+    signups = Tournament_Signups.query.all()
+    
+    if not signups:
+        flash("No signups found in the system")
+        return redirect(url_for('admin.index'))
+    
+    # Prepare data for Excel
+    signup_data = []
+    
+    for signup in signups:
+        # Get user information
+        user_obj = User.query.get(signup.user_id) if signup.user_id else None
+        user_name = f"{user_obj.first_name} {user_obj.last_name}" if user_obj else 'Unknown'
+        user_email = user_obj.email if user_obj else ''
+        
+        # Get tournament information
+        tournament = Tournament.query.get(signup.tournament_id) if signup.tournament_id else None
+        tournament_name = tournament.name if tournament else 'Unknown Tournament'
+        tournament_date = tournament.date.strftime('%Y-%m-%d %H:%M') if tournament and tournament.date else ''
+        
+        # Get event information
+        event = Event.query.get(signup.event_id) if signup.event_id else None
+        event_name = event.event_name if event else 'Unknown Event'
+        
+        # Determine event type/category
+        event_type = 'Unknown'
+        if event:
+            if event.event_type == 0:
+                event_type = 'Speech'
+            elif event.event_type == 1:
+                event_type = 'LD'
+            elif event.event_type == 2:
+                event_type = 'PF'
+        
+        # Get judge information
+        judge = User.query.get(signup.judge_id) if signup.judge_id and signup.judge_id != 0 else None
+        judge_name = f"{judge.first_name} {judge.last_name}" if judge else ''
+        
+        # Get partner information
+        partner = User.query.get(signup.partner_id) if signup.partner_id else None
+        partner_name = f"{partner.first_name} {partner.last_name}" if partner else ''
+        
+        signup_data.append({
+            'Signup ID': signup.id,
+            'Tournament Name': tournament_name,
+            'Tournament Date': tournament_date,
+            'Student Name': user_name,
+            'Student Email': user_email,
+            'Event Name': event_name,
+            'Event Category': event_type,
+            'Partner Name': partner_name,
+            'Bringing Judge': 'Yes' if signup.bringing_judge else 'No',
+            'Judge Name': judge_name,
+            'Is Going': 'Yes' if signup.is_going else 'No',
+            'User ID': signup.user_id,
+            'Tournament ID': signup.tournament_id,
+            'Event ID': signup.event_id,
+            'Judge ID': signup.judge_id if signup.judge_id and signup.judge_id != 0 else '',
+            'Partner ID': signup.partner_id if signup.partner_id else ''
+        })
+    
+    # Create DataFrame
+    df = pd.DataFrame(signup_data)
+    
+    # Create Excel file
+    output = BytesIO()
+    writer = pd.ExcelWriter(output, engine='openpyxl')
+    
+    # Write to Excel with formatting
+    df.to_excel(writer, sheet_name='All Signups', index=False)
+    
+    # Get the workbook and worksheet for styling
+    workbook = writer.book
+    worksheet = writer.sheets['All Signups']
+    
+    # Auto-adjust column widths
+    for column in worksheet.columns:
+        max_length = 0
+        column = [cell for cell in column]
+        for cell in column:
+            try:
+                if len(str(cell.value)) > max_length:
+                    max_length = len(str(cell.value))
+            except:
+                pass
+        adjusted_width = min(max_length + 2, 50)  # Cap at 50 for readability
+        worksheet.column_dimensions[column[0].column_letter].width = adjusted_width
+    
+    # Style the header row
+    from openpyxl.styles import Font, PatternFill, Alignment
+    header_fill = PatternFill(start_color='4472C4', end_color='4472C4', fill_type='solid')
+    header_font = Font(bold=True, color='FFFFFF')
+    
+    for cell in worksheet[1]:
+        cell.fill = header_fill
+        cell.font = header_font
+        cell.alignment = Alignment(horizontal='center', vertical='center')
+    
+    writer.close()
+    output.seek(0)
+    
+    # Generate filename with timestamp
+    filename = f"all_signups_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
+    
+    return send_file(output, 
+                     as_attachment=True, 
+                     download_name=filename,
+                     mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
 
 
 # Testing System Integration Routes

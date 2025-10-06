@@ -7,3 +7,5 @@ pytest
 pytest-flask
 faker
 coverage
+pandas
+openpyxl

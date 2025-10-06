@@ -807,7 +807,7 @@ def view_roster(roster_id):
 
 @rosters_bp.route('/download_roster/<int:roster_id>')
 def download_roster(roster_id):
-    """Download a roster as an Excel file with multiple sheets"""
+    """Download a roster as an Excel file with multiple sheets - fully editable and re-uploadable"""
     user_id = session.get('user_id')
     user = User.query.filter_by(id=user_id).first()
 
@@ -842,18 +842,6 @@ def download_roster(roster_id):
         partnership_map[partnership.partner1_user_id] = partnership.partner2_user_id
         partnership_map[partnership.partner2_user_id] = partnership.partner1_user_id
 
-    # Build event_view and rank_view from competitors
-    event_view = []
-    rank_view = []
-    event_competitors = {}
-    for comp in competitors:
-        event_view.append({'user_id': comp.user_id, 'event_id': comp.event_id})
-        rank_view.append({'user_id': comp.user_id, 'event_id': comp.event_id, 'rank': 'N/A'})
-        eid = comp.event_id
-        if eid not in event_competitors:
-            event_competitors[eid] = []
-        event_competitors[eid].append({'user_id': comp.user_id, 'event_id': eid, 'rank': 'N/A'})
-
     # Build users and events dicts
     user_ids = set([comp.user_id for comp in competitors])
     event_ids = set([comp.event_id for comp in competitors])
@@ -870,11 +858,12 @@ def download_roster(roster_id):
     output = BytesIO()
     writer = pd.ExcelWriter(output, engine='openpyxl')
 
-    # Judges sheet
+    # JUDGES SHEET - fully editable
     judges_data = []
     for judge in judges:
         judge_name = f"{judge_users[judge.user_id].first_name} {judge_users[judge.user_id].last_name}" if judge.user_id in judge_users else 'Unknown'
         child_name = f"{judge.child.first_name} {judge.child.last_name}" if judge.child else ''
+        event_name = judge.event.event_name if judge.event else 'Unknown'
         event_type = 'Unknown'
         if judge.event:
             if judge.event.event_type == 0:
@@ -887,83 +876,126 @@ def download_roster(roster_id):
         judges_data.append({
             'Judge Name': judge_name,
             'Child': child_name,
+            'Event': event_name,
             'Category': event_type,
             'Number People Bringing': judge.people_bringing or 0,
             'Judge ID': judge.user_id,
-            'Child ID': judge.child_id,
-            'Event ID': judge.event_id
+            'Child ID': judge.child_id if judge.child_id else '',
+            'Event ID': judge.event_id if judge.event_id else ''
         })
     
     judges_df = pd.DataFrame(judges_data)
     judges_df.to_excel(writer, sheet_name='Judges', index=False)
 
-    # Rank View sheet
+    # RANK VIEW SHEET - primary sheet for competitor editing
+    # Build rank_view with actual ranking
+    rank_view = []
+    event_competitors_dict = {}
+    
+    for comp in competitors:
+        eid = comp.event_id
+        if eid not in event_competitors_dict:
+            event_competitors_dict[eid] = []
+        event_competitors_dict[eid].append(comp)
+    
+    # Rank competitors within each event by weighted points
+    for event_id, comps in event_competitors_dict.items():
+        sorted_comps = sorted(
+            comps, 
+            key=lambda c: getattr(users[c.user_id], 'weighted_points', getattr(users[c.user_id], 'points', 0)) if c.user_id in users else 0,
+            reverse=True
+        )
+        for rank, comp in enumerate(sorted_comps, start=1):
+            rank_view.append({
+                'comp': comp,
+                'rank': rank,
+                'event_id': event_id
+            })
+    
     rank_data = []
-    for row in rank_view:
-        user_name = f"{users[row['user_id']].first_name} {users[row['user_id']].last_name}" if row['user_id'] in users else 'Unknown'
-        event_name = events[row['event_id']].event_name if row['event_id'] in events else 'Unknown Event'
+    for item in rank_view:
+        comp = item['comp']
+        user = users.get(comp.user_id)
+        event = events.get(comp.event_id)
+        
+        user_name = f"{user.first_name} {user.last_name}" if user else 'Unknown'
+        event_name = event.event_name if event else 'Unknown Event'
         event_type = 'Unknown'
-        if row['event_id'] in events:
-            if events[row['event_id']].event_type == 0:
+        if event:
+            if event.event_type == 0:
                 event_type = 'Speech'
-            elif events[row['event_id']].event_type == 1:
+            elif event.event_type == 1:
                 event_type = 'LD'
-            elif events[row['event_id']].event_type == 2:
+            elif event.event_type == 2:
                 event_type = 'PF'
         
         # Get partner information
         partner_name = ''
-        if row['user_id'] in partnership_map:
-            partner_id = partnership_map[row['user_id']]
+        partner_id = ''
+        if comp.user_id in partnership_map:
+            partner_id = partnership_map[comp.user_id]
             if partner_id in users:
                 partner_name = f"{users[partner_id].first_name} {users[partner_id].last_name}"
         
         rank_data.append({
-            'Rank': row['rank'],
+            'Rank': item['rank'],
             'Competitor Name': user_name,
             'Partner': partner_name,
-            'Weighted Points': users[row['user_id']].points if row['user_id'] in users else 0,
+            'Weighted Points': user.weighted_points if user and hasattr(user, 'weighted_points') else (user.points if user else 0),
             'Event': event_name,
             'Category': event_type,
-            'User ID': row['user_id'],
-            'Event ID': row['event_id']
+            'Status': 'Active',  # Could be extended to show more statuses
+            'User ID': comp.user_id,
+            'Partner ID': partner_id if partner_id else '',
+            'Event ID': comp.event_id
         })
     
     rank_df = pd.DataFrame(rank_data)
     rank_df.to_excel(writer, sheet_name='Rank View', index=False)
 
-    # Event View sheets (one for each event)
-    for event_id, competitors_list in event_competitors.items():
-        event_name = events[event_id].event_name if event_id in events else f'Event {event_id}'
-        event_data = []
+    # EVENT VIEW SHEETS - one for each event
+    for event_id, comps in event_competitors_dict.items():
+        event = events.get(event_id)
+        event_name = event.event_name if event else f'Event {event_id}'
+        event_type = 'Unknown'
+        if event:
+            if event.event_type == 0:
+                event_type = 'Speech'
+            elif event.event_type == 1:
+                event_type = 'LD'
+            elif event.event_type == 2:
+                event_type = 'PF'
         
-        for comp in competitors_list:
-            user_name = f"{users[comp['user_id']].first_name} {users[comp['user_id']].last_name}" if comp['user_id'] in users else 'Unknown'
-            event_type = 'Unknown'
-            if event_id in events:
-                if events[event_id].event_type == 0:
-                    event_type = 'Speech'
-                elif events[event_id].event_type == 1:
-                    event_type = 'LD'
-                elif events[event_id].event_type == 2:
-                    event_type = 'PF'
+        # Sort by weighted points for ranking
+        sorted_comps = sorted(
+            comps,
+            key=lambda c: getattr(users[c.user_id], 'weighted_points', getattr(users[c.user_id], 'points', 0)) if c.user_id in users else 0,
+            reverse=True
+        )
+        
+        event_data = []
+        for rank, comp in enumerate(sorted_comps, start=1):
+            user = users.get(comp.user_id)
+            user_name = f"{user.first_name} {user.last_name}" if user else 'Unknown'
             
             # Get partner information
             partner_name = ''
-            if comp['user_id'] in partnership_map:
-                partner_id = partnership_map[comp['user_id']]
+            partner_id = ''
+            if comp.user_id in partnership_map:
+                partner_id = partnership_map[comp.user_id]
                 if partner_id in users:
                     partner_name = f"{users[partner_id].first_name} {users[partner_id].last_name}"
             
             event_data.append({
                 'Event': event_name,
                 'Category': event_type,
-                'Rank': comp['rank'],
+                'Rank': rank,
                 'Competitor': user_name,
                 'Partner': partner_name,
-                'Weighted Points': users[comp['user_id']].points if comp['user_id'] in users else 0,
-                'User ID': comp['user_id'],
-                'Event ID': comp['event_id']
+                'Weighted Points': user.weighted_points if user and hasattr(user, 'weighted_points') else (user.points if user else 0),
+                'User ID': comp.user_id,
+                'Partner ID': partner_id if partner_id else '',
+                'Event ID': comp.event_id
             })
         
         event_df = pd.DataFrame(event_data)
@@ -971,10 +1003,66 @@ def download_roster(roster_id):
         sheet_name = event_name[:30].replace('/', '-').replace('\\', '-').replace('*', '-').replace('?', '-').replace(':', '-').replace('[', '-').replace(']', '-')
         event_df.to_excel(writer, sheet_name=sheet_name, index=False)
 
+    # Add formatting to make it clear what can be edited
+    from openpyxl.styles import Font, PatternFill, Alignment
+    from openpyxl.utils import get_column_letter
+    
+    # Format all sheets
+    for sheet_name in writer.sheets:
+        worksheet = writer.sheets[sheet_name]
+        
+        # Header formatting
+        header_fill = PatternFill(start_color='366092', end_color='366092', fill_type='solid')
+        header_font = Font(color='FFFFFF', bold=True)
+        
+        # ID columns (read-only indicators) - lighter background
+        id_fill = PatternFill(start_color='E8F4F8', end_color='E8F4F8', fill_type='solid')
+        
+        # Editable columns - white/normal
+        editable_fill = PatternFill(start_color='FFFFFF', end_color='FFFFFF', fill_type='solid')
+        
+        for row in worksheet.iter_rows(min_row=1, max_row=1):
+            for cell in row:
+                cell.fill = header_fill
+                cell.font = header_font
+                cell.alignment = Alignment(horizontal='center', vertical='center')
+        
+        # Apply column-specific formatting
+        for col_idx, column in enumerate(worksheet.iter_cols(min_row=2), start=1):
+            col_letter = get_column_letter(col_idx)
+            header_value = worksheet[f'{col_letter}1'].value
+            
+            # Adjust column width
+            max_length = 0
+            for cell in column:
+                try:
+                    if cell.value:
+                        max_length = max(max_length, len(str(cell.value)))
+                except:
+                    pass
+            
+            adjusted_width = min(max_length + 2, 50)
+            worksheet.column_dimensions[col_letter].width = adjusted_width
+            
+            # Color code columns
+            if header_value and 'ID' in str(header_value):
+                # ID columns - indicate these are used for matching, but names take precedence for display
+                for cell in column:
+                    cell.fill = id_fill
+            else:
+                # Editable columns
+                for cell in column:
+                    if header_value in ['Rank', 'Weighted Points', 'Status', 'Category', 'Event']:
+                        # These are informational/calculated - light gray
+                        cell.fill = PatternFill(start_color='F0F0F0', end_color='F0F0F0', fill_type='solid')
+                    else:
+                        # Names and other editable fields - white
+                        cell.fill = editable_fill
+
     writer.close()
     output.seek(0)
 
-    filename = f"roster_{roster.name}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
+    filename = f"roster_{roster.name.replace(' ', '_')}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
     return send_file(output, 
                      as_attachment=True, 
                      download_name=filename,
@@ -1043,7 +1131,7 @@ def delete_roster(roster_id):
 @rosters_bp.route('/upload_roster', methods=['GET', 'POST'])
 @prevent_race_condition('upload_roster', min_interval=2.0, redirect_on_duplicate=lambda uid, form: redirect(url_for('rosters.index')))
 def upload_roster():
-    """Upload an Excel file to create a new roster"""
+    """Upload an Excel file to create or update a roster with smart name reconciliation"""
     user_id = session.get('user_id')
     user = User.query.filter_by(id=user_id).first()
 
@@ -1077,59 +1165,101 @@ def upload_roster():
             # Read the Excel file
             excel_file = pd.ExcelFile(file)
             
-            # Get roster name from form or use default
+            # Get roster name and ID from form
             roster_name = request.form.get('roster_name', f"Uploaded Roster {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+            roster_id = request.form.get('roster_id')  # If updating existing roster
             
-            # Create new roster
-            tz = pytz.timezone('US/Eastern')
-            new_roster = Roster(name=roster_name, date_made=datetime.now(tz))
-            db.session.add(new_roster)
-            db.session.commit()
+            # Determine if we're updating or creating
+            if roster_id:
+                new_roster = Roster.query.get(int(roster_id))
+                if not new_roster:
+                    flash("Roster not found")
+                    return redirect(url_for('rosters.index'))
+                
+                # Clear existing data
+                Roster_Competitors.query.filter_by(roster_id=new_roster.id).delete()
+                Roster_Judge.query.filter_by(roster_id=new_roster.id).delete()
+                from mason_snd.models.rosters import Roster_Partners
+                Roster_Partners.query.filter_by(roster_id=new_roster.id).delete()
+            else:
+                # Create new roster
+                tz = pytz.timezone('US/Eastern')
+                new_roster = Roster(name=roster_name, date_made=datetime.now(tz))
+                db.session.add(new_roster)
+                db.session.flush()  # Get the ID
 
-            # Process judges sheet
+            # Helper function to find user by ID or name with smart matching
+            def find_user_smart(user_id_val, name_val):
+                """
+                Smart user finder:
+                1. If User ID is provided and valid, use it (name changes are ignored)
+                2. Otherwise, try to match by exact name
+                3. Fall back to fuzzy name matching
+                """
+                # Try User ID first (most reliable)
+                if pd.notna(user_id_val):
+                    try:
+                        user = User.query.get(int(user_id_val))
+                        if user:
+                            return user
+                    except (ValueError, TypeError):
+                        pass
+                
+                # Try exact name match
+                if name_val and str(name_val).strip():
+                    name_parts = str(name_val).strip().split()
+                    if len(name_parts) >= 2:
+                        first_name = name_parts[0]
+                        last_name = ' '.join(name_parts[1:])
+                        user = User.query.filter_by(first_name=first_name, last_name=last_name).first()
+                        if user:
+                            return user
+                        
+                        # Try fuzzy matching (case-insensitive)
+                        user = User.query.filter(
+                            db.func.lower(User.first_name) == first_name.lower(),
+                            db.func.lower(User.last_name) == last_name.lower()
+                        ).first()
+                        if user:
+                            return user
+                
+                return None
+
+            # Process judges sheet with smart reconciliation
+            changes_log = {'judges': [], 'competitors': [], 'warnings': []}
+            
             if 'Judges' in excel_file.sheet_names:
                 judges_df = pd.read_excel(file, sheet_name='Judges')
-                for _, row in judges_df.iterrows():
-                    # Try to find users by name
-                    judge_user = None
-                    child_user = None
+                for idx, row in judges_df.iterrows():
+                    # Find judge user with smart matching
+                    judge_user = find_user_smart(
+                        row.get('Judge ID'),
+                        row.get('Judge Name')
+                    )
                     
-                    if 'Judge ID' in row and pd.notna(row['Judge ID']):
-                        judge_user = User.query.get(int(row['Judge ID']))
-                    else:
-                        # Try to find by name
-                        judge_name_parts = str(row['Judge Name']).split()
-                        if len(judge_name_parts) >= 2:
-                            first_name = judge_name_parts[0]
-                            last_name = ' '.join(judge_name_parts[1:])
-                            judge_user = User.query.filter_by(first_name=first_name, last_name=last_name).first()
+                    # Find child user with smart matching
+                    child_user = find_user_smart(
+                        row.get('Child ID'),
+                        row.get('Child', '')
+                    )
                     
-                    if 'Child ID' in row and pd.notna(row['Child ID']):
-                        child_user = User.query.get(int(row['Child ID']))
-                    else:
-                        # Try to find by name
-                        if str(row['Child']).strip():
-                            child_name_parts = str(row['Child']).split()
-                            if len(child_name_parts) >= 2:
-                                first_name = child_name_parts[0]
-                                last_name = ' '.join(child_name_parts[1:])
-                                child_user = User.query.filter_by(first_name=first_name, last_name=last_name).first()
-                    
-                    # Find event by name or ID
+                    # Find event by ID (prioritize ID over name)
                     event = None
                     if 'Event ID' in row and pd.notna(row['Event ID']):
                         event = Event.query.get(int(row['Event ID']))
+                    elif 'Event' in row and pd.notna(row['Event']):
+                        event = Event.query.filter_by(event_name=str(row['Event'])).first()
                     
-                    # Get people_bringing from spreadsheet or calculate from event type
+                    # Get people_bringing
                     people_bringing = 0
                     if 'Number People Bringing' in row and pd.notna(row['Number People Bringing']):
                         people_bringing = int(row['Number People Bringing'])
                     elif event:
-                        if event.event_type == 0:  # Speech
+                        if event.event_type == 0:
                             people_bringing = 6
-                        elif event.event_type == 1:  # LD
+                        elif event.event_type == 1:
                             people_bringing = 2
-                        elif event.event_type == 2:  # PF
+                        elif event.event_type == 2:
                             people_bringing = 4
                     
                     if judge_user:
@@ -1141,30 +1271,30 @@ def upload_roster():
                             people_bringing=people_bringing
                         )
                         db.session.add(rj)
+                        changes_log['judges'].append(f"Row {idx+2}: Added judge {judge_user.first_name} {judge_user.last_name}")
+                    else:
+                        changes_log['warnings'].append(f"Row {idx+2} in Judges: Could not find user '{row.get('Judge Name', 'Unknown')}'")
 
-            # Process competitors from Rank View sheet
+            # Process competitors from Rank View sheet with smart reconciliation
             if 'Rank View' in excel_file.sheet_names:
                 rank_df = pd.read_excel(file, sheet_name='Rank View')
-                for _, row in rank_df.iterrows():
-                    # Try to find user by ID or name
-                    user = None
+                
+                # Sort by rank if available to preserve order
+                if 'Rank' in rank_df.columns:
+                    rank_df = rank_df.sort_values('Rank')
+                
+                for idx, row in rank_df.iterrows():
+                    # Find user with smart matching
+                    user = find_user_smart(
+                        row.get('User ID'),
+                        row.get('Competitor Name')
+                    )
                     
-                    if 'User ID' in row and pd.notna(row['User ID']):
-                        user = User.query.get(int(row['User ID']))
-                    else:
-                        # Try to find by name
-                        name_parts = str(row['Competitor Name']).split()
-                        if len(name_parts) >= 2:
-                            first_name = name_parts[0]
-                            last_name = ' '.join(name_parts[1:])
-                            user = User.query.filter_by(first_name=first_name, last_name=last_name).first()
-                    
-                    # Find event by ID or name
+                    # Find event by ID (prioritize ID)
                     event = None
                     if 'Event ID' in row and pd.notna(row['Event ID']):
                         event = Event.query.get(int(row['Event ID']))
-                    else:
-                        # Try to find by name
+                    elif 'Event' in row and pd.notna(row['Event']):
                         event = Event.query.filter_by(event_name=str(row['Event'])).first()
                     
                     if user and event:
@@ -1175,14 +1305,79 @@ def upload_roster():
                             roster_id=new_roster.id
                         )
                         db.session.add(rc)
+                        changes_log['competitors'].append(f"Row {idx+2}: Added {user.first_name} {user.last_name} to {event.event_name}")
+                    else:
+                        warning_msg = f"Row {idx+2} in Rank View: "
+                        if not user:
+                            warning_msg += f"Could not find user '{row.get('Competitor Name', 'Unknown')}'"
+                        if not event:
+                            warning_msg += f"Could not find event '{row.get('Event', 'Unknown')}'"
+                        changes_log['warnings'].append(warning_msg)
+
+            # Process event view sheets (for additional competitor data)
+            for sheet_name in excel_file.sheet_names:
+                if sheet_name not in ['Judges', 'Rank View']:
+                    event_df = pd.read_excel(file, sheet_name=sheet_name)
+                    
+                    # Try to find the event for this sheet
+                    event = None
+                    if 'Event ID' in event_df.columns and len(event_df) > 0:
+                        event_id = event_df.iloc[0]['Event ID']
+                        if pd.notna(event_id):
+                            event = Event.query.get(int(event_id))
+                    
+                    if not event and 'Event' in event_df.columns and len(event_df) > 0:
+                        event_name = event_df.iloc[0]['Event']
+                        if pd.notna(event_name):
+                            event = Event.query.filter_by(event_name=str(event_name)).first()
+                    
+                    # Process competitors in this event sheet
+                    for idx, row in event_df.iterrows():
+                        user = find_user_smart(
+                            row.get('User ID'),
+                            row.get('Competitor')
+                        )
+                        
+                        if user and event:
+                            # Check if this competitor is already added
+                            existing = Roster_Competitors.query.filter_by(
+                                roster_id=new_roster.id,
+                                user_id=user.id,
+                                event_id=event.id
+                            ).first()
+                            
+                            if not existing:
+                                rc = Roster_Competitors(
+                                    user_id=user.id,
+                                    event_id=event.id,
+                                    judge_id=None,
+                                    roster_id=new_roster.id
+                                )
+                                db.session.add(rc)
 
             db.session.commit()
-            flash(f"Roster '{roster_name}' uploaded successfully!")
+            
+            # Show success message with changes summary
+            success_msg = f"Roster '{new_roster.name}' {'updated' if roster_id else 'created'} successfully! "
+            success_msg += f"Added {len(changes_log['competitors'])} competitors and {len(changes_log['judges'])} judges."
+            if changes_log['warnings']:
+                success_msg += f" {len(changes_log['warnings'])} warnings."
+            
+            flash(success_msg, 'success')
+            
+            # Show warnings if any
+            for warning in changes_log['warnings'][:5]:  # Limit to first 5 warnings
+                flash(warning, 'warning')
+            
             return redirect(url_for('rosters.view_roster', roster_id=new_roster.id))
 
         except Exception as e:
             db.session.rollback()
-            flash(f"Error processing file: {str(e)}")
+            flash(f"Error processing file: {str(e)}", 'error')
+            import traceback
+            print(traceback.format_exc())
             return redirect(request.url)
 
-    return render_template('rosters/upload_roster.html')
+    # GET request - show upload form with list of rosters
+    rosters = Roster.query.order_by(Roster.date_made.desc()).all()
+    return render_template('rosters/upload_roster.html', rosters=rosters)
