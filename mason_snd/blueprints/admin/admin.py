@@ -1213,6 +1213,203 @@ def download_all_signups():
                      mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
 
 
+@admin_bp.route('/view_tournament_signups/<int:tournament_id>')
+def view_tournament_signups(tournament_id):
+    """View signups for a specific tournament"""
+    user_id = session.get('user_id')
+    
+    if not user_id:
+        flash("Log In First")
+        return redirect(url_for('auth.login'))
+    
+    user = User.query.filter_by(id=user_id).first()
+    if not user or user.role < 2:
+        flash("You are not authorized to access this page")
+        return redirect(url_for('main.index'))
+    
+    tournament = Tournament.query.get_or_404(tournament_id)
+    
+    # Get all signups for this tournament
+    signups = Tournament_Signups.query.filter_by(tournament_id=tournament_id, is_going=True).all()
+    
+    # Prepare signup data with related information
+    signup_data = []
+    for signup in signups:
+        # Get user information
+        user_obj = User.query.get(signup.user_id) if signup.user_id else None
+        user_name = f"{user_obj.first_name} {user_obj.last_name}" if user_obj else 'Unknown'
+        user_email = user_obj.email if user_obj else ''
+        
+        # Get event information
+        event = Event.query.get(signup.event_id) if signup.event_id else None
+        event_name = event.event_name if event else 'Unknown Event'
+        
+        # Determine event type/category
+        event_type = 'Unknown'
+        if event:
+            if event.event_type == 0:
+                event_type = 'Speech'
+            elif event.event_type == 1:
+                event_type = 'LD'
+            elif event.event_type == 2:
+                event_type = 'PF'
+        
+        # Get judge information
+        judge = User.query.get(signup.judge_id) if signup.judge_id and signup.judge_id != 0 else None
+        judge_name = f"{judge.first_name} {judge.last_name}" if judge else ''
+        
+        # Get partner information
+        partner = User.query.get(signup.partner_id) if signup.partner_id else None
+        partner_name = f"{partner.first_name} {partner.last_name}" if partner else ''
+        
+        signup_data.append({
+            'signup': signup,
+            'user_name': user_name,
+            'user_email': user_email,
+            'event_name': event_name,
+            'event_type': event_type,
+            'judge_name': judge_name,
+            'partner_name': partner_name
+        })
+    
+    return render_template('admin/view_tournament_signups.html', 
+                         tournament=tournament, 
+                         signup_data=signup_data)
+
+
+@admin_bp.route('/download_tournament_signups/<int:tournament_id>')
+def download_tournament_signups(tournament_id):
+    """Download signups for a specific tournament as an Excel file"""
+    user_id = session.get('user_id')
+    
+    if not user_id:
+        flash("Log In First")
+        return redirect(url_for('auth.login'))
+    
+    user = User.query.filter_by(id=user_id).first()
+    if not user or user.role < 2:
+        flash("You are not authorized to access this page")
+        return redirect(url_for('main.index'))
+    
+    if pd is None or openpyxl is None:
+        flash("Excel functionality not available. Please install pandas and openpyxl.")
+        return redirect(url_for('admin.view_tournament_signups', tournament_id=tournament_id))
+    
+    tournament = Tournament.query.get_or_404(tournament_id)
+    
+    # Get signups for this specific tournament
+    signups = Tournament_Signups.query.filter_by(tournament_id=tournament_id, is_going=True).all()
+    
+    if not signups:
+        flash(f"No signups found for {tournament.name}")
+        return redirect(url_for('admin.view_tournament_signups', tournament_id=tournament_id))
+    
+    # Prepare data for Excel
+    signup_data = []
+    
+    for signup in signups:
+        # Get user information
+        user_obj = User.query.get(signup.user_id) if signup.user_id else None
+        user_name = f"{user_obj.first_name} {user_obj.last_name}" if user_obj else 'Unknown'
+        user_email = user_obj.email if user_obj else ''
+        
+        # Tournament information
+        tournament_name = tournament.name
+        tournament_date = tournament.date.strftime('%Y-%m-%d %H:%M') if tournament.date else ''
+        
+        # Get event information
+        event = Event.query.get(signup.event_id) if signup.event_id else None
+        event_name = event.event_name if event else 'Unknown Event'
+        
+        # Determine event type/category
+        event_type = 'Unknown'
+        if event:
+            if event.event_type == 0:
+                event_type = 'Speech'
+            elif event.event_type == 1:
+                event_type = 'LD'
+            elif event.event_type == 2:
+                event_type = 'PF'
+        
+        # Get judge information
+        judge = User.query.get(signup.judge_id) if signup.judge_id and signup.judge_id != 0 else None
+        judge_name = f"{judge.first_name} {judge.last_name}" if judge else ''
+        
+        # Get partner information
+        partner = User.query.get(signup.partner_id) if signup.partner_id else None
+        partner_name = f"{partner.first_name} {partner.last_name}" if partner else ''
+        
+        signup_data.append({
+            'Signup ID': signup.id,
+            'Tournament Name': tournament_name,
+            'Tournament Date': tournament_date,
+            'Student Name': user_name,
+            'Student Email': user_email,
+            'Event Name': event_name,
+            'Event Category': event_type,
+            'Partner Name': partner_name,
+            'Bringing Judge': 'Yes' if signup.bringing_judge else 'No',
+            'Judge Name': judge_name,
+            'Is Going': 'Yes' if signup.is_going else 'No',
+            'User ID': signup.user_id,
+            'Tournament ID': signup.tournament_id,
+            'Event ID': signup.event_id,
+            'Judge ID': signup.judge_id if signup.judge_id and signup.judge_id != 0 else '',
+            'Partner ID': signup.partner_id if signup.partner_id else ''
+        })
+    
+    # Create DataFrame
+    df = pd.DataFrame(signup_data)
+    
+    # Create Excel file
+    output = BytesIO()
+    writer = pd.ExcelWriter(output, engine='openpyxl')
+    
+    # Write to Excel with formatting
+    df.to_excel(writer, sheet_name=f'{tournament.name} Signups', index=False)
+    
+    # Get the workbook and worksheet for styling
+    from openpyxl.styles import PatternFill, Font, Alignment
+    
+    workbook = writer.book
+    worksheet = workbook.active
+    
+    # Style the header row
+    header_fill = PatternFill(start_color="1F4E79", end_color="1F4E79", fill_type="solid")
+    header_font = Font(color="FFFFFF", bold=True)
+    
+    for cell in worksheet[1]:
+        cell.fill = header_fill
+        cell.font = header_font
+        cell.alignment = Alignment(horizontal='center', vertical='center')
+    
+    # Auto-adjust column widths
+    for column in worksheet.columns:
+        max_length = 0
+        column_letter = column[0].column_letter
+        for cell in column:
+            try:
+                if len(str(cell.value)) > max_length:
+                    max_length = len(str(cell.value))
+            except:
+                pass
+        adjusted_width = min(max_length + 2, 50)
+        worksheet.column_dimensions[column_letter].width = adjusted_width
+    
+    writer.close()
+    output.seek(0)
+    
+    # Generate filename with tournament name and timestamp
+    safe_tournament_name = "".join(c for c in tournament.name if c.isalnum() or c in (' ', '-', '_')).strip()
+    safe_tournament_name = safe_tournament_name.replace(' ', '_')
+    filename = f"{safe_tournament_name}_signups_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
+    
+    return send_file(output, 
+                     as_attachment=True, 
+                     download_name=filename,
+                     mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+
+
 # Testing System Integration Routes
 
 @admin_bp.route('/testing_suite')

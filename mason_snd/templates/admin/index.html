@@ -21,8 +21,8 @@
 			<div class="text-gray-500">Manage event leaders and settings</div>
 		</a>
 		<a href="{{ url_for('admin.download_all_signups') }}" class="bg-white shadow rounded-lg p-6 hover:shadow-lg transition border-2 border-indigo-200">
-			<div class="text-xl font-semibold text-indigo-800 mb-2">📥 Download All Signups</div>
-			<div class="text-indigo-600">Export all tournament signups as Excel file</div>
+			<div class="text-xl font-semibold text-indigo-800 mb-2">📥 Download ALL Signups</div>
+			<div class="text-indigo-600">Export signups from ALL tournaments as Excel file</div>
 		</a>
 		<a href="{{ url_for('admin.test_data') }}" class="bg-white shadow rounded-lg p-6 hover:shadow-lg transition border-2 border-blue-200">
 			<div class="text-xl font-semibold text-blue-800 mb-2">🧪 Test Data</div>
@@ -41,6 +41,24 @@
 			<div class="text-purple-600">Advanced simulation features with workflow testing and interactive dashboard</div>
 		</a>
 	</div>
+	
+	<!-- Tournament Signup Information -->
+	<div class="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-8">
+		<div class="flex items-start">
+			<div class="flex-shrink-0">
+				<svg class="h-5 w-5 text-blue-400" fill="currentColor" viewBox="0 0 20 20">
+					<path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd" />
+				</svg>
+			</div>
+			<div class="ml-3">
+				<h3 class="text-sm font-medium text-blue-800">Tournament-Specific Signups</h3>
+				<div class="mt-2 text-sm text-blue-700">
+					<p>For signups from individual tournaments, visit the <a href="{{ url_for('tournaments.index') }}" class="font-medium underline">Tournaments page</a>. Each tournament has "View Signups" and "Download" buttons for tournament-specific data.</p>
+				</div>
+			</div>
+		</div>
+	</div>
+	
 	<!-- You can add stats or quick info cards here if desired -->
 </div>
 {% endblock %}
