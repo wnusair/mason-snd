@@ -14,6 +14,8 @@ from mason_snd.models.admin import User_Requirements, Requirements
 from mason_snd.models.tournaments import Tournament, Tournament_Performance, Tournament_Signups, Tournament_Judges
 from mason_snd.models.events import Event, User_Event, Effort_Score
 from mason_snd.models.metrics import MetricsSettings
+from mason_snd.models.auth import Judges
+
 from sqlalchemy import asc, desc, func, and_, or_, extract
 import pytz
 
@@ -440,17 +442,43 @@ def download_user_metrics():
     # Prepare CSV
     si = StringIO()
     writer = csv.writer(si)
-    # Write header row
+    # Write header row with expanded fields
     writer.writerow([
-        'Name', 'Bids', 'Points (Tournaments)', 'Points (Effort)', 'Total Points', f'Weighted Points ({int(tournament_weight*100)}% Tournament, {int(effort_weight*100)}% Effort)'
+        'First Name', 'Last Name', 'Email', 'Phone Number',
+        'Emergency Contact First Name', 'Emergency Contact Last Name', 'Emergency Contact Number', 'Emergency Contact Relationship', 'Emergency Contact Email',
+        'Parent/Child',
+        'Bids', 'Points (Tournaments)', 'Points (Effort)', 'Total Points', f'Weighted Points ({int(tournament_weight*100)}% Tournament, {int(effort_weight*100)}% Effort)'
     ])
+
     for user in users_sorted:
         tournament_points = user.tournament_points or 0
         effort_points = user.effort_points or 0
         total_points = tournament_points + effort_points
         weighted_points = round(tournament_points * tournament_weight + effort_points * effort_weight, 2)
+
+        # Determine Parent/Child status
+        is_parent = Judges.query.filter_by(judge_id=user.id).first() is not None
+        is_child = Judges.query.filter_by(child_id=user.id).first() is not None
+        if is_parent and is_child:
+            parent_child_status = 'Both'
+        elif is_parent:
+            parent_child_status = 'Parent'
+        elif is_child:
+            parent_child_status = 'Child'
+        else:
+            parent_child_status = ''
+
         writer.writerow([
-            f"{user.first_name} {user.last_name}",
+            user.first_name or '',
+            user.last_name or '',
+            user.email or '',
+            user.phone_number or '',
+            user.emergency_contact_first_name or '',
+            user.emergency_contact_last_name or '',
+            user.emergency_contact_number or '',
+            user.emergency_contact_relationship or '',
+            user.emergency_contact_email or '',
+            parent_child_status,
             user.bids or 0,
             tournament_points,
             effort_points,

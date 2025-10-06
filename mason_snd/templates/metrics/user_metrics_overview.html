@@ -34,7 +34,7 @@
                                 ] %}
                                 {% for col_key, col_name in columns %}
                                 <th scope="col" class="py-3.5 pl-4 pr-3 text-left text-sm font-semibold text-gray-900 sm:pl-6">
-                                    <a href="{{ url_for('metrics.index', sort=col_key, direction=next_direction(col_key), page=users.page) }}" class="group inline-flex">
+                                    <a href="{{ url_for('metrics.user_metrics', sort=col_key, direction=next_direction(col_key), page=users.page) }}" class="group inline-flex">
                                         {{ col_name }}
                                         {% if sort == col_key %}<span class="ml-2 flex-none rounded bg-gray-200 text-gray-900 group-hover:bg-gray-300">{% if direction == 'asc' %}▲{% else %}▼{% endif %}</span>{% endif %}
                                     </a>
@@ -69,10 +69,10 @@
                     </div>
                     <div class="flex-1 flex justify-between sm:justify-end">
                         {% if users.has_prev %}
-                        <a href="{{ url_for('metrics.index', page=users.prev_num, sort=sort, direction=direction) }}" class="relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50">Previous</a>
+                        <a href="{{ url_for('metrics.user_metrics', page=users.prev_num, sort=sort, direction=direction) }}" class="relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50">Previous</a>
                         {% endif %}
                         {% if users.has_next %}
-                        <a href="{{ url_for('metrics.index', page=users.next_num, sort=sort, direction=direction) }}" class="ml-3 relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50">Next</a>
+                        <a href="{{ url_for('metrics.user_metrics', page=users.next_num, sort=sort, direction=direction) }}" class="ml-3 relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50">Next</a>
                         {% endif %}
                     </div>
                 </nav>
