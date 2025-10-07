@@ -532,6 +532,9 @@ def view_results(tournament_id):
 @tournaments_bp.route('/tournament_results/<int:tournament_id>', methods=['GET', 'POST'])
 @prevent_race_condition('tournament_results', min_interval=2.0, redirect_on_duplicate=lambda uid, form: redirect(url_for('tournaments.view_results', tournament_id=request.view_args.get('tournament_id'))))
 def tournament_results(tournament_id):
+    # Import Tournament_Performance locally to avoid any import issues
+    from mason_snd.models.tournaments import Tournament_Performance
+    
     user_id = session.get('user_id')
     if not user_id:
         flash("Must Be Logged In")
@@ -579,7 +582,6 @@ def tournament_results(tournament_id):
         user = User.query.filter_by(id=user_id).first()
 
         # Check if user has any previous bids in their tournament performance history
-        from mason_snd.models.tournaments import Tournament_Performance
         previous_bids = Tournament_Performance.query.filter_by(user_id=user_id, bid=True).first()
         
         if bid:
