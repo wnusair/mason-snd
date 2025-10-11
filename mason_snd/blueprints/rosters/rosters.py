@@ -1,3 +1,84 @@
+"""Rosters Blueprint - Intelligent tournament roster generation and management.
+
+Automated roster generation system that fairly distributes competitors based on judge commitments,
+weighted points rankings, and event types. Includes drop penalties, partner tracking, Excel
+export/import with smart name reconciliation, and publishing system for user notifications.
+
+Roster Generation Algorithm:
+    Judge Commitments:
+        - Each judge brings a fixed number of competitors based on event type:
+          * Speech (type 0): 6 competitors
+          * Lincoln-Douglas/LD (type 1): 2 competitors
+          * Public Forum/PF (type 2): 4 competitors
+    
+    Competitor Selection:
+        1. Rank all signups within each event by weighted_points (from metrics system)
+        2. Apply drop penalties (users with drops > 0 are skipped, drops decremented)
+        3. Event-specific selection algorithms:
+           
+           Speech Events (Rotation with Random):
+               - Rotate through speech events selecting top-ranked competitors
+               - Every 5th selection (if 4+ speech judges): pick from middle third (randomness)
+               - Tracks random selections for transparency
+           
+           LD/PF Events (Top-N or Middle):
+               - If 1 judge: select top N competitors by rank
+               - If 2+ judges: select from middle of rankings (fairness)
+               - N = 2 for LD, N = 4 for PF per judge
+    
+    Drop Penalty System:
+        - Users with drops > 0 are excluded from roster selection
+        - Each exclusion decrements user's drop count by 1
+        - Penalty entries tracked in Roster_Penalty_Entries
+        - Replacement user tracked (next user without drops)
+
+Key Features:
+    - Automated roster generation from tournament signups and judges
+    - Drop penalty enforcement with tracking
+    - Partner event support (PF partner matching)
+    - Excel export with multiple sheets (judges, rank view, per-event views)
+    - Excel import with smart name reconciliation (ID priority, fuzzy matching)
+    - Publishing system (marks rosters visible to users, creates notifications)
+    - Weighted points integration (uses metrics system configuration)
+
+Route Organization:
+    Generation & Viewing:
+        - index(): List upcoming tournaments and saved rosters
+        - view_tournament(tournament_id): Generate and preview roster for tournament
+        - save_tournament(tournament_id): Save generated roster to database
+        - view_roster(roster_id): View saved roster
+    
+    Publishing:
+        - publish_roster(roster_id): Make roster visible to users (creates notifications)
+        - unpublish_roster(roster_id): Hide roster from users
+    
+    Excel Operations:
+        - download_tournament(tournament_id): Export live tournament roster to Excel
+        - download_roster(roster_id): Export saved roster to Excel (fully editable)
+        - upload_roster(): Import Excel file to create/update roster (smart reconciliation)
+    
+    Management:
+        - rename_roster(roster_id): Change roster name
+        - delete_roster(roster_id): Delete roster and associated data
+
+Excel Format:
+    Sheets:
+        1. Judges: Judge Name, Child, Event, Category, Number People Bringing, IDs
+        2. Rank View: Rank, Competitor, Partner, Weighted Points, Event, Category, IDs
+        3. Event Sheets: Per-event competitor lists with rankings
+    
+    Smart Reconciliation (Import):
+        - ID Priority: User ID and Event ID take precedence (name changes ignored)
+        - Fuzzy Name Matching: Case-insensitive name matching if ID missing
+        - Change Tracking: Logs added competitors, judges, and warnings
+
+Dependencies:
+    - pandas & openpyxl: Excel functionality (optional, graceful fallback)
+    - Metrics system: Weighted points calculation
+    - Tournament Judges: Judge commitments and event assignments
+    - Tournament Signups: Competitor availability (is_going=True)
+"""
+
 import csv
 from io import StringIO, BytesIO
 from math import ceil
@@ -36,6 +117,18 @@ rosters_bp = Blueprint('rosters', __name__, template_folder='templates')
 
 @rosters_bp.route('/')
 def index():
+    """Rosters dashboard showing upcoming tournaments and saved rosters.
+    
+    Displays two lists:
+    - Upcoming tournaments (signup_deadline > current time) for roster generation
+    - All saved rosters for viewing/management
+    
+    Access Control:
+        Open to all users (viewing only). Generation requires admin access.
+    
+    Template:
+        rosters/index.html with upcoming_tournaments and rosters lists.
+    """
     tournaments = Tournament.query.all()
     rosters = Roster.query.all()
 
@@ -52,6 +145,22 @@ def index():
 # BIG VIEW TOURNAMENT BLOCK!!!!
 
 def get_roster_count(tournament_id):
+    """Calculate total competitor spots based on judge commitments.
+    
+    Each judge brings a fixed number of competitors based on their event type:
+    - Speech (event_type=0): 6 competitors per judge
+    - Lincoln-Douglas (event_type=1): 2 competitors per judge
+    - Public Forum (event_type=2): 4 competitors per judge
+    
+    Args:
+        tournament_id (int): Tournament primary key.
+    
+    Returns:
+        tuple: (speech_competitors, LD_competitors, PF_competitors) - total spots available.
+    
+    Note:
+        Only counts accepted judges (Tournament_Judges.accepted=True).
+    """
     judges = Tournament_Judges.query.filter_by(tournament_id=tournament_id, accepted=True).all()
 
     speech_competitors = 0
@@ -76,6 +185,20 @@ def get_roster_count(tournament_id):
 from mason_snd.models.tournaments import Tournament_Signups
 
 def get_signups_by_event(tournament_id):
+    """Group tournament signups by event.
+    
+    Retrieves all confirmed signups (is_going=True) and organizes them
+    into a dictionary keyed by event_id.
+    
+    Args:
+        tournament_id (int): Tournament primary key.
+    
+    Returns:
+        dict: {event_id: [Tournament_Signups, ...]} - signups grouped by event.
+    
+    Note:
+        Only includes signups with is_going=True (confirmed attendance).
+    """
     signups = Tournament_Signups.query.filter_by(tournament_id=tournament_id, is_going=True).all()
     event_dict = {}
     for signup in signups:
@@ -86,6 +209,20 @@ def get_signups_by_event(tournament_id):
 
 # Helper: Rank signups in each event by weighted points
 def rank_signups(event_dict):
+    """Rank signups within each event by weighted points (highest first).
+    
+    Sorts competitors within each event using weighted_points from the metrics system.
+    Falls back to user.points or 0 if weighted_points unavailable.
+    
+    Args:
+        event_dict (dict): {event_id: [Tournament_Signups, ...]} from get_signups_by_event.
+    
+    Returns:
+        dict: {event_id: [Tournament_Signups, ...]} - signups sorted by weighted_points descending.
+    
+    Note:
+        Uses getattr with fallback chain: weighted_points → points → 0
+    """
     ranked = {}
     for event_id, signups in event_dict.items():
         # Get weighted points from user, fallback to user.points or 0
@@ -94,8 +231,35 @@ def rank_signups(event_dict):
 
 # Helper: Filter out users with drop penalties and track them
 def filter_drops_and_track_penalties(ranked):
-    """
-    Filter out users with drops > 0 and return both filtered rankings and penalty info
+    """Filter users with drop penalties and track penalty applications.
+    
+    Removes users with drops > 0 from rankings, decrements their drop count by 1,
+    and tracks penalty information for reporting.
+    
+    Drop Penalty System:
+        - User with drops > 0: Excluded from roster selection
+        - User's drops count: Decremented by 1 (penalty applied)
+        - Replacement: Next user in ranking without drops
+        - Tracking: All penalties logged with original rank and replacement
+    
+    Args:
+        ranked (dict): {event_id: [Tournament_Signups, ...]} sorted by weighted_points.
+    
+    Returns:
+        tuple: (filtered_ranked, penalty_info)
+            - filtered_ranked (dict): {event_id: [signups]} without dropped users
+            - penalty_info (dict): {event_id: [penalty_dicts]} with penalty details:
+                * user_id: Penalized user's ID
+                * original_rank: User's rank before exclusion
+                * replacement_user_id: Next user without drops (or None)
+                * drops: Number of drops user had before decrement
+    
+    Side Effects:
+        - Decrements User.drops for each penalized user (db.session.commit called)
+    
+    Note:
+        This function modifies the database (drops count) and should only be called
+        during roster generation, not during preview/view operations.
     """
     filtered_ranked = {}
     penalty_info = {}  # {event_id: [(user_id, rank, replacement_user_id), ...]}
@@ -133,6 +297,61 @@ def filter_drops_and_track_penalties(ranked):
 
 # Helper: Select competitors for speech (rotation) and LD/PF (top N with randomness)
 def select_competitors_by_event_type(ranked, speech_spots, ld_spots, pf_spots, event_type_map, seed_randomness=True):
+    """Select competitors using event-type-specific algorithms.
+    
+    Implements three different selection strategies based on event type:
+    
+    Speech Events (type 0) - Rotation with Randomness:
+        - Rotate through speech events selecting top-ranked competitors
+        - If 4+ speech judges: Every 5th selection is random from middle third
+        - Ensures fair distribution across speech events
+        - Randomness adds variety and gives mid-tier competitors opportunities
+    
+    Lincoln-Douglas Events (type 1) - Top-N or Middle:
+        - If 1 judge: Select top 2 competitors by rank
+        - If 2+ judges: Select from middle of rankings (fairness)
+        - Middle selection prevents same top competitors dominating
+    
+    Public Forum Events (type 2) - Top-N or Middle:
+        - If 1 judge: Select top 4 competitors by rank
+        - If 2+ judges: Select from middle of rankings (fairness)
+        - Similar fairness logic as LD
+    
+    Args:
+        ranked (dict): {event_id: [Tournament_Signups, ...]} sorted by weighted_points.
+        speech_spots (int): Total speech competitor slots from judge commitments.
+        ld_spots (int): Total LD competitor slots.
+        pf_spots (int): Total PF competitor slots.
+        event_type_map (dict): {event_id: event_type} - 0=Speech, 1=LD, 2=PF.
+        seed_randomness (bool): Whether to use random selections for speech (default: True).
+    
+    Returns:
+        tuple: (event_view, rank_view, random_selections)
+            - event_view (list): [{'user_id': int, 'event_id': int}, ...] selected competitors
+            - rank_view (list): [{'user_id': int, 'event_id': int, 'rank': int}, ...] with rankings
+            - random_selections (set): {(user_id, event_id), ...} randomly selected competitors
+    
+    Algorithm Details:
+        Speech Rotation:
+            - Cycles through speech events in order
+            - Maintains index counter per event
+            - Every 5th overall selection: pick random from middle third (if 4+ judges)
+            - Stops when all spots filled or all events exhausted
+        
+        LD/PF Selection:
+            - If 2+ judges: middle_index = len(competitors) // 2, select from middle
+            - Otherwise: select top N by rank
+        
+        Random Selection (Speech):
+            - Condition: 4+ speech judges AND position % 5 == 4 AND 2+ competitors in event
+            - Range: middle third (start = len//3, end = 2*len//3)
+            - Tracked in random_selections set for transparency
+    
+    Note:
+        Randomness provides opportunities for mid-tier competitors and prevents
+        roster predictability. Middle selection (LD/PF) ensures fairness when
+        multiple judges are available.
+    """
     event_view = []
     rank_view = []
     random_selections = set()  # Track randomly selected competitors
@@ -218,14 +437,35 @@ def select_competitors_by_event_type(ranked, speech_spots, ld_spots, pf_spots, e
 
 @rosters_bp.route('/view_tournament/<int:tournament_id>')
 def view_tournament(tournament_id):
-    """
+    """Generate and preview roster for a tournament (live generation, not saved).
     
-    take all judges
-    take all accepted judging
-
-    show table of judges (judge name, child, category, number of people brought)
-    show table of event, show table of rank
+    Executes the full roster generation algorithm:
+    1. Calculate competitor slots from judge commitments
+    2. Retrieve and rank all signups by weighted points
+    3. Apply drop penalties (filter and track)
+    4. Select competitors using event-type-specific algorithms
+    5. Display preview with judges, competitors by event, rankings, and penalty info
     
+    URL Parameters:
+        tournament_id (int): Tournament primary key.
+    
+    Displays:
+        - Judges table: Judge name, child, category (Speech/LD/PF), people bringing
+        - Event view: Competitors grouped by event with rankings
+        - Rank view: All selected competitors with rank, weighted points, event
+        - Penalty info: Users excluded due to drops, replacements, penalty details
+        - Random selections: Competitors selected via randomness (speech events)
+    
+    Access Control:
+        Requires role >= 2 (admin). Non-admins redirected to main.index.
+    
+    Template:
+        rosters/view_tournament.html with comprehensive roster preview.
+    
+    Note:
+        This is a PREVIEW - roster is generated dynamically but NOT saved.
+        Use save_tournament() to persist the roster.
+        Drop penalties ARE applied and decremented during preview.
     """
 
     user_id = session.get('user_id')
@@ -332,7 +572,45 @@ def view_tournament(tournament_id):
 
 @rosters_bp.route('/download_tournament/<int:tournament_id>')
 def download_tournament(tournament_id):
-    """Download a tournament view as an Excel file with multiple sheets"""
+    """Export live-generated tournament roster to Excel with multiple sheets.
+    
+    Generates roster using same algorithm as view_tournament() and exports to Excel.
+    Uses pandas and openpyxl for Excel creation (requires optional dependencies).
+    
+    URL Parameters:
+        tournament_id (int): Tournament primary key.
+    
+    Excel Format:
+        Sheet 1 - Judges:
+            Columns: Judge Name, Child, Category, Number People Bringing, Judge ID,
+                    Child ID, Event ID
+        
+        Sheet 2 - Rank View:
+            Columns: Rank, Competitor Name, Weighted Points, Event, Category,
+                    User ID, Event ID
+            Sorted by rank within each event
+        
+        Sheet 3+ - Event Sheets (one per event):
+            Columns: Event, Category, Rank, Competitor, Weighted Points,
+                    User ID, Event ID
+            Sheet name: First 30 chars of event name (sanitized)
+    
+    Access Control:
+        Requires role >= 2 (admin). Non-admins redirected to main.index.
+    
+    Returns:
+        Excel file download (.xlsx): tournament_{name}_{timestamp}.xlsx
+        Redirects to view_tournament if pandas/openpyxl unavailable.
+    
+    Dependencies:
+        - pandas: DataFrame operations
+        - openpyxl: Excel file writing
+        Falls back gracefully if not installed.
+    
+    Note:
+        This generates a fresh roster (not from saved Roster record).
+        Use download_roster() for saved/published rosters.
+    """
     user_id = session.get('user_id')
     user = User.query.filter_by(id=user_id).first()
 
@@ -503,6 +781,51 @@ def download_tournament(tournament_id):
 
 @rosters_bp.route('/save_roster/<int:tournament_id>')
 def save_tournament(tournament_id):
+    """Save generated roster to database for permanent storage.
+    
+    Executes roster generation algorithm and persists results to database:
+    1. Generate roster using same algorithm as view_tournament()
+    2. Create Roster record with timestamp
+    3. Save all Roster_Competitors entries
+    4. Save partner relationships (for partner events like PF)
+    5. Save Roster_Judge entries with people_bringing calculations
+    6. Save penalty entries for tracking drop applications
+    
+    URL Parameters:
+        tournament_id (int): Tournament primary key.
+    
+    Database Records Created:
+        - Roster: Main roster record with name, date, tournament_id
+        - Roster_Competitors: One per selected competitor (user_id, event_id, roster_id)
+        - Roster_Partners: Partner pairs for partner events (both users selected)
+        - Roster_Judge: One per judge (user_id, child_id, event_id, people_bringing)
+        - Roster_Penalty_Entries: Drop penalties applied (user, rank, drops, event)
+    
+    Roster Naming:
+        Format: "{tournament.name} {timestamp}" in US/Eastern timezone
+        Example: "Harvard Tournament 2025-10-11 14:30:45"
+    
+    Partner Event Handling:
+        - Checks if event.is_partner_event is True
+        - Retrieves partner_id from Tournament_Signups
+        - Only creates partnership if BOTH partners selected for roster
+        - Avoids duplicate partnerships using processed_partnerships set
+        - Stores sorted pair (lower ID first) in Roster_Partners
+    
+    Access Control:
+        Requires role >= 2 (admin). Non-admins redirected to main.index.
+    
+    Returns:
+        Redirects to view_roster with new roster_id.
+    
+    Side Effects:
+        - Creates multiple database records
+        - Applies drop penalties (decrements User.drops)
+    
+    Note:
+        This is the permanent save operation. Use view_tournament() for preview.
+        Drop penalties are applied during save and persist in database.
+    """
     user_id = session.get('user_id')
     user = User.query.filter_by(id=user_id).first()
 
@@ -630,6 +953,40 @@ def save_tournament(tournament_id):
 
 @rosters_bp.route('/publish_roster/<int:roster_id>')
 def publish_roster(roster_id):
+    """Publish roster to make it visible to users and create notifications.
+    
+    Publishing Process:
+    1. Mark roster.published = True and set published_at timestamp
+    2. Create User_Published_Rosters entries for all competitors
+    3. Users can then see roster in their profile
+    4. Notification system can alert users (notified flag tracks this)
+    
+    URL Parameters:
+        roster_id (int): Roster primary key.
+    
+    Database Changes:
+        - Roster.published: False → True
+        - Roster.published_at: NULL → current timestamp (US/Eastern)
+        - User_Published_Rosters: Created for each competitor
+            * user_id, roster_id, tournament_id, event_id, notified=False
+    
+    User_Published_Rosters Purpose:
+        - Links users to published rosters they're on
+        - Enables "My Rosters" view in user profiles
+        - Tracks notification status (notified field)
+        - Allows users to see tournament/event assignments
+    
+    Access Control:
+        Requires role >= 2 (admin). Non-admins redirected to main.index.
+    
+    Returns:
+        Redirects to view_roster with success message.
+        Flash error if roster already published.
+    
+    Note:
+        Publishing is irreversible without unpublish_roster().
+        Users are notified of roster assignments via User_Published_Rosters.
+    """
     user_id = session.get('user_id')
     user = User.query.filter_by(id=user_id).first()
 
@@ -678,6 +1035,38 @@ def publish_roster(roster_id):
 
 @rosters_bp.route('/unpublish_roster/<int:roster_id>')
 def unpublish_roster(roster_id):
+    """Unpublish roster to hide it from users (reverses publish_roster).
+    
+    Unpublishing Process:
+    1. Mark roster.published = False and clear published_at timestamp
+    2. Delete all User_Published_Rosters entries for this roster
+    3. Users can no longer see roster in their profiles
+    4. Roster remains in database but is hidden
+    
+    URL Parameters:
+        roster_id (int): Roster primary key.
+    
+    Database Changes:
+        - Roster.published: True → False
+        - Roster.published_at: timestamp → NULL
+        - User_Published_Rosters: All entries deleted (cascade)
+    
+    Use Cases:
+        - Roster needs corrections after publishing
+        - Tournament cancelled or rescheduled
+        - Mistake in roster generation
+        - Want to regenerate roster with updated data
+    
+    Access Control:
+        Requires role >= 2 (admin). Non-admins redirected to main.index.
+    
+    Returns:
+        Redirects to view_roster with confirmation message.
+    
+    Note:
+        Unpublishing does NOT delete the roster, only hides it from users.
+        Use delete_roster() to permanently remove.
+    """
     user_id = session.get('user_id')
     user = User.query.filter_by(id=user_id).first()
 
@@ -706,8 +1095,40 @@ def unpublish_roster(roster_id):
 
 @rosters_bp.route('/view_roster/<int:roster_id>')
 def view_roster(roster_id):
-    """
-    Display a saved roster, using the same layout as view_tournament, but pulling from the Roster tables.
+    """Display a saved roster from database (not live-generated).
+    
+    Retrieves roster data from Roster, Roster_Competitors, Roster_Judge, and
+    Roster_Penalty_Entries tables and displays using same layout as view_tournament.
+    
+    URL Parameters:
+        roster_id (int): Roster primary key.
+    
+    Data Retrieved:
+        - Roster: Basic info (name, date_made, tournament_id, published status)
+        - Roster_Competitors: All selected competitors (user_id, event_id)
+        - Roster_Judge: All judges (user_id, child_id, event_id, people_bringing)
+        - Roster_Penalty_Entries: Drop penalties applied during generation
+    
+    Displays:
+        - Roster metadata (name, date, published status)
+        - Judges table with child and event assignments
+        - Event view (competitors grouped by event)
+        - Rank view (all competitors with rankings and weighted points)
+        - Penalty info (users excluded, original ranks, drops applied)
+    
+    Ranking Logic:
+        Since saved rosters don't recalculate rankings, uses index + 1 as rank.
+        For display purposes, competitors are shown in order they were saved.
+    
+    Access Control:
+        Requires role >= 2 (admin). Non-admins redirected to main.index.
+    
+    Template:
+        rosters/view_roster.html with saved roster data.
+    
+    Note:
+        This displays SAVED data, not live-generated. Changes to signups or
+        weighted points after save are NOT reflected.
     """
     user_id = session.get('user_id')
     user = User.query.filter_by(id=user_id).first()
@@ -807,7 +1228,67 @@ def view_roster(roster_id):
 
 @rosters_bp.route('/download_roster/<int:roster_id>')
 def download_roster(roster_id):
-    """Download a roster as an Excel file with multiple sheets - fully editable and re-uploadable"""
+    """Export saved roster to Excel - fully editable and re-uploadable.
+    
+    Creates comprehensive Excel file from saved Roster record with:
+    - Multiple sheets (Judges, Rank View, per-event views)
+    - Formatted columns (color-coded IDs, editable fields, read-only info)
+    - Partner information (for partner events)
+    - IDs embedded for smart reconciliation on re-upload
+    
+    URL Parameters:
+        roster_id (int): Roster primary key.
+    
+    Excel Format:
+        Sheet 1 - Judges:
+            Columns: Judge Name, Child, Event, Category, Number People Bringing,
+                    Judge ID, Child ID, Event ID
+            Color coding: ID columns (light blue), editable (white), info (gray)
+        
+        Sheet 2 - Rank View (PRIMARY EDITING SHEET):
+            Columns: Rank, Competitor Name, Partner, Weighted Points, Event,
+                    Category, Status, User ID, Partner ID, Event ID
+            Sorted by weighted points within each event
+            Full partner tracking for PF events
+        
+        Sheet 3+ - Event Sheets (one per event):
+            Columns: Event, Category, Rank, Competitor, Partner, Weighted Points,
+                    User ID, Partner ID, Event ID
+            Sorted by weighted points per event
+    
+    Color Coding:
+        - Header row: Dark blue with white text
+        - ID columns: Light blue (read-only indicators, used for matching)
+        - Info columns (Rank, Points, Category): Light gray (calculated/informational)
+        - Editable columns (Names, Partner): White (can be modified)
+    
+    Partner Information:
+        - Retrieves Roster_Partners for this roster
+        - Builds partnership_map: {user_id: partner_user_id}
+        - Displays partner names and IDs in export
+        - Enables partner tracking on re-upload
+    
+    Smart Reconciliation Support:
+        - Embeds User ID, Partner ID, Event ID for accurate matching
+        - Names take precedence for display, IDs for matching
+        - On re-upload: IDs matched first, then fuzzy name matching
+    
+    Access Control:
+        Requires role >= 2 (admin). Non-admins redirected to main.index.
+    
+    Returns:
+        Excel file download (.xlsx): roster_{name}_{timestamp}.xlsx
+        Redirects to view_roster if pandas/openpyxl unavailable.
+    
+    Dependencies:
+        - pandas: DataFrame creation
+        - openpyxl: Excel writing and formatting
+        Falls back gracefully if not installed.
+    
+    Note:
+        This export is designed for editing and re-uploading via upload_roster().
+        ID columns enable accurate user/event matching even if names change.
+    """
     user_id = session.get('user_id')
     user = User.query.filter_by(id=user_id).first()
 
@@ -1071,7 +1552,33 @@ def download_roster(roster_id):
 @rosters_bp.route('/rename_roster/<int:roster_id>', methods=['GET', 'POST'])
 @prevent_race_condition('rename_roster', min_interval=1.0, redirect_on_duplicate=lambda uid, form: redirect(url_for('rosters.view_roster', roster_id=request.view_args.get('roster_id'))))
 def rename_roster(roster_id):
-    """Rename a roster"""
+    """Change roster name for better organization.
+    
+    Methods:
+        GET: Display rename form with current name.
+        POST: Update roster name in database.
+    
+    URL Parameters:
+        roster_id (int): Roster primary key.
+    
+    Form Fields (POST):
+        - new_name (str): New roster name.
+    
+    Race Condition Protection:
+        @prevent_race_condition decorator prevents duplicate submissions within 1 second.
+    
+    Access Control:
+        Requires role >= 2 (admin). Non-admins redirected to main.index.
+    
+    Returns:
+        GET: rosters/rename_roster.html with current roster.
+        POST: Redirects to view_roster with success message.
+    
+    Use Cases:
+        - Clarify roster purpose (e.g., "Harvard Final Roster v2")
+        - Add notes (e.g., "Revised after drops")
+        - Standardize naming convention
+    """
     user_id = session.get('user_id')
     user = User.query.filter_by(id=user_id).first()
 
@@ -1100,7 +1607,42 @@ def rename_roster(roster_id):
 
 @rosters_bp.route('/delete_roster/<int:roster_id>')
 def delete_roster(roster_id):
-    """Delete a roster and all associated data"""
+    """Permanently delete a roster and all associated data.
+    
+    Deletion Process:
+    1. Delete all Roster_Competitors entries
+    2. Delete all Roster_Judge entries
+    3. Delete Roster record itself
+    
+    URL Parameters:
+        roster_id (int): Roster primary key.
+    
+    Database Records Deleted:
+        - Roster_Competitors: All competitor assignments
+        - Roster_Judge: All judge assignments
+        - Roster: Main roster record
+    
+    Cascade Deletions:
+        Foreign key constraints may also delete:
+        - User_Published_Rosters (if roster was published)
+        - Roster_Penalty_Entries (penalty tracking)
+        - Roster_Partners (partner relationships)
+    
+    Access Control:
+        Requires role >= 2 (admin). Non-admins redirected to main.index.
+    
+    Returns:
+        Redirects to rosters.index with success message.
+        Flash error if roster not found.
+    
+    Warning:
+        This is PERMANENT deletion. Cannot be undone.
+        Consider unpublishing instead if you may need roster later.
+    
+    Note:
+        Deleting a published roster removes it from all user profiles
+        (User_Published_Rosters entries are cascaded).
+    """
     user_id = session.get('user_id')
     user = User.query.filter_by(id=user_id).first()
 
@@ -1131,7 +1673,73 @@ def delete_roster(roster_id):
 @rosters_bp.route('/upload_roster', methods=['GET', 'POST'])
 @prevent_race_condition('upload_roster', min_interval=2.0, redirect_on_duplicate=lambda uid, form: redirect(url_for('rosters.index')))
 def upload_roster():
-    """Upload an Excel file to create or update a roster with smart name reconciliation"""
+    """Import Excel file to create or update roster with smart name reconciliation.
+    
+    Methods:
+        GET: Display upload form with roster list (for updating existing rosters).
+        POST: Process Excel file and create/update roster.
+    
+    Form Fields (POST):
+        - file: Excel file (.xlsx) from download_roster() or similar format
+        - roster_name: Name for new roster (optional, default: "Uploaded Roster {timestamp}")
+        - roster_id: ID of existing roster to update (optional, for updates)
+    
+    Smart Reconciliation Algorithm:
+        User Matching (Priority Order):
+            1. User ID: If valid ID in 'User ID' column, use it (name changes ignored)
+            2. Exact Name Match: "First Last" → User.query.filter_by(first_name, last_name)
+            3. Fuzzy Name Match: Case-insensitive matching
+            4. No Match: Log warning, skip entry
+        
+        Event Matching (Priority Order):
+            1. Event ID: If valid ID in 'Event ID' column, use it
+            2. Event Name: Event.query.filter_by(event_name)
+            3. No Match: Log warning, skip entry
+    
+    Excel Format Expected:
+        Required Sheets:
+            - Judges: Judge Name, Child, Event, Category, Number People Bringing,
+                     Judge ID*, Child ID*, Event ID*
+            - Rank View: Competitor Name, Event, User ID*, Event ID*
+                        (Partner, Weighted Points, Rank, Category are optional)
+        
+        Optional Sheets:
+            - Event-specific sheets: Same columns as Rank View, event-scoped
+        
+        * ID columns are optional but enable accurate reconciliation
+    
+    Update vs Create:
+        - If roster_id provided: Updates existing roster (clears old data)
+        - Otherwise: Creates new roster with provided name
+        - Update clears: Roster_Competitors, Roster_Judge, Roster_Partners
+    
+    Change Tracking:
+        Returns log with:
+        - judges: List of added judges with row numbers
+        - competitors: List of added competitors with events
+        - warnings: List of unmatched entries (up to 5 shown in flash)
+    
+    Race Condition Protection:
+        @prevent_race_condition (2 second interval) prevents duplicate uploads.
+    
+    Access Control:
+        Requires role >= 2 (admin). Non-admins redirected to main.index.
+    
+    Returns:
+        GET: rosters/upload_roster.html with roster list.
+        POST: Redirects to view_roster with change summary.
+        Error: Flash error message, redirect to upload form.
+    
+    Dependencies:
+        - pandas: Excel reading
+        - openpyxl: Excel file format support
+        Falls back with error message if not installed.
+    
+    Note:
+        Smart reconciliation allows editing names in Excel while maintaining
+        correct user associations via ID columns. This enables collaborative
+        editing workflows and roster corrections.
+    """
     user_id = session.get('user_id')
     user = User.query.filter_by(id=user_id).first()
 

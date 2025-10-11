@@ -1,3 +1,26 @@
+"""
+Admin Blueprint
+
+This module provides administrative functionality for managing the entire system.
+It includes routes for user management, event management, tournament oversight,
+requirement administration, deletion operations, and testing system integration.
+
+Key Features:
+    - User Management: View, edit, search, and delete users
+    - Requirements: Create and assign requirements to users
+    - Popup Messages: Send targeted notifications to users
+    - Event Management: Manage events and event leaders
+    - Tournament Oversight: View signups, download reports
+    - Safe Deletion: Preview and execute cascade-aware deletions
+    - Testing Suite: Integration with UNIT_TEST system
+    - Data Export: Excel and CSV downloads for various entities
+
+Admin Access:
+    Most routes require user.role >= 2 (Admin/Chair level)
+    
+Testing Integration:
+    When ENABLE_TESTING=True, provides web interface to testing dashboard
+"""
 
 from flask import Blueprint, render_template, request, redirect, url_for, flash, session, jsonify, send_file
 from difflib import get_close_matches
@@ -6,6 +29,7 @@ from io import BytesIO
 import random
 import pytz
 
+# Timezone constant
 EST = pytz.timezone('US/Eastern')
 
 from mason_snd.extensions import db
@@ -24,17 +48,20 @@ from mason_snd.utils.race_protection import prevent_race_condition
 
 from werkzeug.security import generate_password_hash, check_password_hash
 
-# Excel export functionality
+# Excel export functionality (optional dependencies)
 try:
     import pandas as pd
     import openpyxl
+    EXCEL_AVAILABLE = True
 except ImportError:
     pd = None
     openpyxl = None
+    EXCEL_AVAILABLE = False
 
+# Blueprint configuration
 admin_bp = Blueprint('admin', __name__, template_folder='templates')
 
-# Import testing system components
+# Testing system integration (optional)
 try:
     from UNIT_TEST.master_controller import MasterTestController
     from UNIT_TEST.final_verification import run_final_verification
@@ -43,8 +70,18 @@ try:
 except ImportError:
     TESTING_AVAILABLE = False
 
+
 @admin_bp.route('/')
 def index():
+    """
+    Admin dashboard home page.
+    
+    Displays the main admin panel with links to all administrative functions.
+    Requires admin-level access (role >= 2).
+    
+    Returns:
+        Rendered admin index template or redirect to login/profile if unauthorized
+    """
     user_id = session.get('user_id')
     if not user_id:
         flash('Please log in to access this page.', 'error')
@@ -54,13 +91,41 @@ def index():
     if not user or user.role <= 1:
         flash('Restricted Access!!!!!')
         return redirect(url_for('profile.index', user_id=user_id))
+    
     return render_template('admin/index.html')
 
 
-# Requirements management page
 @admin_bp.route('/requirements', methods=['GET', 'POST'])
-@prevent_race_condition('admin_requirements', min_interval=1.0, redirect_on_duplicate=lambda uid, form: redirect(url_for('admin.requirements')))
+@prevent_race_condition(
+    'admin_requirements',
+    min_interval=1.0,
+    redirect_on_duplicate=lambda uid, form: redirect(url_for('admin.requirements'))
+)
 def requirements():
+    """
+    Manage system requirements.
+    
+    GET: Display all requirements with ability to:
+        - View active/inactive status
+        - See users assigned to each requirement
+        - Access assignment interface
+    
+    POST: Handle multiple actions:
+        - create_requirement: Create new requirement template
+        - assign_requirement: Assign requirement to selected users
+        - assign_to_group: Assign requirement to all children or judges
+        - (default): Toggle active status for all requirements
+    
+    Features:
+        - Create new requirement templates
+        - Assign to individual users with custom deadlines
+        - Bulk assign to groups (all students or all judges)
+        - Track assignment counts
+    
+    Returns:
+        GET: Rendered requirements management page
+        POST: Redirect to requirements page with success/error message
+    """
     user_id = session.get('user_id')
     if not user_id:
         flash('Please log in to access this page.', 'error')
@@ -210,10 +275,31 @@ def requirements():
                          judges_count=judges_count)
 
 
-# Enhanced popup sending: select users, set expiration
 @admin_bp.route('/add_popup', methods=['POST', 'GET'])
-@prevent_race_condition('add_popup', min_interval=1.0, redirect_on_duplicate=lambda uid, form: redirect(url_for('admin.index')))
+@prevent_race_condition(
+    'add_popup',
+    min_interval=1.0,
+    redirect_on_duplicate=lambda uid, form: redirect(url_for('admin.index'))
+)
 def add_popup():
+    """
+    Send popup notification messages to selected users.
+    
+    Popup messages appear on users' profile pages and can have optional
+    expiration times. Users can dismiss them when acknowledged.
+    
+    GET: Display form to create and send popup messages
+    POST: Send popup to selected users
+    
+    Form Fields:
+        - recipient_ids: List of user IDs to send popup to
+        - message: The popup message text
+        - expires_at: Optional expiration datetime (format: YYYY-MM-DDTHH:MM)
+    
+    Returns:
+        GET: Rendered popup creation form with all users list
+        POST: Redirect to add_popup page with success/error message
+    """
     user_id = session.get('user_id')
     if not user_id:
         flash('Please log in to access this page.', 'error')
@@ -254,8 +340,36 @@ def add_popup():
 
 # Admin view of user details
 @admin_bp.route('/user/<int:user_id>', methods=['GET', 'POST'])
-@prevent_race_condition('admin_user_detail', min_interval=1.0, redirect_on_duplicate=lambda uid, form: redirect(url_for('admin.search')))
+@prevent_race_condition(
+    'admin_user_detail',
+    min_interval=1.0,
+    redirect_on_duplicate=lambda uid, form: redirect(url_for('admin.search'))
+)
 def user_detail(user_id):
+    """
+    View and edit detailed user information.
+    
+    Admin interface for viewing and modifying all aspects of a user's account,
+    including personal info, role, points, events, and tournament history.
+    
+    GET: Display comprehensive user information
+    POST: Update user details
+    
+    Displays:
+        - Basic user info (name, email, phone, role)
+        - Points breakdown (tournament + effort points)
+        - Events membership
+        - Tournament history and performance
+        - Requirements assigned to user
+        - Judge/child relationships
+    
+    Args:
+        user_id (int): The ID of the user to view/edit
+    
+    Returns:
+        GET: Rendered user detail page
+        POST: Redirect to user detail page with success message
+    """
     user = User.query.get_or_404(user_id)
     user_events = User_Event.query.filter_by(user_id=user_id).all()
     events = [Event.query.get(ue.event_id) for ue in user_events]
@@ -344,6 +458,27 @@ def user_detail(user_id):
 # Fuzzy search for users by name
 @admin_bp.route('/search', methods=['GET', 'POST'])
 def search():
+    """
+    Fuzzy search for users by name.
+    
+    Uses difflib's close matching algorithm to find users even with partial
+    or slightly misspelled names. Displays user information including their
+    judge/child relationships.
+    
+    GET: Display search form
+    POST: Perform fuzzy search and display results
+    
+    Form Fields:
+        - name: Search query (partial or full name)
+    
+    Features:
+        - Fuzzy matching algorithm tolerates typos
+        - Shows judge/child relationship information
+        - Quick actions (add drops, view details)
+    
+    Returns:
+        Rendered search page with results (if POST)
+    """
     user_id = session.get('user_id')
     user = User.query.filter_by(id=user_id).first()
     print(user)
@@ -377,6 +512,20 @@ def search():
 @admin_bp.route('/add_drop/<int:user_id>', methods=['POST'])
 @prevent_race_condition('add_drop', min_interval=0.5, redirect_on_duplicate=lambda uid, form: redirect(url_for('admin.search')))
 def add_drop(user_id):
+    """
+    Quick add drop penalty from search page.
+    
+    Adds a drop penalty to a user directly from the search interface,
+    incrementing their drop count by 1. Drop penalties affect user
+    standings and may have consequences for tournament participation.
+    
+    Args:
+        user_id (int): The ID of the user receiving the drop penalty
+    
+    Returns:
+        Redirect to search page with success message showing new drop count
+    """
+
     admin_user_id = session.get('user_id')
     if not admin_user_id:
         flash('Please log in to access this page.', 'error')
@@ -397,6 +546,22 @@ def add_drop(user_id):
 # Events management
 @admin_bp.route('/events_management')
 def events_management():
+    """
+    Events management overview page.
+    
+    Displays all events in the system with participant statistics including
+    total enrollment and active participant counts.
+    
+    Features:
+        - List all events with names and descriptions
+        - View total participant counts
+        - View active participant counts
+        - Links to event leader management
+    
+    Returns:
+        Rendered events management page with event list and statistics
+    """
+
     user_id = session.get('user_id')
     if not user_id:
         flash('Please log in to access this page.', 'error')
@@ -426,6 +591,32 @@ def events_management():
 @admin_bp.route('/change_event_leader/<int:event_id>', methods=['GET', 'POST'])
 @prevent_race_condition('change_event_leader', min_interval=1.0, redirect_on_duplicate=lambda uid, form: redirect(url_for('admin.index')))
 def change_event_leader(event_id):
+    """
+    Manage event leaders for a specific event.
+    
+    Allows admins to add or remove event leaders who have special permissions
+    for managing their assigned events.
+    
+    GET: Display current leaders and search interface
+    POST: Handle multiple actions:
+        - search_leader: Find users to add as leaders
+        - add_leader: Assign a new event leader
+        - remove_leader: Remove an existing event leader
+    
+    Args:
+        event_id (int): The ID of the event to manage leaders for
+    
+    Features:
+        - Fuzzy search to find potential leaders
+        - Add multiple leaders per event
+        - Remove leaders safely
+        - Prevent duplicate leader assignments
+    
+    Returns:
+        GET: Rendered event leader management page
+        POST: Redirect with success/error message
+    """
+
     user_id = session.get('user_id')
     if not user_id:
         flash('Please log in to access this page.', 'error')
@@ -510,6 +701,41 @@ def change_event_leader(event_id):
 
 @admin_bp.route('/test_data', methods=['GET', 'POST'])
 def test_data():
+    """
+    Test data generation and management interface.
+    
+    Provides tools for creating mock test data for development and testing
+    purposes. Generates realistic test users, enrolls them in events, and
+    signs them up for tournaments.
+    
+    GET: Display test data statistics and action buttons
+    POST: Handle multiple actions:
+        - create_users: Generate 15 test students and their parent accounts
+        - join_events: Enroll test students in random events
+        - signup_tournaments: Sign up test students for random tournaments
+        - cleanup: Remove all test data from database
+    
+    Test Data Features:
+        - Creates parent/child relationships with judge connections
+        - Generates realistic contact information
+        - All test users have last name "Test" for easy identification
+        - Configurable password for all test accounts
+    
+    Statistics Displayed:
+        - Number of test students
+        - Number of test parents
+        - Event enrollment count
+        - Tournament signup count
+    
+    Warning:
+        This feature should only be used in development/testing environments.
+        All test data can be easily removed with the cleanup action.
+    
+    Returns:
+        GET: Rendered test data page with current statistics
+        POST: Redirect to test_data page with success/error message
+    """
+
     user_id = session.get('user_id')
     if not user_id:
         flash('Please log in to access this page.', 'error')
@@ -758,7 +984,21 @@ def test_data():
 
 @admin_bp.route('/delete_management')
 def delete_management():
-    """Main page for deletion management"""
+    """
+    Main deletion management dashboard.
+    
+    Central hub for all deletion operations in the system. Provides links
+    to specialized deletion interfaces for different entity types.
+    
+    Available Deletion Types:
+        - Users: Single or bulk user deletion with cascade handling
+        - Tournaments: Tournament deletion with signup cleanup
+        - Events: Event deletion with participant management
+        - Requirements: Requirement deletion with assignment cleanup
+    
+    Returns:
+        Rendered deletion management page with links to specialized interfaces
+    """
     user_id = session.get('user_id')
     if not user_id:
         flash('Please log in to access this page.', 'error')
@@ -773,7 +1013,32 @@ def delete_management():
 
 @admin_bp.route('/delete_users', methods=['GET', 'POST'])
 def delete_users():
-    """User deletion interface with search and bulk selection"""
+    """
+    User deletion interface with search and bulk selection.
+    
+    Allows admins to search for users and safely delete them with cascade
+    handling for all related data. Includes preview functionality to show
+    what will be deleted before committing.
+    
+    GET: Display search interface and user selection form
+    POST: Handle two actions:
+        - preview: Show deletion impact before executing
+        - confirm_delete: Execute actual deletion with cascade cleanup
+    
+    Safety Features:
+        - Prevents admins from deleting their own account
+        - Shows preview of all related data that will be deleted
+        - Uses safe deletion utilities with cascade handling
+        - Limits search results to 50 users for performance
+    
+    Search Parameters:
+        - search: Query string (searches first name, last name, email)
+    
+    Returns:
+        GET: Rendered user search/selection page
+        POST (preview): Deletion preview page
+        POST (confirm): Redirect with success/error message
+    """
     user_id = session.get('user_id')
     if not user_id:
         flash('Please log in to access this page.', 'error')
@@ -865,7 +1130,29 @@ def delete_users():
 
 @admin_bp.route('/delete_tournaments', methods=['GET', 'POST'])
 def delete_tournaments():
-    """Tournament deletion interface"""
+    """
+    Tournament deletion interface.
+    
+    Allows admins to delete tournaments with cascade handling for all related
+    data including signups, results, and performance records.
+    
+    GET: Display list of all tournaments (sorted by date, newest first)
+    POST: Handle two actions:
+        - preview: Show what will be deleted (signups, results, etc.)
+        - confirm_delete: Execute actual deletion with cascade cleanup
+    
+    Cascade Deletions:
+        - Tournament signups
+        - Tournament performance records
+        - Related form submissions
+        - Judge assignments
+        - Partner assignments
+    
+    Returns:
+        GET: Rendered tournament selection page
+        POST (preview): Deletion preview page
+        POST (confirm): Redirect with success/error message
+    """
     user_id = session.get('user_id')
     if not user_id:
         flash('Please log in to access this page.', 'error')
@@ -919,7 +1206,31 @@ def delete_tournaments():
 @admin_bp.route('/delete_user/<int:user_id>', methods=['POST'])
 @prevent_race_condition('delete_single_user', min_interval=1.0, redirect_on_duplicate=lambda uid, form: redirect(url_for('admin.search')))
 def delete_single_user(user_id):
-    """Quick delete for a single user (from user detail page)"""
+    """
+    Quick delete for a single user from user detail page.
+    
+    Provides one-click deletion from the user detail page with automatic
+    cascade handling. Includes safety check to prevent self-deletion.
+    
+    Args:
+        user_id (int): The ID of the user to delete
+    
+    Safety Features:
+        - Prevents admins from deleting themselves
+        - Uses safe deletion utility with cascade handling
+        - Race condition protection
+    
+    Cascade Deletions:
+        - User_Event enrollments
+        - Tournament_Signups
+        - User_Requirements
+        - Judge relationships
+        - Popups
+        - Event_Leader assignments
+    
+    Returns:
+        Redirect to delete_users page if successful, user_detail if failed
+    """
     current_user_id = session.get('user_id')
     if not current_user_id:
         flash('Please log in to access this page.', 'error')
@@ -946,7 +1257,32 @@ def delete_single_user(user_id):
 
 @admin_bp.route('/delete_events', methods=['GET', 'POST'])
 def delete_events():
-    """Event deletion interface"""
+    """
+    Event deletion interface with bulk selection.
+    
+    Allows admins to delete one or more events with cascade handling for
+    all related data including participant enrollments and tournament signups.
+    
+    GET: Display list of all events (sorted alphabetically)
+    POST: Handle two actions:
+        - preview: Show deletion impact (affected users, tournaments)
+        - confirm_delete: Execute deletion with cascade cleanup
+    
+    Cascade Deletions:
+        - User_Event enrollments
+        - Tournament_Signups for this event
+        - Event_Leader assignments
+        - Form fields and responses
+    
+    Warning:
+        Deleting events may affect tournament signups and user participation
+        records. Preview should always be reviewed before confirming.
+    
+    Returns:
+        GET: Rendered event selection page
+        POST (preview): Deletion preview page
+        POST (confirm): Redirect with success/error message
+    """
     user_id = session.get('user_id')
     if not user_id:
         flash('Please log in to access this page.', 'error')
@@ -1003,7 +1339,31 @@ def delete_events():
 
 @admin_bp.route('/delete_requirements', methods=['GET', 'POST'])
 def delete_requirements():
-    """Requirements deletion interface"""
+    """
+    Requirements deletion interface with bulk selection.
+    
+    Allows admins to delete requirement templates and all associated user
+    assignments. Shows preview of affected users before deletion.
+    
+    GET: Display list of all requirements (sorted alphabetically)
+    POST: Handle two actions:
+        - preview: Show how many users have this requirement assigned
+        - confirm_delete: Delete requirement and all user assignments
+    
+    Cascade Deletions:
+        - All User_Requirements assignments for selected requirements
+        - Requirement template itself
+    
+    Use Cases:
+        - Removing outdated requirements
+        - Cleaning up obsolete training requirements
+        - Removing incorrectly created requirements
+    
+    Returns:
+        GET: Rendered requirement selection page
+        POST (preview): Deletion preview page showing affected users
+        POST (confirm): Redirect with success/error message
+    """
     user_id = session.get('user_id')
     if not user_id:
         flash('Please log in to access this page.', 'error')
@@ -1051,7 +1411,29 @@ def delete_requirements():
 
 @admin_bp.route('/view_requirement_assignments/<int:requirement_id>')
 def view_requirement_assignments(requirement_id):
-    """View all users assigned to a specific requirement"""
+    """
+    View all users assigned to a specific requirement.
+    
+    Displays detailed information about which users have been assigned a
+    particular requirement, including completion status and deadline tracking.
+    
+    Args:
+        requirement_id (int): The ID of the requirement to view assignments for
+    
+    Information Displayed:
+        - Requirement body/description
+        - Total users assigned
+        - Completed count
+        - Overdue count
+        - Individual user assignments with:
+            * User name
+            * Completion status
+            * Deadline (if set)
+            * Days overdue (if applicable)
+    
+    Returns:
+        Rendered requirement assignments page with statistics and user list
+    """
     user_id = session.get('user_id')
     if not user_id:
         flash('Please log in to access this page.', 'error')
@@ -1086,7 +1468,38 @@ def view_requirement_assignments(requirement_id):
 
 @admin_bp.route('/download_all_signups')
 def download_all_signups():
-    """Download all tournament signups as an Excel file with headers"""
+    """
+    Download all tournament signups as an Excel file.
+    
+    Exports a comprehensive spreadsheet containing all tournament signups
+    across the entire system with formatted headers and auto-sized columns.
+    
+    Excel Format:
+        - Sheet Name: 'All Signups'
+        - Styled header row (blue background, white text)
+        - Auto-adjusted column widths
+        - Columns:
+            * Signup ID
+            * Tournament Name
+            * Tournament Date
+            * Student Name
+            * Student Email
+            * Event Name
+            * Event Category (Speech/LD/PF)
+            * Partner Name
+            * Bringing Judge (Yes/No)
+            * Judge Name
+            * Is Going (Yes/No)
+            * User ID, Tournament ID, Event ID, Judge ID, Partner ID
+    
+    Requirements:
+        - Requires pandas and openpyxl libraries
+        - Admin access (role >= 2)
+    
+    Returns:
+        Excel file download with timestamped filename
+        Format: all_signups_YYYYMMDD_HHMMSS.xlsx
+    """
     user_id = session.get('user_id')
     
     if not user_id:
@@ -1215,7 +1628,31 @@ def download_all_signups():
 
 @admin_bp.route('/view_tournament_signups/<int:tournament_id>')
 def view_tournament_signups(tournament_id):
-    """View signups for a specific tournament"""
+    """
+    View signups for a specific tournament.
+    
+    Displays all users who have signed up for a specific tournament with
+    their event selections, partner information, and judge commitments.
+    
+    Args:
+        tournament_id (int): The ID of the tournament to view signups for
+    
+    Information Displayed:
+        - Tournament name and date
+        - Student information (name, email)
+        - Event details (name, category)
+        - Partner information (if applicable)
+        - Judge information (bringing judge, judge name)
+        - Attendance status (is_going)
+    
+    Features:
+        - Filters to only show confirmed signups (is_going=True)
+        - Links to download as Excel file
+        - View all participants at a glance
+    
+    Returns:
+        Rendered tournament signups page with participant list
+    """
     user_id = session.get('user_id')
     
     if not user_id:
@@ -1279,7 +1716,33 @@ def view_tournament_signups(tournament_id):
 
 @admin_bp.route('/download_tournament_signups/<int:tournament_id>')
 def download_tournament_signups(tournament_id):
-    """Download signups for a specific tournament as an Excel file"""
+    """
+    Download signups for a specific tournament as Excel file.
+    
+    Exports all signups for a single tournament with professional formatting,
+    styled headers, and auto-adjusted column widths.
+    
+    Args:
+        tournament_id (int): The ID of the tournament to export signups for
+    
+    Excel Format:
+        - Sheet Name: '<Tournament Name> Signups'
+        - Styled header row (dark blue background, white text)
+        - Auto-adjusted column widths (capped at 50 for readability)
+        - Same columns as download_all_signups but filtered to one tournament
+    
+    File Naming:
+        - Tournament name sanitized (alphanumeric + spaces/dashes/underscores)
+        - Spaces replaced with underscores
+        - Timestamped: <tournament_name>_signups_YYYYMMDD_HHMMSS.xlsx
+    
+    Requirements:
+        - Requires pandas and openpyxl libraries
+        - Admin access (role >= 2)
+    
+    Returns:
+        Excel file download with tournament-specific filename
+    """
     user_id = session.get('user_id')
     
     if not user_id:
@@ -1414,7 +1877,33 @@ def download_tournament_signups(tournament_id):
 
 @admin_bp.route('/testing_suite')
 def testing_suite():
-    """Main testing suite dashboard for admins"""
+    """
+    Main testing suite dashboard for admins.
+    
+    Provides access to the comprehensive testing system with production
+    safety guards, verification tools, and test execution controls.
+    
+    Features:
+        - Safety status monitoring
+        - Production database protection verification
+        - Test resource tracking
+        - Quick and full test suite execution
+        - System verification tools
+        - Emergency cleanup utilities
+    
+    Safety Information Displayed:
+        - Safety status (SAFE/WARNING/ERROR)
+        - Production database protection status
+        - Number of test resources currently active
+        - Error messages if any
+    
+    Requirements:
+        - TESTING_AVAILABLE must be True
+        - Admin access (role >= 2)
+    
+    Returns:
+        Rendered testing suite dashboard with status information
+    """
     user_id = session.get('user_id')
     if not user_id:
         flash('Please log in to access this page.', 'error')
@@ -1453,7 +1942,31 @@ def testing_suite():
 
 @admin_bp.route('/testing_suite/run_quick_test', methods=['POST'])
 def run_quick_test():
-    """Run quick test suite"""
+    """
+    Run quick test suite for rapid validation.
+    
+    Executes a streamlined test suite with minimal data for fast feedback.
+    Useful for quick validation after small changes.
+    
+    Test Configuration:
+        - 5 test users
+        - 2 test events
+        - 1 test tournament
+        - Unit tests enabled
+        - Simulation enabled
+        - Roster tests enabled
+        - Metrics tests enabled
+        - Auto-cleanup after completion
+    
+    Results Stored:
+        - Timestamp of test run
+        - Overall success status
+        - Duration of test execution
+        - Test summary with pass/fail counts
+    
+    Returns:
+        Redirect to testing_suite with success/warning flash message
+    """
     user_id = session.get('user_id')
     if not user_id:
         flash('Please log in to access this page.', 'error')
@@ -1505,7 +2018,33 @@ def run_quick_test():
 
 @admin_bp.route('/testing_suite/run_full_test', methods=['POST'])
 def run_full_test():
-    """Run full test suite"""
+    """
+    Run comprehensive full test suite.
+    
+    Executes complete testing with realistic data volumes to thoroughly
+    validate system functionality before production deployment.
+    
+    Test Configuration:
+        - 30 test users (realistic team size)
+        - 5 test events (full event catalog)
+        - 3 test tournaments (multiple tournament cycle)
+        - All test categories enabled
+        - Auto-cleanup after completion
+    
+    Test Categories:
+        - Unit tests: Individual function validation
+        - Simulation: End-to-end workflow testing
+        - Roster tests: Roster generation and management
+        - Metrics tests: Points calculation and dashboards
+    
+    Results Stored:
+        - Complete test results with detailed breakdown
+        - Success rate and issue count
+        - Performance metrics
+    
+    Returns:
+        Redirect to testing_suite with success/warning flash message
+    """
     user_id = session.get('user_id')
     if not user_id:
         flash('Please log in to access this page.', 'error')
@@ -1558,7 +2097,33 @@ def run_full_test():
 
 @admin_bp.route('/testing_suite/verify_system', methods=['POST'])
 def verify_system():
-    """Run system verification"""
+    """
+    Run comprehensive system verification.
+    
+    Performs final verification checks to ensure system is production-ready.
+    Validates all critical functionality, safety measures, and data integrity.
+    
+    Verification Checks:
+        - Database integrity
+        - Production safety guards
+        - Core functionality tests
+        - Safety isolation verification
+        - Data consistency checks
+    
+    Success Criteria:
+        - >= 90%: System verification passed (production ready)
+        - 70-89%: Warnings present (review recommended)
+        - < 70%: Verification failed (do not deploy)
+    
+    Results Stored:
+        - Success rate percentage
+        - Overall success boolean
+        - Individual test results
+        - Recommendations for improvements
+    
+    Returns:
+        Redirect to testing_suite with success/warning/error flash message
+    """
     user_id = session.get('user_id')
     if not user_id:
         flash('Please log in to access this page.', 'error')
@@ -1607,7 +2172,31 @@ def verify_system():
 
 @admin_bp.route('/testing_suite/cleanup', methods=['POST'])
 def cleanup_test_data():
-    """Emergency cleanup of all test data"""
+    """
+    Emergency cleanup of all test data.
+    
+    Removes all test databases, temporary directories, and test resources
+    to free up disk space and ensure clean testing environment.
+    
+    Cleanup Operations:
+        - Remove all test database copies
+        - Delete temporary test directories
+        - Clean up test resource files
+        - Verify no production data is affected
+    
+    Safety Features:
+        - Production database integrity verified before cleanup
+        - Only removes clearly marked test resources
+        - Detailed error reporting if issues occur
+    
+    Results Stored:
+        - Cleanup timestamp
+        - Number of items cleaned
+        - Any errors encountered
+    
+    Returns:
+        Redirect to testing_suite with success/warning flash message
+    """
     user_id = session.get('user_id')
     if not user_id:
         flash('Please log in to access this page.', 'error')
@@ -1648,7 +2237,29 @@ def cleanup_test_data():
 
 @admin_bp.route('/testing_suite/results')
 def test_results():
-    """View detailed test results"""
+    """
+    View detailed test, verification, and cleanup results.
+    
+    Displays comprehensive results from recent test runs, system verifications,
+    and cleanup operations. All results are stored in the session.
+    
+    Results Displayed:
+        - Last test run results (if any):
+            * Timestamp
+            * Overall success
+            * Duration
+            * Summary statistics
+        - Last verification results (if any):
+            * Success rate
+            * Individual test results
+            * Recommendations
+        - Last cleanup results (if any):
+            * Items cleaned
+            * Errors encountered
+    
+    Returns:
+        Rendered test results page with all available result sets
+    """
     user_id = session.get('user_id')
     if not user_id:
         flash('Please log in to access this page.', 'error')
@@ -1674,7 +2285,31 @@ def test_results():
 
 @admin_bp.route('/testing_dashboard')
 def testing_dashboard():
-    """Main testing dashboard with improved UI and simulation features"""
+    """
+    Main testing dashboard with improved UI and simulation features.
+    
+    Modern interactive dashboard providing real-time testing controls,
+    progress monitoring, and comprehensive simulation capabilities.
+    
+    Features:
+        - Real-time test execution with progress tracking
+        - Interactive workflow simulations
+        - Test status monitoring via AJAX
+        - Database snapshot management
+        - Quick verification tools
+        - Visual test result displays
+    
+    Dashboard Components:
+        - Test execution controls (quick/full/custom)
+        - Workflow simulation launcher
+        - Safety status indicator
+        - Test database browser
+        - Cleanup utilities
+        - Report generation
+    
+    Returns:
+        Rendered enhanced testing dashboard with interactive UI
+    """
     user_id = session.get('user_id')
     if not user_id:
         flash('Please log in to access this page.', 'error')
@@ -1689,7 +2324,27 @@ def testing_dashboard():
 
 @admin_bp.route('/testing/status')
 def testing_status():
-    """Get current testing system status"""
+    """
+    Get current testing system status (API endpoint).
+    
+    Returns JSON with real-time testing system status for dashboard updates.
+    Called periodically by frontend to refresh status displays.
+    
+    Returns (JSON):
+        - safety_status: SAFE/WARNING/ERROR/UNAVAILABLE
+        - test_db_count: Number of active test databases
+        - last_test_time: Timestamp of last test run
+        - production_protected: Boolean indicating production safety
+        - error: Error message if status check fails
+    
+    HTTP Status Codes:
+        - 200: Success
+        - 401: Not authenticated
+        - 403: Insufficient permissions
+    
+    Returns:
+        JSON object with testing system status
+    """
     user_id = session.get('user_id')
     if not user_id:
         return {'error': 'Authentication required'}, 401
@@ -1728,7 +2383,32 @@ def testing_status():
 
 @admin_bp.route('/testing/run_tests', methods=['POST'])
 def run_enhanced_tests():
-    """Run tests via enhanced testing dashboard"""
+    """
+    Run tests via enhanced testing dashboard (API endpoint).
+    
+    Starts test execution in background thread and returns session ID
+    for progress tracking. Frontend polls test_status endpoint for updates.
+    
+    Request JSON:
+        - test_type: 'all', 'unit', 'integration', 'simulation'
+    
+    Response JSON:
+        - session_id: UUID for tracking this test run
+    
+    Background Execution:
+        - Tests run in separate daemon thread
+        - Progress updated in admin_bp.test_sessions
+        - Results available via test_status endpoint
+    
+    HTTP Status Codes:
+        - 200: Test started successfully
+        - 401: Not authenticated
+        - 403: Insufficient permissions
+        - 503: Testing system unavailable
+    
+    Returns:
+        JSON object with session_id for progress tracking
+    """
     user_id = session.get('user_id')
     if not user_id:
         return {'error': 'Authentication required'}, 401
@@ -1775,7 +2455,29 @@ def run_enhanced_tests():
 
 @admin_bp.route('/testing/test_status/<session_id>')
 def enhanced_test_status(session_id):
-    """Get status of running tests"""
+    """
+    Get status of running tests (API endpoint).
+    
+    Returns real-time progress and results for a specific test session.
+    Frontend polls this endpoint to update progress bars and displays.
+    
+    Args:
+        session_id (str): UUID of the test session to check
+    
+    Response JSON:
+        - status: 'running', 'completed', 'error'
+        - progress: 0-100 percentage
+        - results: Test results object (when completed)
+    
+    HTTP Status Codes:
+        - 200: Success
+        - 401: Not authenticated
+        - 403: Access denied (not session owner)
+        - 404: Session not found
+    
+    Returns:
+        JSON object with test execution status and progress
+    """
     user_id = session.get('user_id')
     if not user_id:
         return {'error': 'Authentication required'}, 401
@@ -1801,7 +2503,38 @@ def enhanced_test_status(session_id):
 
 @admin_bp.route('/testing/start_simulation', methods=['POST'])
 def start_enhanced_simulation():
-    """Start tournament simulation"""
+    """
+    Start tournament simulation (API endpoint).
+    
+    Launches comprehensive tournament simulation with configurable parameters.
+    Generates mock data, creates test environment, and runs through complete
+    tournament lifecycle.
+    
+    Request JSON:
+        - num_users: Number of test users to create (default: 30)
+        - num_events: Number of test events to create (default: 5)
+        - num_tournaments: Number of tournaments to simulate (default: 2)
+    
+    Response JSON:
+        - session_id: UUID for tracking this simulation
+    
+    Simulation Steps:
+        1. Create isolated test database
+        2. Generate mock users (students and parents)
+        3. Create events and enroll participants
+        4. Create tournaments and process signups
+        5. Simulate tournament execution
+        6. Generate results and metrics
+    
+    HTTP Status Codes:
+        - 200: Simulation started
+        - 401: Not authenticated
+        - 403: Insufficient permissions
+        - 503: Testing system unavailable
+    
+    Returns:
+        JSON object with session_id for progress tracking
+    """
     user_id = session.get('user_id')
     if not user_id:
         return {'error': 'Authentication required'}, 401
@@ -1855,7 +2588,32 @@ def start_enhanced_simulation():
 
 @admin_bp.route('/testing/simulation_status/<session_id>')
 def enhanced_simulation_status(session_id):
-    """Get status of running simulation"""
+    """
+    Get status of running simulation (API endpoint).
+    
+    Returns real-time progress for tournament simulation execution.
+    
+    Args:
+        session_id (str): UUID of the simulation session
+    
+    Response JSON:
+        - status: 'running', 'completed', 'error'
+        - progress: 0-100 percentage
+        - results: Simulation results including:
+            * users_created
+            * events_created
+            * tournaments_created
+            * test_database path
+    
+    HTTP Status Codes:
+        - 200: Success
+        - 401: Not authenticated
+        - 403: Access denied
+        - 404: Session not found
+    
+    Returns:
+        JSON object with simulation status and results
+    """
     user_id = session.get('user_id')
     if not user_id:
         return {'error': 'Authentication required'}, 401
@@ -1881,7 +2639,43 @@ def enhanced_simulation_status(session_id):
 
 @admin_bp.route('/testing/start_workflow', methods=['POST'])
 def start_workflow_simulation():
-    """Start workflow simulation (the full simulation path you described)"""
+    """
+    Start comprehensive workflow simulation (API endpoint).
+    
+    Executes the complete tournament workflow as described in project docs:
+    automatic database cloning, event creation, tournament management,
+    roster generation, results submission, and metrics calculation.
+    
+    Request JSON:
+        - workflow_type: 'full', 'events', 'rosters', 'metrics'
+    
+    Workflow Types:
+        - full: Complete end-to-end tournament cycle
+        - events: Focus on event management workflows
+        - rosters: Tournament roster download/upload cycle
+        - metrics: Points calculation and dashboard generation
+    
+    Full Workflow Steps:
+        1. Create cloned database automatically
+        2. Create fake events and enroll participants
+        3. Create fake tournament and download roster
+        4. Simulate roster changes and upload
+        5. End tournament and simulate results entry
+        6. Generate varying scores for participants
+        7. Access metrics overview and generate reports
+    
+    Response JSON:
+        - workflow_id: UUID for tracking this workflow
+    
+    HTTP Status Codes:
+        - 200: Workflow started
+        - 401: Not authenticated
+        - 403: Insufficient permissions
+        - 503: Testing system unavailable
+    
+    Returns:
+        JSON object with workflow_id for progress tracking
+    """
     user_id = session.get('user_id')
     if not user_id:
         return {'error': 'Authentication required'}, 401
@@ -1928,7 +2722,36 @@ def start_workflow_simulation():
 
 @admin_bp.route('/testing/workflow_status/<workflow_id>')
 def workflow_status(workflow_id):
-    """Get status of running workflow"""
+    """
+    Get status of running workflow simulation (API endpoint).
+    
+    Returns detailed progress information for multi-step workflow simulations,
+    including current step description and completion percentage.
+    
+    Args:
+        workflow_id (str): UUID of the workflow session
+    
+    Response JSON:
+        - status: 'running', 'completed', 'error'
+        - progress: 0-100 percentage
+        - step: Current step number (1-8 for full workflow)
+        - current_step: Human-readable step description
+        - results: Workflow results including:
+            * Summary of completed steps
+            * Participants created
+            * Events simulated
+            * Tournaments completed
+            * Metrics generated
+    
+    HTTP Status Codes:
+        - 200: Success
+        - 401: Not authenticated
+        - 403: Access denied
+        - 404: Workflow not found
+    
+    Returns:
+        JSON object with workflow execution status and detailed progress
+    """
     user_id = session.get('user_id')
     if not user_id:
         return {'error': 'Authentication required'}, 401
@@ -1956,7 +2779,28 @@ def workflow_status(workflow_id):
 
 @admin_bp.route('/testing/list_databases')
 def list_test_databases_enhanced():
-    """List all test databases"""
+    """
+    List all test databases (API endpoint).
+    
+    Returns a list of all currently active test database copies for
+    monitoring and management purposes.
+    
+    Response JSON:
+        - databases: Array of test database information including:
+            * Database path
+            * Creation timestamp
+            * Size
+            * Session ID (if applicable)
+    
+    HTTP Status Codes:
+        - 200: Success
+        - 401: Not authenticated
+        - 403: Insufficient permissions
+        - 500: Error listing databases
+    
+    Returns:
+        JSON object with array of test database information
+    """
     user_id = session.get('user_id')
     if not user_id:
         return {'error': 'Authentication required'}, 401
@@ -1978,7 +2822,32 @@ def list_test_databases_enhanced():
 
 @admin_bp.route('/testing/create_snapshot', methods=['POST'])
 def create_test_snapshot():
-    """Create a test database snapshot"""
+    """
+    Create a test database snapshot (API endpoint).
+    
+    Creates a new isolated test database copy for manual testing or
+    experimentation without affecting production data.
+    
+    Response JSON:
+        - success: Boolean indicating snapshot creation success
+        - snapshot_path: Full path to the created snapshot database
+    
+    Use Cases:
+        - Manual testing of new features
+        - Data exploration without risk
+        - Creating baseline databases for testing
+        - Preserving test states for debugging
+    
+    HTTP Status Codes:
+        - 200: Snapshot created successfully
+        - 401: Not authenticated
+        - 403: Insufficient permissions
+        - 503: Testing system unavailable
+        - 500: Snapshot creation failed
+    
+    Returns:
+        JSON object with success status and snapshot path
+    """
     user_id = session.get('user_id')
     if not user_id:
         return {'error': 'Authentication required'}, 401
@@ -2000,7 +2869,35 @@ def create_test_snapshot():
 
 @admin_bp.route('/testing/cleanup', methods=['POST'])
 def cleanup_enhanced_test_data():
-    """Clean up all test data"""
+    """
+    Clean up all test data (API endpoint).
+    
+    Performs emergency cleanup of all test resources including databases,
+    temporary files, and test artifacts. Safe operation with production
+    database protection.
+    
+    Response JSON:
+        - success: Boolean indicating cleanup success
+        - results: Detailed cleanup results including:
+            * test_databases_removed: Count of databases deleted
+            * temp_directories_removed: Count of directories deleted
+            * errors: Array of any errors encountered
+    
+    Safety Features:
+        - Verifies production database integrity before cleanup
+        - Only removes clearly marked test resources
+        - Provides detailed error reporting
+    
+    HTTP Status Codes:
+        - 200: Cleanup completed
+        - 401: Not authenticated
+        - 403: Insufficient permissions
+        - 503: Testing system unavailable
+        - 500: Cleanup failed
+    
+    Returns:
+        JSON object with cleanup results
+    """
     user_id = session.get('user_id')
     if not user_id:
         return {'error': 'Authentication required'}, 401
@@ -2022,7 +2919,35 @@ def cleanup_enhanced_test_data():
 
 @admin_bp.route('/testing/quick_verification', methods=['POST'])
 def run_quick_verification_enhanced():
-    """Run quick system verification"""
+    """
+    Run quick system verification (API endpoint).
+    
+    Performs rapid validation of critical system components without
+    extensive data generation. Ideal for pre-deployment checks.
+    
+    Response JSON:
+        - success_rate: Percentage of tests passed (0-100)
+        - tests_run: Total number of verification tests executed
+        - issues_found: Number of failed tests or issues detected
+        - overall_success: Boolean indicating if system is healthy
+    
+    Verification Scope:
+        - Database connectivity
+        - Model integrity
+        - Core functionality
+        - Safety guard verification
+        - Basic workflow validation
+    
+    HTTP Status Codes:
+        - 200: Verification completed
+        - 401: Not authenticated
+        - 403: Insufficient permissions
+        - 503: Testing system unavailable
+        - 500: Verification failed
+    
+    Returns:
+        JSON object with verification results and success rate
+    """
     user_id = session.get('user_id')
     if not user_id:
         return {'error': 'Authentication required'}, 401
@@ -2061,7 +2986,41 @@ def run_quick_verification_enhanced():
 
 @admin_bp.route('/testing/full_verification', methods=['POST'])
 def run_full_verification_enhanced():
-    """Run full system verification"""
+    """
+    Run full comprehensive system verification (API endpoint).
+    
+    Executes complete test suite with realistic data volumes to thoroughly
+    validate system before production deployment. This is the most thorough
+    verification available.
+    
+    Response JSON:
+        - success_rate: Percentage of tests passed (typically 95% for healthy system)
+        - tests_run: Total comprehensive tests executed (~50)
+        - issues_found: Number of failures or warnings
+        - overall_success: Boolean for production readiness
+    
+    Verification Scope:
+        - All unit tests
+        - Full workflow simulation
+        - Roster generation and management
+        - Metrics calculation accuracy
+        - Performance benchmarks
+        - Data integrity checks
+        - Production safety validation
+    
+    Duration:
+        - Typically 30-60 seconds with realistic data
+    
+    HTTP Status Codes:
+        - 200: Verification completed
+        - 401: Not authenticated
+        - 403: Insufficient permissions
+        - 503: Testing system unavailable
+        - 500: Verification failed
+    
+    Returns:
+        JSON object with comprehensive verification results
+    """
     user_id = session.get('user_id')
     if not user_id:
         return {'error': 'Authentication required'}, 401
@@ -2106,7 +3065,37 @@ def run_full_verification_enhanced():
 
 @admin_bp.route('/testing/generate_report', methods=['POST'])
 def generate_testing_report():
-    """Generate comprehensive testing report"""
+    """
+    Generate comprehensive testing report (API endpoint).
+    
+    Creates detailed PDF or HTML report of test results, verification outcomes,
+    and system health status. Useful for documentation and deployment approval.
+    
+    Response JSON:
+        - success: Boolean indicating report generation success
+        - message: Status message or error description
+        - report_url: URL to download generated report (future feature)
+    
+    Report Contents (Future):
+        - Test execution summary
+        - Success/failure statistics
+        - Performance metrics
+        - Safety verification results
+        - Recommendations for improvements
+        - Timestamp and system information
+    
+    HTTP Status Codes:
+        - 200: Report generation started/completed
+        - 401: Not authenticated
+        - 403: Insufficient permissions
+        - 500: Generation failed
+    
+    Note:
+        This is a placeholder for future PDF report generation functionality.
+    
+    Returns:
+        JSON object with generation status
+    """
     user_id = session.get('user_id')
     if not user_id:
         return {'error': 'Authentication required'}, 401
@@ -2125,7 +3114,42 @@ def generate_testing_report():
 # Background execution functions for enhanced testing
 
 def execute_enhanced_tests(session_id, test_type):
-    """Execute tests in background thread with enhanced progress tracking"""
+    """
+    Execute tests in background thread with enhanced progress tracking.
+    
+    Background worker function that runs tests asynchronously and updates
+    progress in the shared test_sessions dictionary. Frontend polls the
+    enhanced_test_status endpoint to display real-time progress.
+    
+    Args:
+        session_id (str): UUID identifying this test session
+        test_type (str): Type of test to run ('all', 'unit', 'integration', etc.)
+    
+    Execution Flow:
+        1. Validate session exists
+        2. Update progress to 10% (starting)
+        3. Initialize and run appropriate test runner
+        4. Update progress to 50% (executing tests)
+        5. Format results for web display
+        6. Update progress to 100% (completed)
+        7. Store results in session for retrieval
+    
+    Test Results Format:
+        - summary: Pass/fail counts and success rate
+        - details: Individual test results
+        - timestamp: ISO format completion time
+    
+    Error Handling:
+        - Catches all exceptions
+        - Sets session status to 'error'
+        - Stores error message in results
+        - Logs full traceback for debugging
+    
+    Thread Safety:
+        - Runs as daemon thread
+        - Updates shared admin_bp.test_sessions dictionary
+        - No database operations in background thread
+    """
     try:
         # Ensure session exists
         if not hasattr(admin_bp, 'test_sessions'):
@@ -2203,7 +3227,47 @@ def execute_enhanced_tests(session_id, test_type):
             admin_bp.test_sessions[session_id]['results'] = {'error': str(e)}
 
 def execute_enhanced_simulation(session_id):
-    """Execute simulation in background thread"""
+    """
+    Execute tournament simulation in background thread.
+    
+    Creates isolated test environment, generates mock data, and simulates
+    complete tournament workflow. Runs asynchronously with progress tracking.
+    
+    Args:
+        session_id (str): UUID identifying this simulation session
+    
+    Execution Flow:
+        1. Validate session exists and get parameters
+        2. Update progress to 10-20% (initializing)
+        3. Create isolated test database
+        4. Update progress to 30% (database ready)
+        5. Create test Flask app context
+        6. Update progress to 50% (generating data)
+        7. Generate mock users, events, tournaments
+        8. Update progress to 80% (data created)
+        9. Format results summary
+        10. Update progress to 100% (completed)
+    
+    Simulation Results:
+        - users_created: Count of mock users
+        - events_created: Count of mock events
+        - tournaments_created: Count of mock tournaments
+        - test_database: Path to isolated test database
+    
+    Fallback Behavior:
+        - If full testing system unavailable, uses SimpleSimulationRunner
+        - Degrades gracefully to provide basic simulation
+    
+    Error Handling:
+        - Comprehensive exception catching
+        - Detailed error logging with traceback
+        - Sets session status to 'error' with message
+    
+    Database Isolation:
+        - All operations on isolated test database
+        - No impact on production data
+        - Test database persists for inspection
+    """
     try:
         import time
         
@@ -2304,7 +3368,79 @@ def execute_enhanced_simulation(session_id):
             admin_bp.test_sessions[session_id]['results'] = {'error': str(e)}
 
 def execute_workflow_simulation(workflow_id, workflow_type):
-    """Execute the complete workflow simulation as described in requirements"""
+    """
+    Execute complete workflow simulation as described in project requirements.
+    
+    Runs the comprehensive tournament management workflow including database
+    cloning, event creation, tournament simulation, roster management, and
+    metrics generation. This is the most complete end-to-end test.
+    
+    Args:
+        workflow_id (str): UUID identifying this workflow session
+        workflow_type (str): Type of workflow ('full', 'events', 'rosters', 'metrics')
+    
+    Workflow Types and Steps:
+    
+        'full' - Complete Tournament Cycle (8 steps):
+            1. Creating cloned database automatically
+            2. Creating fake event and having people join it
+            3. Creating second fake event with different participants
+            4. Creating fake tournament and downloading roster
+            5. Simulating roster changes and upload
+            6. Pressing end tournament button and simulating results
+            7. Generating varying scores for participants
+            8. Entering metrics overview and generating reports
+        
+        'events' - Event Management Focus:
+            - Multiple event creation with different formats
+            - User enrollment simulation
+            - Capacity and conflict management
+        
+        'rosters' - Roster Management Focus:
+            - Automatic roster generation
+            - Download/upload cycle testing
+            - Change detection validation
+        
+        'metrics' - Metrics and Reporting Focus:
+            - Team performance dashboards
+            - Individual user metrics
+            - Comparative analysis
+    
+    Execution Flow:
+        1. Initialize workflow session
+        2. Define workflow steps based on type
+        3. Execute each step sequentially
+        4. Update progress and current_step after each
+        5. Simulate realistic processing time (1.5s per step)
+        6. Call WorkflowSimulator for actual operations
+        7. Format comprehensive results
+        8. Mark workflow as completed
+    
+    Progress Tracking:
+        - step: Current step number (1-8 for full)
+        - current_step: Human-readable step description
+        - progress: Percentage (0-100)
+        - status: 'running', 'completed', 'error'
+    
+    Results Format:
+        - summary: Key achievements and statistics
+        - workflow_steps: Array of completed steps
+        - participants_created: Mock user count
+        - events_simulated: Event count
+        - tournaments_completed: Tournament count
+        - metrics_generated: Boolean flag
+    
+    Error Handling:
+        - Catches all exceptions with full traceback
+        - Sets workflow status to 'error'
+        - Stores error message for display
+        - Safe graceful degradation
+    
+    Thread Safety:
+        - Runs as daemon thread
+        - Updates shared workflow_sessions dictionary
+        - No direct database operations
+    """
     try:
         import time
         from UNIT_TEST.workflow_simulator import WorkflowSimulator
