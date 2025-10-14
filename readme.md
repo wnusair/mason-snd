@@ -1,8 +1,5 @@
 # Mason-SND - Project Documentation
 
-**Last Updated:** October 11, 2025  
-**Purpose:** Tournament and Event Management System
-
 ---
 
 ## My pledge
