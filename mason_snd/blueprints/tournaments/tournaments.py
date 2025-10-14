@@ -306,6 +306,15 @@ def signup():
             flash("Tournament not found.", "error")
             return redirect(url_for('tournaments.signup'))
 
+        # Ensure signup deadline hasn't passed
+        if tournament.signup_deadline:
+            sd = tournament.signup_deadline
+            if sd.tzinfo is None:
+                sd = EST.localize(sd)
+            if sd < now:
+                flash("The signup deadline for this tournament has passed.", "error")
+                return redirect(url_for('tournaments.signup'))
+
         # Prevent signup if there are no form fields (no signup form)
         if not tournament.form_fields or len(tournament.form_fields) == 0:
             flash("Signup is not available for this tournament.", "error")
@@ -413,19 +422,29 @@ def signup():
         tournament_id = request.args.get('tournament_id')
         selected_tournament = Tournament.query.get(tournament_id) if tournament_id else None
 
-        # Localize signup_deadline for all tournaments
+        # Localize signup_deadline for all tournaments and filter out expired ones
+        valid_tournaments = []
         for tournament in tournaments:
             if tournament.signup_deadline:
-                tournament.signup_deadline = EST.localize(tournament.signup_deadline)
+                sd = tournament.signup_deadline
+                if sd.tzinfo is None:
+                    sd = EST.localize(sd)
+                # attach localized deadline back to object for templates
+                tournament.signup_deadline = sd
+                if sd >= now:
+                    valid_tournaments.append(tournament)
+            else:
+                # If no deadline is set, consider it valid
+                valid_tournaments.append(tournament)
 
         fields = selected_tournament.form_fields if selected_tournament else []
 
         return render_template(
             "tournaments/signup.html",
-            tournaments=tournaments,
+            tournaments=valid_tournaments,
             selected_tournament=selected_tournament,
             fields=fields,
-            now=now,  # Pass the current time to the template
+            now=now,
             user_events=user_events
         )
 
