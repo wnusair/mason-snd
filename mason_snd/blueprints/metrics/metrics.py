@@ -1,3 +1,45 @@
+"""Metrics Blueprint - Advanced analytics and performance tracking system.
+
+Provides comprehensive metrics and analytics across users, tournaments, events, and effort scores.
+Includes weighted points calculation (configurable tournament/effort balance), performance trends,
+ranking systems, and CSV exports for data analysis.
+
+Weighted Points System:
+    - Default: 70% tournament points + 30% effort points
+    - Configurable via MetricsSettings (must sum to 1.0)
+    - Tournament points: From Tournament_Performance records (bids, ranks, stages)
+    - Effort points: From Effort_Score records (event participation tracking)
+
+Route Organization:
+    Admin Routes (role >= 2):
+        - index(): Main analytics dashboard with comprehensive stats
+        - user_metrics(): Detailed user metrics table with sorting
+        - event_detail(event_id): Deep dive into specific event performance
+        - user_detail(user_id): Individual user analytics and progression
+        - tournaments_overview(): Tournament comparison and trends
+        - tournament_detail(tournament_id): Single tournament analysis
+        - events_overview(): Event comparison with engagement metrics
+        - settings(): Configure tournament/effort weight balance
+        - download_user_metrics(): CSV export of all user metrics
+        - download_events(): CSV export of event analytics
+        - download_tournaments(): CSV export of tournament stats
+        - download_user_metrics_for_tournament(tournament_id): Per-tournament user CSV
+    
+    User-Facing Routes (role >= 0):
+        - my_metrics(): Personal dashboard with rank and stats
+        - my_performance_trends(): Individual performance over time with moving averages
+        - my_ranking(): Ranking information without revealing others' data
+
+Key Features:
+    - Performance distribution analysis (high/mid/low/inactive performers)
+    - Trend tracking with moving averages and predictions
+    - Event-specific and tournament-specific analytics
+    - Timezone-aware comparisons (EST)
+    - Sortable tables with pagination
+    - Chart data for visualizations
+    - Comprehensive CSV exports
+"""
+
 import csv
 from io import StringIO
 from math import ceil
@@ -24,9 +66,20 @@ EST = pytz.timezone('US/Eastern')
 metrics_bp = Blueprint('metrics', __name__, template_folder='templates')
 
 def normalize_timestamp_for_comparison(timestamp):
-    """
-    Helper function to normalize timestamps for timezone-aware comparisons.
-    If timestamp is naive, assumes it's in EST timezone.
+    """Normalize timestamps for timezone-aware comparisons.
+    
+    Ensures all datetime objects are timezone-aware for consistent comparisons.
+    Naive datetimes are assumed to be in US/Eastern timezone.
+    
+    Args:
+        timestamp (datetime or None): The timestamp to normalize.
+    
+    Returns:
+        datetime or None: Timezone-aware datetime in EST, or None if input is None.
+    
+    Note:
+        This is critical for comparing Effort_Score timestamps and Tournament dates,
+        which may be stored as naive datetimes in the database.
     """
     if timestamp is None:
         return None
@@ -35,7 +88,19 @@ def normalize_timestamp_for_comparison(timestamp):
     return timestamp
 
 def get_point_weights():
-    """Helper function to get tournament and effort weights from settings"""
+    """Retrieve configured tournament and effort point weights.
+    
+    Fetches the weighting configuration from MetricsSettings table, creating
+    default settings (70% tournament, 30% effort) if none exist.
+    
+    Returns:
+        tuple: (tournament_weight, effort_weight) as floats that sum to 1.0.
+            Example: (0.7, 0.3) means 70% tournament points, 30% effort points.
+    
+    Note:
+        Used in weighted_points calculation: 
+        weighted_points = (tournament_pts * tournament_weight) + (effort_pts * effort_weight)
+    """
     settings = MetricsSettings.query.first()
     if not settings:
         settings = MetricsSettings()
@@ -44,7 +109,32 @@ def get_point_weights():
     return settings.tournament_weight, settings.effort_weight
 
 def calculate_comprehensive_stats():
-    """Calculate comprehensive statistics across the entire system"""
+    """Calculate system-wide statistics across all users, tournaments, and events.
+    
+    Computes comprehensive metrics including user counts, tournament statistics,
+    performance averages, effort scores, and recent activity trends (last 30 days).
+    
+    Returns:
+        dict: Comprehensive statistics including:
+            - total_users: Total user count
+            - total_tournaments: Total tournament count
+            - total_events: Total event count
+            - past_tournaments: Tournaments before current date
+            - upcoming_tournaments: Tournaments on or after current date
+            - total_performances: Total Tournament_Performance records
+            - avg_points_per_tournament: Average points across all performances
+            - total_effort_scores: Total Effort_Score records
+            - avg_effort_score: Average effort score value
+            - active_users: Users with at least one tournament performance
+            - users_with_bids: Users with bids > 0
+            - recent_tournaments: Tournaments in last 30 days
+            - recent_effort_scores: Effort scores in last 30 days
+            - engagement_rate: Percentage of users with tournament activity
+    
+    Note:
+        Handles timezone-aware comparisons for effort scores. Recent activity
+        window is 30 days from current EST time.
+    """
     current_date = datetime.now(EST)
     
     # Basic stats
@@ -101,7 +191,25 @@ def calculate_comprehensive_stats():
     }
 
 def get_tournament_trends():
-    """Get tournament performance trends over time"""
+    """Calculate tournament performance trends in chronological order.
+    
+    Analyzes all past tournaments to show progression of points, participants,
+    and averages over time. Includes cumulative tracking.
+    
+    Returns:
+        list: List of dicts (one per tournament) containing:
+            - tournament_name: Name of tournament
+            - date: Tournament date (YYYY-MM-DD format)
+            - points: Total points earned across all performances
+            - participants: Number of participants (Tournament_Performance records)
+            - avg_points_per_participant: Average points per participant
+            - cumulative_points: Running total of points across all tournaments
+            - cumulative_participants: Running total of participants
+    
+    Note:
+        Only includes tournaments with date < current EST time. Ordered
+        chronologically to show trends over time.
+    """
     tournaments = Tournament.query.filter(Tournament.date < datetime.now(EST)).order_by(Tournament.date).all()
     
     trend_data = []
@@ -129,7 +237,27 @@ def get_tournament_trends():
     return trend_data
 
 def get_event_performance_analytics():
-    """Get detailed event performance analytics"""
+    """Calculate detailed performance analytics for all events.
+    
+    Analyzes each event's participants to compute tournament points, effort points,
+    tournament participation rates, and recent activity (last 30 days).
+    
+    Returns:
+        list: List of event analytics dicts, sorted by combined avg tournament/effort points:
+            - event: Event object
+            - participant_count: Number of active participants (User_Event.active=True)
+            - avg_tournament_points: Average tournament_points across participants
+            - avg_effort_points: Average effort_points across participants
+            - total_effort_scores: Total Effort_Score records for this event
+            - recent_effort_scores: Effort scores in last 30 days (count)
+            - avg_recent_effort: Average of recent effort scores
+            - avg_tournament_participation: Average tournament count per participant
+            - top_performers: Top 5 participants by combined points (tournament + effort)
+    
+    Note:
+        Events without active participants are excluded. Recent activity window is
+        30 days with timezone-aware comparisons.
+    """
     events = Event.query.all()
     event_analytics = []
     
@@ -181,7 +309,23 @@ def get_event_performance_analytics():
     return sorted(event_analytics, key=lambda x: x['avg_tournament_points'] + x['avg_effort_points'], reverse=True)
 
 def get_user_performance_distribution():
-    """Get distribution of user performance for analytics"""
+    """Categorize all users into performance buckets based on weighted points.
+    
+    Divides users into performance tiers using weighted points calculation.
+    Distribution follows 20/60/20 rule (high/mid/low) among active users.
+    
+    Returns:
+        dict: Performance buckets containing user lists:
+            - high_performers: Top 20% by weighted points
+            - mid_performers: Middle 60% by weighted points
+            - low_performers: Bottom 20% by weighted points
+            - inactive: Users with 0 weighted points (no tournament or effort activity)
+    
+    Note:
+        Uses current tournament_weight and effort_weight from MetricsSettings.
+        Weighted score = (tournament_pts * weight) + (effort_pts * weight).
+        Only users with weighted_score > 0 are distributed into performance tiers.
+    """
     users = User.query.all()
     tournament_weight, effort_weight = get_point_weights()
     
@@ -220,7 +364,23 @@ def get_user_performance_distribution():
     return performance_buckets
 
 def next_direction(column, current_sort, current_direction):
-    """Helper function to determine next sort direction"""
+    """Determine next sort direction for sortable table columns.
+    
+    Implements three-state sorting: asc → desc → default (unsorted) → asc.
+    When clicking a different column, always starts with 'asc'.
+    
+    Args:
+        column (str): The column being clicked.
+        current_sort (str): The currently sorted column.
+        current_direction (str): Current sort direction ('asc', 'desc', or 'default').
+    
+    Returns:
+        str: Next direction to use ('asc', 'desc', or 'default').
+    
+    Examples:
+        Clicking same column cycles: asc → desc → default → asc
+        Clicking different column always starts: asc
+    """
     if current_sort == column:
         if current_direction == 'asc':
             return 'desc'
@@ -233,7 +393,26 @@ def next_direction(column, current_sort, current_direction):
 
 @metrics_bp.route('/')
 def index():
-    """Main metrics dashboard with comprehensive analytics"""
+    """Main metrics dashboard with comprehensive system-wide analytics.
+    
+    Admin route (role >= 2) displaying high-level overview of entire system including:
+    - Comprehensive system statistics (users, tournaments, events, engagement)
+    - Performance distribution (high/mid/low performers and inactive users)
+    - Top 10 performers by weighted points
+    - Top 5 events by performance
+    - Recent tournament trends (last 10 tournaments)
+    - Chart data for visualizations (tournament points, participants over time)
+    
+    Access Control:
+        Requires role >= 2 (admin). Non-admins redirected to their profile.
+    
+    Template:
+        metrics/dashboard.html with comprehensive stats, charts, and rankings.
+    
+    Note:
+        Uses weighted points (configurable tournament/effort balance) for all rankings.
+        Chart data serialized as JSON for JavaScript consumption.
+    """
     user_id = session.get('user_id')
     if not user_id:
         flash("Log in first!")
@@ -302,6 +481,31 @@ def index():
 
 @metrics_bp.route('/user_metrics')
 def user_metrics():
+    """Sortable paginated table of all user metrics.
+    
+    Admin route displaying comprehensive user metrics with advanced sorting and pagination.
+    Supports sorting by database columns (name, bids) and computed properties (points).
+    
+    Query Parameters:
+        - page (int): Page number (default: 1)
+        - sort (str): Sort column - 'name', 'bids', 'total_points', 'weighted_points',
+                     'tournament_points', 'effort_points' (default: 'default')
+        - direction (str): 'asc', 'desc', or 'default' (default: 'default')
+    
+    Sorting Logic:
+        - Database columns (name, bids): Sorted via SQL query
+        - Computed columns (points): All users fetched and sorted in Python
+        - Default: Alphabetical by last_name, first_name
+    
+    Access Control:
+        Requires role >= 2 (admin). Non-admins redirected to their profile.
+    
+    Returns:
+        Paginated user list (15 per page) with current tournament_weight and effort_weight.
+    
+    Template:
+        metrics/user_metrics_overview.html with sortable columns and pagination controls.
+    """
     user_id = session.get('user_id')
     if not user_id:
         flash("Log in first!")
@@ -388,6 +592,33 @@ def user_metrics():
 
 @metrics_bp.route('/user_metrics/download')
 def download_user_metrics():
+    """Generate CSV export of all user metrics with comprehensive details.
+    
+    Admin route exporting full user roster with metrics, contact information,
+    emergency contacts, and parent/child relationships.
+    
+    Query Parameters:
+        - sort (str): Same sorting options as user_metrics route
+        - direction (str): 'asc', 'desc', or 'default'
+    
+    CSV Columns:
+        - First Name, Last Name, Email, Phone Number
+        - Emergency Contact: First Name, Last Name, Number, Relationship, Email
+        - Parent/Child: Relationship status ('Parent', 'Child', 'Both', or '')
+        - Bids, Points (Tournaments), Points (Effort), Total Points
+        - Weighted Points (with percentage breakdown in header)
+    
+    Parent/Child Logic:
+        - Parent: User is judge_id in Judges table (has a child)
+        - Child: User is child_id in Judges table (has a parent)
+        - Both: User appears in both roles
+    
+    Access Control:
+        Requires role >= 2 (admin). Non-admins redirected to their profile.
+    
+    Returns:
+        CSV file download: 'user_metrics.csv' with comprehensive user data.
+    """
     user_id = session.get('user_id')
     if not user_id:
         flash("Log in first!")
@@ -498,6 +729,39 @@ def download_user_metrics():
 
 @metrics_bp.route('/event/<int:event_id>')
 def event_detail(event_id):
+    """Detailed analytics for a specific event.
+    
+    Admin route providing deep dive into single event's performance, including
+    participant analytics, performance distribution, and activity trends.
+    
+    URL Parameters:
+        event_id (int): Primary key of Event to analyze.
+    
+    Analytics Provided:
+        Participant Analytics (per active user):
+            - Total/weighted points, tournament participations (all-time + recent 6 months)
+            - Bids count, average tournament points, effort scores (all + recent 30 days)
+        
+        Event Statistics:
+            - Total participants, averages (tournament/effort points)
+            - Total tournament participations, bids, participations per person
+            - Event type (Speech=0, LD=1, PF=2)
+        
+        Performance Distribution:
+            - High Performers (60+ pts), Mid (20-59), Developing (1-19), New (0 pts)
+        
+        Monthly Trends (last 6 months):
+            - Effort scores per month, tournament performances per month
+    
+    Access Control:
+        Requires role >= 2 (admin). Non-admins redirected to their profile.
+    
+    Returns:
+        404 if event not found. Redirects to events_overview if no active participants.
+    
+    Template:
+        metrics/event_detail.html with comprehensive event analytics.
+    """
     user_id = session.get('user_id')
     if not user_id:
         flash("Log in first!")
@@ -627,6 +891,52 @@ def event_detail(event_id):
 
 @metrics_bp.route('/user/<int:user_id>')
 def user_detail(user_id):
+    """Comprehensive individual user performance analytics.
+    
+    Admin route providing detailed analysis of a single user's tournament performance,
+    progression over time, event participation, and ranking.
+    
+    URL Parameters:
+        user_id (int): Primary key of User to analyze.
+    
+    Analytics Provided:
+        Tournament Progression:
+            - All Tournament_Performance records in chronological order
+            - Cumulative points tracking, per-tournament breakdown
+            - Stage advancement tracking (0=None, 1=Double Octas...5=Finals)
+        
+        Performance Statistics:
+            - Total tournaments, bids, average points, best performance
+            - Recent average (last 5 tournaments), improvement trend
+            - Bid rate percentage
+        
+        Event Analytics (per active event):
+            - Effort scores (all-time + recent 30 days)
+            - Average effort scores (overall + recent)
+        
+        Peer Comparison:
+            - User rank among all active users (by weighted points)
+            - Total active users count
+        
+        Chart Data:
+            - Points per tournament, cumulative points
+            - Predicted next performance (if >= 3 tournaments)
+            - Trend analysis (up/down/flat with percentage)
+        
+        Recent Activity:
+            - Tournaments in last 6 months with details
+            - Top events by effort score
+            - Achievement badges (veteran, consistent, high achiever)
+    
+    Access Control:
+        Requires role >= 2 (admin). Non-admins redirected to their profile.
+    
+    Returns:
+        404 if user not found.
+    
+    Template:
+        metrics/user_detail.html with charts, progression data, and comprehensive analytics.
+    """
     current_user_id = session.get('user_id')
     if not current_user_id:
         flash("Log in first!")
@@ -819,6 +1129,38 @@ def user_detail(user_id):
 
 @metrics_bp.route('/tournaments')
 def tournaments_overview():
+    """Sortable paginated overview of all tournaments with analytics.
+    
+    Admin route displaying tournament comparison table with performance metrics,
+    participation rates, and trend charts.
+    
+    Query Parameters:
+        - page (int): Page number (default: 1)
+        - sort (str): Sort column - 'name', 'date', 'total_points', 'total_bids',
+                     'avg_points', 'participation_rate' (default: 'date')
+        - direction (str): 'asc' or 'desc' (default: 'desc')
+    
+    Sorting Logic:
+        - Database columns (name, date): Sorted via SQL query with pagination
+        - Computed columns: All tournaments fetched, computed, sorted, then paginated manually
+    
+    Tournament Analytics (per tournament):
+        - Total/average points, bid count, bid rate
+        - Participant count, signup count, participation rate
+        - Stage distribution (breakdown by advancement level)
+    
+    Chart Data (last 15 tournaments chronologically):
+        - Total points, participant count, average points per tournament
+    
+    Access Control:
+        Requires role >= 2 (admin). Non-admins redirected to their profile.
+    
+    Returns:
+        Paginated tournament list (15 per page) with analytics and charts.
+    
+    Template:
+        metrics/tournaments_overview.html with sortable table and trend charts.
+    """
     user_id = session.get('user_id')
     if not user_id:
         flash("Log in first!")
@@ -958,6 +1300,51 @@ def tournaments_overview():
 
 @metrics_bp.route('/tournament/<int:tournament_id>')
 def tournament_detail(tournament_id):
+    """Detailed analytics for a specific tournament.
+    
+    Admin route providing comprehensive analysis of single tournament including
+    participant performance, stage distribution, event breakdown, and comparative analysis.
+    
+    URL Parameters:
+        tournament_id (int): Primary key of Tournament to analyze.
+    
+    Analytics Provided:
+        Basic Statistics:
+            - Total signups (is_going=True), actual participants (performances)
+            - Participation rate, total/average points, bid count/rate
+        
+        Stage Breakdown:
+            - Distribution by advancement stage (0=None...5=Finals)
+            - Count per stage with stage names
+        
+        Points Distribution:
+            - Buckets: 0-20, 21-40, 41-60, 61-80, 81+ points
+        
+        Event Breakdown:
+            - Per-event statistics (participants, points, bids, rates)
+            - Only includes events with signups and performances
+        
+        Top Performers:
+            - All participants ranked by performance points, then weighted points
+            - Includes user info, rank, stage, events participated
+        
+        Comparative Analysis:
+            - Last 5 tournaments before this one
+            - Comparison of avg points, bid rate, participant count
+        
+        Judge Information:
+            - All accepted judges and competitors who judged
+            - Event assignments for each judge
+    
+    Access Control:
+        Requires role >= 2 (admin). Non-admins redirected to their profile.
+    
+    Returns:
+        404 if tournament not found.
+    
+    Template:
+        metrics/tournament_detail.html with comprehensive tournament analytics.
+    """
     user_id = session.get('user_id')
     if not user_id:
         flash("Log in first!")
@@ -1108,6 +1495,47 @@ def tournament_detail(tournament_id):
 
 @metrics_bp.route('/events')
 def events_overview():
+    """Sortable paginated overview of all events with comprehensive analytics.
+    
+    Admin route displaying event comparison table with performance metrics,
+    engagement scores, and top performers.
+    
+    Query Parameters:
+        - page (int): Page number (default: 1)
+        - sort (str): Sort column - 'name', 'weighted_points', 'total_points',
+                     'effort_points', 'tournament_points', 'participant_count',
+                     'avg_tournament_participation', 'bid_rate', 'engagement_score'
+                     (default: 'weighted_points')
+        - direction (str): 'asc' or 'desc' (default: 'desc')
+    
+    Event Analytics (per event with active participants):
+        - Weighted/total/tournament/effort points (totals and averages)
+        - Participant count, tournament participations (all-time + recent 6 months)
+        - Bid count and bid rate
+        - Effort scores (all + recent 30 days)
+        - Performance distribution (high/mid/developing/new)
+        - Top 3 performers by combined points
+        - Engagement score: (recent effort scores / participants * 10)
+        - Event type (Speech=0, LD=1, PF=2)
+    
+    Chart Data (top 10 events):
+        - Weighted points, participant count, engagement score
+    
+    Sorting:
+        All events are fetched, computed, then sorted in Python before pagination.
+    
+    Access Control:
+        Requires role >= 2 (admin). Non-admins redirected to their profile.
+    
+    Returns:
+        Paginated event list (15 per page) with analytics and charts.
+    
+    Template:
+        metrics/events_overview.html with sortable table and comparison charts.
+    
+    Note:
+        Events without active participants are excluded from analytics.
+    """
     user_id = session.get('user_id')
     if not user_id:
         flash("Log in first!")
@@ -1270,6 +1698,40 @@ def events_overview():
 @metrics_bp.route('/settings', methods=['GET', 'POST'])
 @prevent_race_condition('metrics_settings', min_interval=1.0, redirect_on_duplicate=lambda uid, form: redirect(url_for('metrics.settings')))
 def settings():
+    """Configure tournament and effort point weights for weighted calculations.
+    
+    Admin route for adjusting the balance between tournament points and effort points
+    in all weighted_points calculations across the metrics system.
+    
+    Methods:
+        GET: Display current settings with weight percentages.
+        POST: Update tournament_weight and effort_weight.
+    
+    Form Fields (POST):
+        - tournament_weight (float): Weight for tournament points (0.0 to 1.0)
+        - effort_weight (float): Weight for effort points (0.0 to 1.0)
+    
+    Validation:
+        - Both weights must sum to exactly 1.0 (checked with rounding to 2 decimals)
+        - Flash error if validation fails, redirect back to settings
+        - Flash success on valid update
+    
+    Default Weights:
+        If no MetricsSettings record exists, creates one with default values.
+    
+    Race Condition Protection:
+        @prevent_race_condition decorator ensures no duplicate submissions within 1 second.
+    
+    Access Control:
+        Requires role >= 2 (admin). Non-admins redirected to their profile.
+    
+    Template:
+        metrics/metrics_settings.html with weight configuration form.
+    
+    Note:
+        Changing weights affects ALL weighted_points calculations system-wide,
+        including rankings, charts, and CSV exports.
+    """
     user_id = session.get('user_id')
     user = User.query.filter_by(id=user_id).first()
     if not user or user.role < 2:
@@ -1300,6 +1762,31 @@ def settings():
 
 @metrics_bp.route('/download_events')
 def download_events():
+    """Generate CSV export of all events with points analytics.
+    
+    Admin route exporting event performance metrics with sorting.
+    
+    Query Parameters:
+        - sort (str): 'name', 'weighted_points', 'total_points', 'effort_points',
+                     'tournament_points' (default: 'weighted_points')
+        - direction (str): 'asc' or 'desc' (default: 'desc')
+    
+    CSV Columns:
+        - Event Name
+        - Weighted Points (using current tournament/effort weights)
+        - Total Points (tournament + effort)
+        - Effort Points (sum of all effort_points for event participants)
+        - Tournament Points (sum of all tournament_points for event participants)
+    
+    Note:
+        Events without participants show 0 for all point values.
+    
+    Access Control:
+        Requires role >= 2 (admin). Non-admins redirected to their profile.
+    
+    Returns:
+        CSV file download: 'events_overview.csv'
+    """
     user_id = session.get('user_id')
     if not user_id:
         flash("Log in first!")
@@ -1376,6 +1863,30 @@ def download_events():
 
 @metrics_bp.route('/download_tournaments')
 def download_tournaments():
+    """Generate CSV export of all tournaments with points and bids.
+    
+    Admin route exporting tournament performance metrics with sorting.
+    
+    Query Parameters:
+        - sort (str): 'name', 'total_points', 'total_bids' (default: 'name')
+        - direction (str): 'asc' or 'desc' (default: 'asc')
+    
+    CSV Columns:
+        - Name (tournament name)
+        - Total Points (sum of all Tournament_Performance.points for tournament)
+        - Total Bids (sum of User.bids for all participants - NOTE: this is user's
+                     total bids, not bids earned at this specific tournament)
+    
+    Note:
+        Total Bids column sums each participant's total bid count (User.bids),
+        not just bids from this tournament. This may not reflect tournament-specific bids.
+    
+    Access Control:
+        Requires role >= 2 (admin). Non-admins redirected to their profile.
+    
+    Returns:
+        CSV file download: 'tournaments_overview.csv'
+    """
     user_id = session.get('user_id')
     if not user_id:
         flash("Log in first!")
@@ -1433,7 +1944,43 @@ def download_tournaments():
 
 @metrics_bp.route('/my_metrics')
 def my_metrics():
-    """User's personal metrics dashboard"""
+    """User's personal metrics dashboard with performance stats and ranking.
+    
+    User-facing route (all logged-in users) displaying individual performance metrics
+    without revealing other users' detailed data.
+    
+    Analytics Displayed:
+        Overall Statistics:
+            - Total tournaments, points (tournament/effort/total/weighted)
+            - Bids count, average points, best performance
+            - Recent average (last 5 tournaments), bid rate
+        
+        Ranking Information:
+            - User's rank among all active users (by weighted points)
+            - Total active users count (users with tournament or effort activity)
+            - Rank calculated by counting users with higher weighted points
+        
+        Recent Activity (last 6 months):
+            - Tournament count in last 180 days
+            - List of recent performances (last 10 tournaments)
+        
+        Event Breakdown:
+            - Per active event: tournament count, points, bids, bid rate
+            - Sorted by average points per event
+    
+    Access Control:
+        Requires login (any role). Displays only current user's own data.
+    
+    Privacy:
+        User sees their rank and total active user count, but NOT other users'
+        names, points, or detailed statistics.
+    
+    Template:
+        metrics/user_dashboard.html with personal stats and recent activity.
+    
+    Note:
+        Uses current weighted points configuration (tournament/effort balance).
+    """
     user_id = session.get('user_id')
     if not user_id:
         flash("Log in first!")
@@ -1545,7 +2092,43 @@ def my_metrics():
 
 @metrics_bp.route('/my_performance_trends')
 def my_performance_trends():
-    """User's performance trends over time"""
+    """User's performance trends with moving averages and predictions.
+    
+    User-facing route displaying chronological performance analysis with trend tracking.
+    
+    Analytics Displayed:
+        Tournament Progression:
+            - All tournaments in chronological order
+            - Points per tournament, cumulative points, bid/rank/stage info
+        
+        Weekly Analysis:
+            - Tournaments per week, total points per week, bids per week
+            - Week start is Monday (weekday=0)
+        
+        Moving Averages:
+            - 5-tournament rolling average for each data point
+            - Smooths out variance to show overall trend
+        
+        Trend Analysis (if >= 3 tournaments):
+            - Direction: 'improving' (recent > older by 10%+)
+                       'declining' (recent < older by 10%+)
+                       'stable' (within 10% variance)
+            - Percentage change from older average to recent average
+            - Recent = last 3 tournaments, Older = all before last 3
+        
+        Chart Data:
+            - Points per tournament, cumulative points, moving averages
+            - Serialized as JSON for JavaScript chart rendering
+    
+    Access Control:
+        Requires login (any role). Displays only current user's own data.
+    
+    Template:
+        metrics/user_trends.html with progression charts and trend analysis.
+    
+    Note:
+        Timezone-aware date handling for accurate weekly grouping.
+    """
     user_id = session.get('user_id')
     if not user_id:
         flash("Log in first!")
@@ -1638,7 +2221,42 @@ def my_performance_trends():
 
 @metrics_bp.route('/my_ranking')
 def my_ranking():
-    """User's ranking information (without revealing others' data)"""
+    """User's ranking and percentile information without revealing competitors' data.
+    
+    User-facing route showing ranking statistics and performance changes without
+    disclosing other users' names or detailed metrics.
+    
+    Analytics Displayed:
+        Overall Ranking:
+            - User's rank (1 = highest weighted points)
+            - Total active users (users with tournament or effort activity)
+            - Percentile (higher is better - e.g., 90th percentile = top 10%)
+            - Users above/below current user (counts only)
+            - User's weighted score
+        
+        Performance Change (3-month comparison):
+            - Recent average (last 3 months)
+            - Older average (3-6 months ago)
+            - Absolute and percentage change
+        
+        Event-Specific Rankings:
+            - Rank within each active event
+            - Total participants in event, percentile
+            - Only shown if event has 2+ participants
+    
+    Privacy:
+        User sees counts and their own position, but NEVER sees other users'
+        names, points, or identifying information.
+    
+    Access Control:
+        Requires login (any role). Displays only current user's ranking data.
+    
+    Template:
+        metrics/user_ranking.html with ranking stats and performance trends.
+    
+    Note:
+        Uses weighted points (configurable tournament/effort balance) for all rankings.
+    """
     user_id = session.get('user_id')
     if not user_id:
         flash("Log in first!")
@@ -1751,6 +2369,34 @@ def my_ranking():
 
 @metrics_bp.route('/download_user_metrics_for_tournament/<int:tournament_id>')
 def download_user_metrics_for_tournament(tournament_id):
+    """Generate CSV export of user metrics for a specific tournament.
+    
+    Admin route exporting participant performance data for one tournament,
+    including both tournament-specific and overall user metrics.
+    
+    URL Parameters:
+        tournament_id (int): Primary key of Tournament to export.
+    
+    CSV Columns:
+        - Name (Full name: first + last)
+        - Total Points (User's overall tournament_points + effort_points)
+        - Tournament Points (User's overall tournament_points property)
+        - Weighted Points (User's overall weighted score using current weights)
+        - Tournament Performance Points (Points earned at THIS tournament - p.points)
+        - Bid (Whether user earned bid at THIS tournament - 'Yes'/'No')
+    
+    Note:
+        Mixes tournament-specific data (performance points, bid) with overall
+        user data (total points, tournament points, weighted points). All users
+        with Tournament_Performance records for this tournament are included.
+    
+    Access Control:
+        Requires role >= 2 (admin). Non-admins redirected to their profile.
+    
+    Returns:
+        404 if tournament not found.
+        CSV file download: 'tournament_{name}_user_metrics.csv'
+    """
     user_id = session.get('user_id')
     if not user_id:
         flash("Log in first!")

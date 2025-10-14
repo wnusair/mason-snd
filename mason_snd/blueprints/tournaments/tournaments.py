@@ -1,22 +1,59 @@
+"""
+Tournaments Blueprint
+
+This module handles all tournament-related functionality including creation,
+signup management, judge requests, results submission, and partner matching.
+
+Key Features:
+    - Tournament Creation: Admins can create tournaments with custom forms
+    - Tournament Signup: Students sign up for events within tournaments
+    - Judge Requests: Students can request their parents to judge
+    - Results Submission: Students and admins can submit tournament performance
+    - Partner Matching: Support for partner events (e.g., Public Forum)
+    - Custom Forms: Tournaments can have dynamic form fields for additional data
+
+Workflow:
+    1. Admin creates tournament with dates and deadlines
+    2. Admin optionally adds custom form fields
+    3. Students sign up for tournament events
+    4. Students request judges (parents) if bringing one
+    5. After tournament, students submit results
+    6. Admin finalizes and publishes results
+"""
+
 from flask import Blueprint, render_template, request, redirect, url_for, flash, session
 
 from mason_snd.extensions import db
 from mason_snd.models.auth import User, Judges
-from mason_snd.models.tournaments import Tournament, Tournament_Performance, Tournaments_Attended, Form_Responses, Form_Fields, Tournament_Signups, Tournament_Judges
+from mason_snd.models.tournaments import (
+    Tournament, Tournament_Performance, Tournaments_Attended,
+    Form_Responses, Form_Fields, Tournament_Signups, Tournament_Judges
+)
 from mason_snd.models.events import User_Event, Event
 from mason_snd.utils.race_protection import prevent_race_condition
 
 from werkzeug.security import generate_password_hash, check_password_hash
-
 from datetime import datetime
 import pytz
 
+# Timezone constant
 EST = pytz.timezone('US/Eastern')
 
+# Blueprint configuration
 tournaments_bp = Blueprint('tournaments', __name__, template_folder='templates')
+
 
 @tournaments_bp.route('/')
 def index():
+    """
+    Display list of tournaments categorized as upcoming or past.
+    
+    Shows all tournaments sorted by date, with separation between future
+    tournaments (upcoming) and tournaments that have already occurred (past).
+    
+    Returns:
+        Rendered template with upcoming_tournaments and past_tournaments lists
+    """
     tournaments = Tournament.query.all()
 
     user_id = session.get('user_id')
@@ -47,17 +84,42 @@ def index():
     upcoming_tournaments.sort(key=lambda t: t.date)
     past_tournaments.sort(key=lambda t: t.date, reverse=True)
 
-    return render_template('tournaments/index.html', 
-                         upcoming_tournaments=upcoming_tournaments, 
-                         past_tournaments=past_tournaments, 
-                         user=user, 
-                         now=now)
+    return render_template(
+        'tournaments/index.html',
+        upcoming_tournaments=upcoming_tournaments,
+        past_tournaments=past_tournaments,
+        user=user,
+        now=now
+    )
 
-from datetime import datetime
+
 
 @tournaments_bp.route('/add_tournament', methods=['POST', 'GET'])
-@prevent_race_condition('add_tournament', min_interval=2.0, redirect_on_duplicate=lambda uid, form: redirect(url_for('tournaments.index')))
+@prevent_race_condition(
+    'add_tournament',
+    min_interval=2.0,
+    redirect_on_duplicate=lambda uid, form: redirect(url_for('tournaments.index'))
+)
 def add_tournament():
+    """
+    Create a new tournament (admin only).
+    
+    GET: Display tournament creation form
+    POST: Create tournament with provided details
+    
+    Form Fields:
+        - name: Tournament name
+        - address: Tournament location
+        - date: Tournament date and time (YYYY-MM-DDTHH:MM)
+        - signup_deadline: Deadline for signups (YYYY-MM-DDTHH:MM)
+        - performance_deadline: Deadline for results submission (YYYY-MM-DDTHH:MM)
+    
+    Access: Requires role >= 2 (Admin)
+    
+    Returns:
+        GET: Rendered tournament creation form
+        POST: Redirect to tournaments index with success message
+    """
     user_id = session.get('user_id')
     if not user_id:
         flash("Please Log in", "error")
@@ -72,13 +134,13 @@ def add_tournament():
         name = request.form.get("name")
         address = request.form.get("address")
         date_str = request.form.get("date")  # "YYYY-MM-DDTHH:MM"
-        signup_deadline_str = request.form.get("signup_deadline")  # "YYYY-MM-DDTHH:MM"
-        performance_deadline_str = request.form.get("performance_deadline")  # "YYYY-MM-DDTHH:MM"
+        signup_deadline_str = request.form.get("signup_deadline")
+        performance_deadline_str = request.form.get("performance_deadline")
         created_at = datetime.now(EST)
 
         try:
             # Convert string inputs to datetime objects
-            date = datetime.strptime(date_str, "%Y-%m-%dT%H:%M")  # Now parses datetime
+            date = datetime.strptime(date_str, "%Y-%m-%dT%H:%M")
             signup_deadline = datetime.strptime(signup_deadline_str, "%Y-%m-%dT%H:%M")
             performance_deadline = datetime.strptime(performance_deadline_str, "%Y-%m-%dT%H:%M")
         except ValueError:
@@ -116,6 +178,41 @@ def add_tournament():
 @tournaments_bp.route('/add_form', methods=['GET', 'POST'])
 @prevent_race_condition('add_form', min_interval=1.5, redirect_on_duplicate=lambda uid, form: redirect(url_for('tournaments.index')))
 def add_form():
+    """
+    Add custom form fields to a tournament (admin only).
+    
+    Allows admins to create dynamic form fields that students must complete
+    during tournament signup. Supports multiple field types including text,
+    textarea, select dropdowns, and checkboxes.
+    
+    GET: Display form creation interface with tournament selection
+    POST: Create form fields for selected tournament
+    
+    Form Field Attributes:
+        - label: Field label/question text
+        - type: Field type ('text', 'textarea', 'select', 'checkbox')
+        - options: Comma-separated options for select/checkbox fields
+        - required: Boolean indicating if field is mandatory
+        - tournament_id: Tournament to attach fields to
+    
+    Field Types:
+        - text: Single-line text input
+        - textarea: Multi-line text input
+        - select: Dropdown selection
+        - checkbox: Yes/No checkbox
+    
+    Features:
+        - Add multiple fields at once (dynamic form builder)
+        - Optional vs required field designation
+        - Dropdown options for select fields
+        - Supports special questions (e.g., "Are you bringing a judge?")
+    
+    Access: Requires role >= 2 (Admin)
+    
+    Returns:
+        GET: Rendered form creation interface
+        POST: Redirect to tournaments index with success message
+    """
     user_id = session.get('user_id')
     if not user_id:
         flash("Please log in", "error")
@@ -161,8 +258,33 @@ def add_form():
     return render_template("tournaments/add_form.html", tournaments=tournaments)
 
 @tournaments_bp.route('/signup', methods=['GET', 'POST'])
-@prevent_race_condition('tournament_signup', min_interval=1.5, redirect_on_duplicate=lambda uid, form: redirect(url_for('tournaments.index')))
+@prevent_race_condition(
+    'tournament_signup',
+    min_interval=1.5,
+    redirect_on_duplicate=lambda uid, form: redirect(url_for('tournaments.index'))
+)
 def signup():
+    """
+    Handle tournament signup for students.
+    
+    Students select which event(s) they're competing in at a tournament,
+    indicate if they're bringing a judge, fill out custom form fields,
+    and optionally select a partner for partner events.
+    
+    GET: Display signup form with available events and custom fields
+    POST: Process signup and create Tournament_Signups records
+    
+    Features:
+        - Multi-event signup (can sign up for multiple events at once)
+        - Partner selection for partner events
+        - Custom form responses
+        - Judge request flag
+        - Automatic Tournament_Judges record creation
+    
+    Returns:
+        GET: Rendered signup form
+        POST: Redirect to tournaments index with success message
+    """
     tournaments = Tournament.query.all()
 
     user_id = session.get('user_id')
@@ -183,6 +305,15 @@ def signup():
         if not tournament:
             flash("Tournament not found.", "error")
             return redirect(url_for('tournaments.signup'))
+
+        # Ensure signup deadline hasn't passed
+        if tournament.signup_deadline:
+            sd = tournament.signup_deadline
+            if sd.tzinfo is None:
+                sd = EST.localize(sd)
+            if sd < now:
+                flash("The signup deadline for this tournament has passed.", "error")
+                return redirect(url_for('tournaments.signup'))
 
         # Prevent signup if there are no form fields (no signup form)
         if not tournament.form_fields or len(tournament.form_fields) == 0:
@@ -291,25 +422,62 @@ def signup():
         tournament_id = request.args.get('tournament_id')
         selected_tournament = Tournament.query.get(tournament_id) if tournament_id else None
 
-        # Localize signup_deadline for all tournaments
+        # Localize signup_deadline for all tournaments and filter out expired ones
+        valid_tournaments = []
         for tournament in tournaments:
             if tournament.signup_deadline:
-                tournament.signup_deadline = EST.localize(tournament.signup_deadline)
+                sd = tournament.signup_deadline
+                if sd.tzinfo is None:
+                    sd = EST.localize(sd)
+                # attach localized deadline back to object for templates
+                tournament.signup_deadline = sd
+                if sd >= now:
+                    valid_tournaments.append(tournament)
+            else:
+                # If no deadline is set, consider it valid
+                valid_tournaments.append(tournament)
 
         fields = selected_tournament.form_fields if selected_tournament else []
 
         return render_template(
             "tournaments/signup.html",
-            tournaments=tournaments,
+            tournaments=valid_tournaments,
             selected_tournament=selected_tournament,
             fields=fields,
-            now=now,  # Pass the current time to the template
+            now=now,
             user_events=user_events
         )
 
 @tournaments_bp.route('/bringing_judge/<int:tournament_id>', methods=['POST', 'GET'])
 @prevent_race_condition('bringing_judge', min_interval=1.0, redirect_on_duplicate=lambda uid, form: redirect(url_for('tournaments.index')))
 def bringing_judge(tournament_id):
+    """
+    Select which judge (parent) the student is bringing to a tournament.
+    
+    After indicating they're bringing a judge during signup, students use
+    this route to specify which of their registered parents will judge.
+    Automatically updates Tournament_Signups and Tournament_Judges records.
+    
+    Args:
+        tournament_id (int): The tournament the student is attending
+    
+    GET: Display form with dropdown of student's parent judges
+    POST: Save judge selection and update database
+    
+    Judge Selection:
+        - Lists all parents associated with student (from Judges table)
+        - Updates Tournament_Signups.judge_id
+        - Updates Tournament_Signups.bringing_judge to True
+        - Updates Tournament_Judges records for all events student signed up for
+    
+    Database Updates:
+        - Tournament_Signups: bringing_judge=True, judge_id set
+        - Tournament_Judges: judge_id populated for student's events
+    
+    Returns:
+        GET: Rendered judge selection form with parent options
+        POST: Redirect to tournaments index with success message
+    """
     user_id = session.get('user_id')
 
     if not user_id:
@@ -356,6 +524,31 @@ def bringing_judge(tournament_id):
 
 @tournaments_bp.route('/delete_tournament/<int:tournament_id>', methods=['POST'])
 def delete_tournament(tournament_id):
+    """
+    Delete a tournament and all related data (admin only).
+    
+    Permanently removes a tournament from the system. Related data is
+    cascade-deleted through database relationships.
+    
+    Args:
+        tournament_id (int): The ID of the tournament to delete
+    
+    Cascade Deletions:
+        - Tournament_Signups (all student signups)
+        - Tournament_Performance (all submitted results)
+        - Form_Fields (custom form fields)
+        - Form_Responses (student form responses)
+        - Tournament_Judges (judge requests and acceptances)
+    
+    Access: Requires role >= 2 (Admin)
+    
+    Warning:
+        This is a destructive operation with no confirmation dialog.
+        All tournament data is permanently lost.
+    
+    Returns:
+        Redirect to tournaments index
+    """
     user_id = session.get('user_id')
     if not user_id:
         flash("Please Log in", "error")
@@ -376,6 +569,38 @@ def delete_tournament(tournament_id):
 @tournaments_bp.route('/judge_requests', methods=['POST', 'GET'])
 @prevent_race_condition('judge_requests', min_interval=1.0, redirect_on_duplicate=lambda uid, form: redirect(url_for('tournaments.index')))
 def judge_requests():
+    """
+    View and respond to judge requests (parents only).
+    
+    Parents see a list of all tournaments where their children have requested
+    them to judge. They can accept or decline each request.
+    
+    GET: Display all pending judge requests
+    POST: Update acceptance status for judge requests
+    
+    Displayed Information:
+        - Tournament name and location
+        - Tournament date
+        - Child's name (which child is requesting)
+        - Current acceptance status
+    
+    Form Actions:
+        - decision_{request_id}: 'yes' or 'no' for each request
+        - Updates Tournament_Judges.accepted field
+    
+    Access: Requires user.is_parent == True
+    
+    Use Case:
+        1. Student signs up for tournament and requests parent to judge
+        2. Parent logs in and visits this route
+        3. Parent reviews each request (tournament, date, child)
+        4. Parent accepts or declines each request
+        5. Acceptance status saved in Tournament_Judges
+    
+    Returns:
+        GET: Rendered judge requests page with all pending requests
+        POST: Redirect to judge_requests with success message
+    """
     user_id = session.get('user_id')
     user = User.query.filter_by(id=user_id).first()
 
@@ -416,6 +641,34 @@ def judge_requests():
 
 @tournaments_bp.route('/my_tournaments')
 def my_tournaments():
+    """
+    View list of tournaments the current user attended.
+    
+    Displays all past tournaments where the user signed up (is_going=True),
+    showing submission status and allowing result submission if deadline
+    hasn't passed.
+    
+    Displayed Information:
+        - Tournament name, date, location
+        - Performance submission status
+        - Whether user can still submit results
+        - Performance deadline
+    
+    Submission Eligibility:
+        - User must have signed up (Tournament_Signups.is_going=True)
+        - Tournament date must have passed
+        - Performance deadline must be in the future
+        - User must not have already submitted results
+    
+    Features:
+        - View-only access to already-submitted results
+        - Direct link to submit results if eligible
+        - Visual indicators for submission status
+        - Sorted by date (newest first)
+    
+    Returns:
+        Rendered my_tournaments page with tournament list and submission status
+    """
     user_id = session.get('user_id')
     if not user_id:
         flash("Must Be Logged In")
@@ -454,6 +707,42 @@ def my_tournaments():
 @tournaments_bp.route('/submit_results/<int:tournament_id>', methods=['GET', 'POST'])
 @prevent_race_condition('submit_results', min_interval=2.0, redirect_on_duplicate=lambda uid, form: redirect(url_for('tournaments.view_results', tournament_id=request.view_args.get('tournament_id'))))
 def submit_results(tournament_id):
+    """
+    Close results collection for a tournament (admin only).
+    
+    Admin route to finalize a tournament by marking results_submitted=True,
+    which prevents additional result submissions and indicates the tournament
+    is complete.
+    
+    Args:
+        tournament_id (int): The tournament to finalize
+    
+    GET: Display results submission status and statistics
+    POST: Mark tournament.results_submitted = True
+    
+    Validation:
+        - Tournament date must have passed (can't finalize future tournaments)
+        - Results must not already be submitted
+    
+    Statistics Displayed:
+        - Total participants (signed up students)
+        - Submitted results count
+        - Pending results count
+        - List of all signups
+        - List of submitted performances
+    
+    Effect of Closing Results:
+        - Sets tournament.results_submitted = True
+        - Prevents students from submitting/editing results
+        - Marks tournament as officially complete
+        - Redirects future submissions to view-only page
+    
+    Access: Requires role >= 2 (Admin)
+    
+    Returns:
+        GET: Rendered results submission page with statistics
+        POST: Redirect to view_results with success message
+    """
     user_id = session.get('user_id')
     if not user_id:
         flash("Please log in", "error")
@@ -508,6 +797,36 @@ def submit_results(tournament_id):
 
 @tournaments_bp.route('/view_results/<int:tournament_id>')
 def view_results(tournament_id):
+    """
+    View all submitted results for a tournament.
+    
+    Displays a comprehensive list of all Tournament_Performance records
+    for a specific tournament, showing which users submitted results and
+    their performance details.
+    
+    Args:
+        tournament_id (int): The tournament to view results for
+    
+    Displayed Information:
+        - Tournament details (name, date, location)
+        - List of all submitted performances with:
+            * Student name
+            * Points earned
+            * Bid status
+            * Speaker rank
+            * Stage reached
+    
+    Access: Requires login (any authenticated user)
+    
+    Use Cases:
+        - Admins reviewing submitted results
+        - Students viewing tournament outcomes
+        - Checking who has/hasn't submitted results
+        - Verifying performance data before finalizing
+    
+    Returns:
+        Rendered view_results page with all tournament performances
+    """
     user_id = session.get('user_id')
     if not user_id:
         flash("Please log in", "error")
@@ -532,6 +851,58 @@ def view_results(tournament_id):
 @tournaments_bp.route('/tournament_results/<int:tournament_id>', methods=['GET', 'POST'])
 @prevent_race_condition('tournament_results', min_interval=2.0, redirect_on_duplicate=lambda uid, form: redirect(url_for('tournaments.view_results', tournament_id=request.view_args.get('tournament_id'))))
 def tournament_results(tournament_id):
+    """
+    Submit tournament performance results (students).
+    
+    Students use this route to submit their tournament performance after
+    competing. The system automatically calculates points based on bid,
+    speaker rank, and elimination stage.
+    
+    Args:
+        tournament_id (int): The tournament to submit results for
+    
+    GET: Display result submission form (if eligible)
+    POST: Process and save tournament performance
+    
+    Form Fields:
+        - bid: 'yes' or 'no' - Did student receive a bid?
+        - rank: 1-10+ - Speaker rank/placement
+        - stage: Elimination round reached (None, Doubles, Octas, Quarters, Semis, Finals)
+    
+    Points Calculation:
+        Bid Points:
+            - First-ever bid: +15 points
+            - Subsequent bids: +5 points each
+        
+        Stage Points:
+            - None: 0
+            - Double Octafinals: 2 points
+            - Octafinals: 3 points
+            - Quarter Finals: 4 points
+            - Semifinals: 5 points
+            - Finals: 6 points
+        
+        Rank Points:
+            - Ranks 7-10: +1 point
+            - Ranks 4-6: +2 points
+            - Ranks 1-3: +3 points
+        
+        Base: +1 point for participation
+    
+    Database Updates:
+        - Creates Tournament_Performance record
+        - Updates user.points (cumulative tournament points)
+        - Updates user.bids counter if bid received
+    
+    Validation:
+        - Tournament results must not be closed (results_submitted=False)
+        - User cannot have already submitted for this tournament
+        - User must be logged in
+    
+    Returns:
+        GET: Rendered result submission form
+        POST: Redirect to user profile with updated points
+    """
     # Import Tournament_Performance locally to avoid any import issues
     from mason_snd.models.tournaments import Tournament_Performance
     
@@ -627,6 +998,49 @@ def tournament_results(tournament_id):
 
 @tournaments_bp.route('/search_partners')
 def search_partners():
+    """
+    AJAX endpoint to search for tournament partners.
+    
+    Provides autocomplete/search functionality for finding partners for
+    partner events (e.g., Public Forum debate). Returns JSON list of users
+    who match the search query and are enrolled in the specified event.
+    
+    Query Parameters:
+        - q: Search query (first name, last name, or full name)
+        - event_id: Optional event filter (only show users in this event)
+    
+    Search Logic:
+        - Minimum 2 characters required
+        - Case-insensitive partial matching
+        - Searches first name, last name, and full name combinations
+        - Excludes current user from results
+        - Limits to 10 results
+        - Optionally filters to users enrolled in specific event
+    
+    Response JSON:
+        {
+            'users': [
+                {
+                    'id': user_id,
+                    'first_name': 'John',
+                    'last_name': 'Doe'
+                },
+                ...
+            ]
+        }
+    
+    HTTP Status Codes:
+        - 200: Success with user list
+        - 401: Not authenticated
+    
+    Use Case:
+        - Frontend AJAX call for partner autocomplete
+        - Real-time search as user types
+        - Ensures partner is eligible (enrolled in same event)
+    
+    Returns:
+        JSON response with matching users array
+    """
     from flask import jsonify
     
     user_id = session.get('user_id')
