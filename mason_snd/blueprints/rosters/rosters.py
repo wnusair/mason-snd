@@ -118,6 +118,14 @@ EST = pytz.timezone('US/Eastern')
 
 rosters_bp = Blueprint('rosters', __name__, template_folder='templates')
 
+def calculate_weighted_points(user):
+    if not user:
+        return 0
+    tournament_weight, effort_weight = get_point_weights()
+    tournament_pts = user.tournament_points if hasattr(user, 'tournament_points') else 0
+    effort_pts = user.effort_points if hasattr(user, 'effort_points') else 0
+    return round((tournament_pts * tournament_weight) + (effort_pts * effort_weight), 2)
+
 @rosters_bp.route('/')
 def index():
     """Rosters dashboard showing upcoming tournaments and saved rosters.
@@ -539,12 +547,11 @@ def view_tournament(tournament_id):
     # Get point weights for weighted points calculation
     tournament_weight, effort_weight = get_point_weights()
 
-    # Add weighted_points to event_competitors for display
     for eid, competitors in event_competitors.items():
         for comp in competitors:
             user = users.get(comp['user_id'])
             if user:
-                comp['weighted_points'] = getattr(user, 'weighted_points', getattr(user, 'points', 0))
+                comp['weighted_points'] = calculate_weighted_points(user)
 
     # Judges for the tournament
     judges = Tournament_Judges.query.filter_by(tournament_id=tournament_id, accepted=True).all()
@@ -734,7 +741,7 @@ def download_tournament(tournament_id):
                 event_type = 'LD'
             elif events[row['event_id']].event_type == 2:
                 event_type = 'PF'
-        weighted_points = getattr(user, 'weighted_points', getattr(user, 'points', 0)) if user else 0
+        weighted_points = calculate_weighted_points(user)
         rank_data.append({
             'Rank': row['rank'],
             'Competitor Name': user_name,
@@ -764,7 +771,7 @@ def download_tournament(tournament_id):
                     event_type = 'LD'
                 elif events[event_id].event_type == 2:
                     event_type = 'PF'
-            weighted_points = getattr(user, 'weighted_points', getattr(user, 'points', 0)) if user else 0
+            weighted_points = calculate_weighted_points(user)
             event_data.append({
                 'Event': event_name,
                 'Category': event_type,
@@ -1724,7 +1731,7 @@ def download_roster(roster_id):
     for event_id, comps in event_competitors_dict.items():
         sorted_comps = sorted(
             comps, 
-            key=lambda c: getattr(users[c.user_id], 'weighted_points', getattr(users[c.user_id], 'points', 0)) if c.user_id in users else 0,
+            key=lambda c: calculate_weighted_points(users.get(c.user_id)),
             reverse=True
         )
         for rank, comp in enumerate(sorted_comps, start=1):
@@ -1763,7 +1770,7 @@ def download_roster(roster_id):
             'Rank': item['rank'],
             'Competitor Name': user_name,
             'Partner': partner_name,
-            'Weighted Points': user.weighted_points if user and hasattr(user, 'weighted_points') else (user.points if user else 0),
+            'Weighted Points': calculate_weighted_points(user),
             'Event': event_name,
             'Category': event_type,
             'Status': 'Active',  # Could be extended to show more statuses
@@ -1791,7 +1798,7 @@ def download_roster(roster_id):
         # Sort by weighted points for ranking
         sorted_comps = sorted(
             comps,
-            key=lambda c: getattr(users[c.user_id], 'weighted_points', getattr(users[c.user_id], 'points', 0)) if c.user_id in users else 0,
+            key=lambda c: calculate_weighted_points(users.get(c.user_id)),
             reverse=True
         )
         
@@ -1814,7 +1821,7 @@ def download_roster(roster_id):
                 'Rank': rank,
                 'Competitor': user_name,
                 'Partner': partner_name,
-                'Weighted Points': user.weighted_points if user and hasattr(user, 'weighted_points') else (user.points if user else 0),
+                'Weighted Points': calculate_weighted_points(user),
                 'User ID': comp.user_id,
                 'Partner ID': partner_id if partner_id else '',
                 'Event ID': comp.event_id
