@@ -313,8 +313,7 @@ def filter_drops_and_track_penalties(ranked):
     
     return filtered_ranked, penalty_info
 
-# Helper: Select competitors for speech (rotation) and LD/PF (top N with randomness)
-def select_competitors_by_event_type(ranked, speech_spots, ld_spots, pf_spots, event_type_map, seed_randomness=True):
+def select_competitors_by_event_type(ranked, speech_spots, ld_spots, pf_spots, event_type_map, judge_children_ids=None, seed_randomness=True):
     """Select competitors using event-type-specific algorithms.
     
     Implements three different selection strategies based on event type:
@@ -372,25 +371,64 @@ def select_competitors_by_event_type(ranked, speech_spots, ld_spots, pf_spots, e
     """
     event_view = []
     rank_view = []
-    random_selections = set()  # Track randomly selected competitors
+    random_selections = set()
+    selected_user_ids = set()
+    if judge_children_ids is None:
+        judge_children_ids = set()
     
-    # Speech events: rotation with random selections
+    partnership_map = {}
+    for event_id, signups in ranked.items():
+        for signup in signups:
+            if hasattr(signup, 'partner_id') and signup.partner_id:
+                partnership_map[signup.user_id] = signup.partner_id
+                partnership_map[signup.partner_id] = signup.user_id
+    
+    def add_competitor(signup, eid, rank):
+        user_id = signup.user_id
+        if user_id in selected_user_ids:
+            return False
+        
+        partner_id = partnership_map.get(user_id)
+        if partner_id:
+            if partner_id in selected_user_ids:
+                return False
+            partner_in_list = any(s.user_id == partner_id for s in ranked.get(eid, []))
+            if not partner_in_list:
+                return False
+            selected_user_ids.add(partner_id)
+        
+        selected_user_ids.add(user_id)
+        event_view.append({'user_id': user_id, 'event_id': eid})
+        rank_view.append({'user_id': user_id, 'event_id': eid, 'rank': rank})
+        
+        if partner_id:
+            event_view.append({'user_id': partner_id, 'event_id': eid})
+            partner_rank_info = next((i+1 for i, s in enumerate(ranked.get(eid, [])) if s.user_id == partner_id), rank)
+            rank_view.append({'user_id': partner_id, 'event_id': eid, 'rank': partner_rank_info})
+        
+        return True
+    
     speech_event_ids = [eid for eid, etype in event_type_map.items() if etype == 0]
     speech_judges_count = len(speech_event_ids)
     
+    for eid in speech_event_ids:
+        competitors = ranked.get(eid, [])
+        for signup in competitors:
+            if signup.user_id in judge_children_ids:
+                if add_competitor(signup, eid, competitors.index(signup) + 1):
+                    speech_filled = len([e for e in event_view if e['event_id'] in speech_event_ids])
+    
     speech_indices = {eid: 0 for eid in speech_event_ids}
-    speech_filled = 0
+    speech_filled = len([e for e in event_view if e['event_id'] in speech_event_ids])
     random_counter = 0
     
     while speech_filled < speech_spots and speech_event_ids:
         for eid in speech_event_ids:
             competitors = ranked.get(eid, [])
             if speech_indices[eid] < len(competitors):
-                # Every 5th person should be random from middle if 4+ speech judges
                 should_be_random = (speech_judges_count >= 4 and random_counter % 5 == 4)
                 
                 if should_be_random and len(competitors) > 2:
-                    # Pick from middle third of competitors
                     mid_start = len(competitors) // 3
                     mid_end = 2 * len(competitors) // 3
                     idx = random.randint(mid_start, mid_end)
@@ -398,58 +436,79 @@ def select_competitors_by_event_type(ranked, speech_spots, ld_spots, pf_spots, e
                 else:
                     idx = speech_indices[eid]
                 
-                if idx < len(competitors):
+                while idx < len(competitors):
                     signup = competitors[idx]
-                    event_view.append({'user_id': signup.user_id, 'event_id': eid})
-                    rank_view.append({'user_id': signup.user_id, 'event_id': eid, 'rank': idx+1})
-                    speech_indices[eid] += 1
-                    speech_filled += 1
-                    random_counter += 1
-                    if speech_filled >= speech_spots:
+                    if add_competitor(signup, eid, idx + 1):
+                        speech_indices[eid] = idx + 1
+                        speech_filled = len([e for e in event_view if e['event_id'] in speech_event_ids])
+                        random_counter += 1
                         break
+                    idx += 1
+                    speech_indices[eid] = idx
+                
+                if speech_filled >= speech_spots:
+                    break
         
         if all(speech_indices[eid] >= len(ranked.get(eid, [])) for eid in speech_event_ids):
             break
     
-    # LD events: top people, or middle if 2+ judges
     ld_event_ids = [eid for eid, etype in event_type_map.items() if etype == 1]
     ld_judges_count = len(ld_event_ids)
     
     for eid in ld_event_ids:
         competitors = ranked.get(eid, [])
-        for i in range(min(ld_spots, len(competitors))):
+        for signup in competitors:
+            if signup.user_id in judge_children_ids:
+                add_competitor(signup, eid, competitors.index(signup) + 1)
+    
+    for eid in ld_event_ids:
+        competitors = ranked.get(eid, [])
+        filled = len([e for e in event_view if e['event_id'] == eid])
+        
+        for i in range(filled, min(ld_spots, len(competitors))):
             if ld_judges_count >= 2 and len(competitors) > 2:
-                # Pick from middle
                 mid_idx = len(competitors) // 2
                 idx = min(i + mid_idx, len(competitors) - 1)
                 random_selections.add((competitors[idx].user_id, eid))
             else:
                 idx = i
             
-            if idx < len(competitors):
+            attempt = 0
+            while idx < len(competitors) and attempt < len(competitors):
                 signup = competitors[idx]
-                event_view.append({'user_id': signup.user_id, 'event_id': eid})
-                rank_view.append({'user_id': signup.user_id, 'event_id': eid, 'rank': idx+1})
+                if add_competitor(signup, eid, idx + 1):
+                    break
+                idx += 1
+                attempt += 1
     
-    # PF events: top people, or middle if 2+ judges
     pf_event_ids = [eid for eid, etype in event_type_map.items() if etype == 2]
     pf_judges_count = len(pf_event_ids)
     
     for eid in pf_event_ids:
         competitors = ranked.get(eid, [])
-        for i in range(min(pf_spots, len(competitors))):
+        for signup in competitors:
+            if signup.user_id in judge_children_ids:
+                add_competitor(signup, eid, competitors.index(signup) + 1)
+    
+    for eid in pf_event_ids:
+        competitors = ranked.get(eid, [])
+        filled = len([e for e in event_view if e['event_id'] == eid])
+        
+        for i in range(filled, min(pf_spots, len(competitors))):
             if pf_judges_count >= 2 and len(competitors) > 2:
-                # Pick from middle
                 mid_idx = len(competitors) // 2
                 idx = min(i + mid_idx, len(competitors) - 1)
                 random_selections.add((competitors[idx].user_id, eid))
             else:
                 idx = i
             
-            if idx < len(competitors):
+            attempt = 0
+            while idx < len(competitors) and attempt < len(competitors):
                 signup = competitors[idx]
-                event_view.append({'user_id': signup.user_id, 'event_id': eid})
-                rank_view.append({'user_id': signup.user_id, 'event_id': eid, 'rank': idx+1})
+                if add_competitor(signup, eid, idx + 1):
+                    break
+                idx += 1
+                attempt += 1
     
     return event_view, rank_view, random_selections
 
@@ -505,18 +564,22 @@ def view_tournament(tournament_id):
     # Filter out users with drops and track penalties
     filtered_ranked, penalty_info = filter_drops_and_track_penalties(ranked)
     
-    # Build event_type_map: event_id -> event_type
     event_type_map = {}
     for eid in event_dict.keys():
         event = Event.query.filter_by(id=eid).first()
         if event:
             event_type_map[eid] = event.event_type
+    
+    judges = Tournament_Judges.query.filter_by(tournament_id=tournament_id, accepted=True).all()
+    judge_children_ids = set(j.child_id for j in judges if j.child_id)
+    
     event_view, rank_view, random_selections = select_competitors_by_event_type(
-        filtered_ranked,  # Use filtered rankings
+        filtered_ranked,
         speech_spots=speech_competitors,
         ld_spots=LD_competitors,
         pf_spots=PF_competitors,
         event_type_map=event_type_map,
+        judge_children_ids=judge_children_ids,
         seed_randomness=True
     )
 
@@ -657,12 +720,17 @@ def download_tournament(tournament_id):
         event = Event.query.filter_by(id=eid).first()
         if event:
             event_type_map[eid] = event.event_type
+    
+    judges = Tournament_Judges.query.filter_by(tournament_id=tournament_id, accepted=True).all()
+    judge_children_ids = set(j.child_id for j in judges if j.child_id)
+    
     event_view, rank_view, random_selections = select_competitors_by_event_type(
         ranked,
         speech_spots=speech_competitors,
         ld_spots=LD_competitors,
         pf_spots=PF_competitors,
         event_type_map=event_type_map,
+        judge_children_ids=judge_children_ids,
         seed_randomness=True
     )
 
@@ -867,12 +935,17 @@ def save_tournament(tournament_id):
         event = Event.query.filter_by(id=eid).first()
         if event:
             event_type_map[eid] = event.event_type
+    
+    judges = Tournament_Judges.query.filter_by(tournament_id=tournament_id, accepted=True).all()
+    judge_children_ids = set(j.child_id for j in judges if j.child_id)
+    
     event_view, rank_view, random_selections = select_competitors_by_event_type(
-        filtered_ranked,  # Use filtered rankings
+        filtered_ranked,
         speech_spots=speech_competitors,
         ld_spots=LD_competitors,
         pf_spots=PF_competitors,
         event_type_map=event_type_map,
+        judge_children_ids=judge_children_ids,
         seed_randomness=True
     )
 
