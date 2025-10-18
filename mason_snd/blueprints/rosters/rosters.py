@@ -1212,14 +1212,6 @@ def view_roster(roster_id):
     if all_judge_user_ids:
         judge_users = {u.id: u for u in User.query.filter(User.id.in_(all_judge_user_ids)).all()}
 
-    # Get all children from Judges table for dropdown (not just those in current roster)
-    from mason_snd.models.auth import Judges as JudgesRelationship
-    all_children_relationships = JudgesRelationship.query.all()
-    all_children = {}
-    for rel in all_children_relationships:
-        if rel.child_id and rel.child:
-            all_children[rel.child_id] = rel.child
-
     # Debug information
     print(f"Roster {roster_id}: {len(competitors)} competitors, {len(judges)} judges")
     print(f"Event view has {len(event_view)} entries")
@@ -1237,7 +1229,6 @@ def view_roster(roster_id):
                           events=events,
                           judges=judges,
                           judge_users=judge_users,
-                          all_children=all_children,
                           penalty_info=penalty_info,
                           tournament_weight=tournament_weight,
                           effort_weight=effort_weight,
@@ -1270,6 +1261,37 @@ def search_judges():
     ).limit(20).all()
 
     return jsonify({'users': [{'id': u.id, 'first_name': u.first_name, 'last_name': u.last_name} for u in users]})
+
+
+# AJAX endpoint: get children for a specific judge
+@rosters_bp.route('/get_judge_children')
+def get_judge_children():
+    from flask import jsonify
+    from mason_snd.models.auth import Judges as JudgesRelationship
+    
+    judge_id = request.args.get('judge_id')
+    
+    if not judge_id:
+        return jsonify({'children': []})
+    
+    try:
+        judge_id = int(judge_id)
+    except (ValueError, TypeError):
+        return jsonify({'children': []})
+    
+    # Get all children for this judge from Judges relationship table
+    relationships = JudgesRelationship.query.filter_by(judge_id=judge_id).all()
+    
+    children = []
+    for rel in relationships:
+        if rel.child_id and rel.child:
+            children.append({
+                'id': rel.child.id,
+                'first_name': rel.child.first_name,
+                'last_name': rel.child.last_name
+            })
+    
+    return jsonify({'children': children})
 
 
 def _auto_fill_roster_from_signups(roster_id):

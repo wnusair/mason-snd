@@ -238,10 +238,7 @@
             <div class="mt-2">
                 <label for="child_id" class="block text-sm font-medium text-gray-700">Child (optional)</label>
                 <select name="child_id" id="child_id" class="mt-1 block w-full border rounded px-2 py-1">
-                    <option value="">-- None --</option>
-                    {% for child_id, child in all_children.items() %}
-                        <option value="{{ child_id }}">{{ child.first_name }} {{ child.last_name }}</option>
-                    {% endfor %}
+                    <option value="">-- Select judge first --</option>
                 </select>
             </div>
             <div class="mt-2">
@@ -297,9 +294,13 @@ document.addEventListener('DOMContentLoaded', function(){
                     el.textContent = u.first_name + ' ' + u.last_name;
                     el.dataset.userid = u.id;
                     el.addEventListener('click', function(){
-                        selectedJudgeId.value = this.dataset.userid;
+                        const judgeId = this.dataset.userid;
+                        selectedJudgeId.value = judgeId;
                         searchInput.value = this.textContent;
                         suggestions.classList.add('hidden');
+                        
+                        // Load children for this judge
+                        loadChildrenForJudge(judgeId);
                     });
                     suggestions.appendChild(el);
                 });
@@ -307,6 +308,30 @@ document.addEventListener('DOMContentLoaded', function(){
             }).catch(err=>{ console.error(err); });
         }, 250);
     });
+    
+    // Function to load children for selected judge
+    function loadChildrenForJudge(judgeId) {
+        const childSelect = document.getElementById('child_id');
+        childSelect.innerHTML = '<option value="">Loading...</option>';
+        
+        fetch(`{{ url_for('rosters.get_judge_children') }}?judge_id=` + encodeURIComponent(judgeId))
+            .then(r => r.json())
+            .then(data => {
+                childSelect.innerHTML = '<option value="">-- None --</option>';
+                if (data.children && data.children.length > 0) {
+                    data.children.forEach(child => {
+                        const opt = document.createElement('option');
+                        opt.value = child.id;
+                        opt.textContent = child.first_name + ' ' + child.last_name;
+                        childSelect.appendChild(opt);
+                    });
+                }
+            })
+            .catch(err => {
+                console.error(err);
+                childSelect.innerHTML = '<option value="">-- None --</option>';
+            });
+    }
 });
 </script>
 {% endblock %}
