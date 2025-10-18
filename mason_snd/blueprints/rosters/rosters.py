@@ -2110,9 +2110,12 @@ def delete_roster(roster_id):
         flash("Roster not found")
         return redirect(url_for('rosters.index'))
 
-    # Delete associated competitors and judges
+    # Delete associated competitors, judges, and partners
     Roster_Competitors.query.filter_by(roster_id=roster_id).delete()
     Roster_Judge.query.filter_by(roster_id=roster_id).delete()
+    
+    from mason_snd.models.rosters import Roster_Partners
+    Roster_Partners.query.filter_by(roster_id=roster_id).delete()
     
     # Delete the roster itself
     db.session.delete(roster)

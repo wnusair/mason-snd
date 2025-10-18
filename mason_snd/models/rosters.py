@@ -452,5 +452,5 @@ class Roster_Partners(db.Model):
     partner2_user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
     partner2_user = db.relationship('User', foreign_keys=[partner2_user_id], backref='roster_partner2')
     
-    roster_id = db.Column(db.Integer, db.ForeignKey('roster.id'), nullable=False)
-    roster = db.relationship('Roster', foreign_keys=[roster_id], backref='roster_partners')
+    roster_id = db.Column(db.Integer, db.ForeignKey('roster.id', ondelete='CASCADE'), nullable=False)
+    roster = db.relationship('Roster', foreign_keys=[roster_id], backref=db.backref('roster_partners', cascade='all, delete-orphan'))
