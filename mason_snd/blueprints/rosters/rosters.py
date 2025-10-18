@@ -112,6 +112,9 @@ except ImportError:
     pd = None
     openpyxl = None
 
+# Timezone constant used throughout the app
+EST = pytz.timezone('US/Eastern')
+
 
 rosters_bp = Blueprint('rosters', __name__, template_folder='templates')
 
@@ -133,9 +136,16 @@ def index():
     rosters = Roster.query.all()
 
     upcoming_tournaments = []
-    now = datetime.now()
+    now = datetime.now(EST)
     for tournament in tournaments:
-        if tournament.signup_deadline and tournament.signup_deadline > now:
+        # Keep tournaments available for roster actions up until the tournament date
+        tournament_date = tournament.date
+        if tournament_date is None:
+            continue
+        # Localize naive datetimes to EST for correct comparison
+        if tournament_date.tzinfo is None:
+            tournament_date = EST.localize(tournament_date)
+        if tournament_date >= now:
             upcoming_tournaments.append(tournament)
 
     return render_template('rosters/index.html', upcoming_tournaments=upcoming_tournaments, tournaments=tournaments, rosters=rosters)
