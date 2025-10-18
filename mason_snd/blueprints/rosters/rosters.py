@@ -174,7 +174,8 @@ def get_roster_count(tournament_id):
         tournament_id (int): Tournament primary key.
     
     Returns:
-        tuple: (speech_competitors, LD_competitors, PF_competitors) - total spots available.
+        tuple: (speech_competitors, LD_competitors, PF_competitors, spots_per_event) - total spots available.
+            spots_per_event: dict mapping event_id to number of spots for that specific event
     
     Note:
         Only counts accepted judges (Tournament_Judges.accepted=True).
@@ -184,6 +185,7 @@ def get_roster_count(tournament_id):
     speech_competitors = 0
     LD_competitors = 0
     PF_competitors = 0
+    spots_per_event = {}
 
     for judge in judges:
         event_id = judge.event_id
@@ -192,12 +194,15 @@ def get_roster_count(tournament_id):
 
         if event.event_type == 0:
             speech_competitors += 6
+            spots_per_event[event_id] = spots_per_event.get(event_id, 0) + 6
         elif event.event_type == 1:
             LD_competitors += 2
+            spots_per_event[event_id] = spots_per_event.get(event_id, 0) + 2
         else:
             PF_competitors += 4
+            spots_per_event[event_id] = spots_per_event.get(event_id, 0) + 4
 
-    return speech_competitors, LD_competitors, PF_competitors
+    return speech_competitors, LD_competitors, PF_competitors, spots_per_event
 
 # Helper: Get all signups for a tournament, grouped by event
 from mason_snd.models.tournaments import Tournament_Signups
@@ -313,7 +318,7 @@ def filter_drops_and_track_penalties(ranked):
     
     return filtered_ranked, penalty_info
 
-def select_competitors_by_event_type(ranked, speech_spots, ld_spots, pf_spots, event_type_map, judge_children_ids=None, seed_randomness=True):
+def select_competitors_by_event_type(ranked, speech_spots, ld_spots, pf_spots, event_type_map, judge_children_ids=None, seed_randomness=True, spots_per_event=None):
     """Select competitors using event-type-specific algorithms.
     
     Implements three different selection strategies based on event type:
@@ -375,6 +380,8 @@ def select_competitors_by_event_type(ranked, speech_spots, ld_spots, pf_spots, e
     selected_user_ids = set()
     if judge_children_ids is None:
         judge_children_ids = set()
+    if spots_per_event is None:
+        spots_per_event = {}
     
     partnership_map = {}
     for event_id, signups in ranked.items():
@@ -413,10 +420,12 @@ def select_competitors_by_event_type(ranked, speech_spots, ld_spots, pf_spots, e
     
     for eid in speech_event_ids:
         competitors = ranked.get(eid, [])
+        event_max = spots_per_event.get(eid, speech_spots)
         for signup in competitors:
             if signup.user_id in judge_children_ids:
-                if add_competitor(signup, eid, competitors.index(signup) + 1):
-                    speech_filled = len([e for e in event_view if e['event_id'] in speech_event_ids])
+                current_filled = len([e for e in event_view if e['event_id'] == eid])
+                if current_filled < event_max:
+                    add_competitor(signup, eid, competitors.index(signup) + 1)
     
     speech_indices = {eid: 0 for eid in speech_event_ids}
     speech_filled = len([e for e in event_view if e['event_id'] in speech_event_ids])
@@ -457,58 +466,80 @@ def select_competitors_by_event_type(ranked, speech_spots, ld_spots, pf_spots, e
     
     for eid in ld_event_ids:
         competitors = ranked.get(eid, [])
+        event_max = spots_per_event.get(eid, ld_spots)
         for signup in competitors:
             if signup.user_id in judge_children_ids:
-                add_competitor(signup, eid, competitors.index(signup) + 1)
+                current_filled = len([e for e in event_view if e['event_id'] == eid])
+                if current_filled < event_max:
+                    add_competitor(signup, eid, competitors.index(signup) + 1)
     
     for eid in ld_event_ids:
         competitors = ranked.get(eid, [])
+        event_max = spots_per_event.get(eid, ld_spots)
         filled = len([e for e in event_view if e['event_id'] == eid])
         
-        for i in range(filled, min(ld_spots, len(competitors))):
+        idx = 0
+        while filled < event_max and idx < len(competitors):
             if ld_judges_count >= 2 and len(competitors) > 2:
                 mid_idx = len(competitors) // 2
-                idx = min(i + mid_idx, len(competitors) - 1)
-                random_selections.add((competitors[idx].user_id, eid))
+                calc_idx = min(idx + mid_idx, len(competitors) - 1)
+                random_selections.add((competitors[calc_idx].user_id, eid))
             else:
-                idx = i
+                calc_idx = idx
             
             attempt = 0
-            while idx < len(competitors) and attempt < len(competitors):
-                signup = competitors[idx]
-                if add_competitor(signup, eid, idx + 1):
+            search_idx = calc_idx
+            while search_idx < len(competitors) and attempt < len(competitors):
+                signup = competitors[search_idx]
+                if add_competitor(signup, eid, search_idx + 1):
+                    filled = len([e for e in event_view if e['event_id'] == eid])
                     break
-                idx += 1
+                search_idx += 1
                 attempt += 1
+            
+            idx += 1
+            if attempt >= len(competitors):
+                break
     
     pf_event_ids = [eid for eid, etype in event_type_map.items() if etype == 2]
     pf_judges_count = len(pf_event_ids)
     
     for eid in pf_event_ids:
         competitors = ranked.get(eid, [])
+        event_max = spots_per_event.get(eid, pf_spots)
         for signup in competitors:
             if signup.user_id in judge_children_ids:
-                add_competitor(signup, eid, competitors.index(signup) + 1)
+                current_filled = len([e for e in event_view if e['event_id'] == eid])
+                if current_filled < event_max:
+                    add_competitor(signup, eid, competitors.index(signup) + 1)
     
     for eid in pf_event_ids:
         competitors = ranked.get(eid, [])
+        event_max = spots_per_event.get(eid, pf_spots)
         filled = len([e for e in event_view if e['event_id'] == eid])
         
-        for i in range(filled, min(pf_spots, len(competitors))):
+        idx = 0
+        while filled < event_max and idx < len(competitors):
             if pf_judges_count >= 2 and len(competitors) > 2:
                 mid_idx = len(competitors) // 2
-                idx = min(i + mid_idx, len(competitors) - 1)
-                random_selections.add((competitors[idx].user_id, eid))
+                calc_idx = min(idx + mid_idx, len(competitors) - 1)
+                random_selections.add((competitors[calc_idx].user_id, eid))
             else:
-                idx = i
+                calc_idx = idx
             
             attempt = 0
-            while idx < len(competitors) and attempt < len(competitors):
-                signup = competitors[idx]
-                if add_competitor(signup, eid, idx + 1):
+            search_idx = calc_idx
+            while search_idx < len(competitors) and attempt < len(competitors):
+                signup = competitors[search_idx]
+                if add_competitor(signup, eid, search_idx + 1):
+                    filled = len([e for e in event_view if e['event_id'] == eid])
                     break
-                idx += 1
+                search_idx += 1
                 attempt += 1
+            
+            idx += 1
+            if attempt >= len(competitors):
+                break
     
     return event_view, rank_view, random_selections
 
@@ -556,12 +587,11 @@ def view_tournament(tournament_id):
         flash("You are not authorized to access this page")
         return redirect(url_for('main.index'))
     
-    speech_competitors, LD_competitors, PF_competitors = get_roster_count(tournament_id)
+    speech_competitors, LD_competitors, PF_competitors, spots_per_event = get_roster_count(tournament_id)
 
     event_dict = get_signups_by_event(tournament_id)
     ranked = rank_signups(event_dict)
     
-    # Filter out users with drops and track penalties
     filtered_ranked, penalty_info = filter_drops_and_track_penalties(ranked)
     
     event_type_map = {}
@@ -580,7 +610,8 @@ def view_tournament(tournament_id):
         pf_spots=PF_competitors,
         event_type_map=event_type_map,
         judge_children_ids=judge_children_ids,
-        seed_randomness=True
+        seed_randomness=True,
+        spots_per_event=spots_per_event
     )
 
     # Build event_competitors: {event_id: [comp, ...]} with rank info
@@ -711,8 +742,7 @@ def download_tournament(tournament_id):
         flash("Excel functionality not available. Please install pandas and openpyxl.")
         return redirect(url_for('rosters.view_tournament', tournament_id=tournament_id))
 
-    # Use the same algorithm as view_tournament by calling the same helper functions
-    speech_competitors, LD_competitors, PF_competitors = get_roster_count(tournament_id)
+    speech_competitors, LD_competitors, PF_competitors, spots_per_event = get_roster_count(tournament_id)
     event_dict = get_signups_by_event(tournament_id)
     ranked = rank_signups(event_dict)
     event_type_map = {}
@@ -731,7 +761,8 @@ def download_tournament(tournament_id):
         pf_spots=PF_competitors,
         event_type_map=event_type_map,
         judge_children_ids=judge_children_ids,
-        seed_randomness=True
+        seed_randomness=True,
+        spots_per_event=spots_per_event
     )
 
     # Build event_competitors: {event_id: [comp, ...]} with rank info
@@ -922,12 +953,10 @@ def save_tournament(tournament_id):
         flash("You are not authorized to access this page")
         return redirect(url_for('main.index'))
 
-    # Use the same algorithm as view_tournament by calling the same helper functions
-    speech_competitors, LD_competitors, PF_competitors = get_roster_count(tournament_id)
+    speech_competitors, LD_competitors, PF_competitors, spots_per_event = get_roster_count(tournament_id)
     event_dict = get_signups_by_event(tournament_id)
     ranked = rank_signups(event_dict)
     
-    # Filter out users with drops and track penalties
     filtered_ranked, penalty_info = filter_drops_and_track_penalties(ranked)
     
     event_type_map = {}
@@ -946,7 +975,8 @@ def save_tournament(tournament_id):
         pf_spots=PF_competitors,
         event_type_map=event_type_map,
         judge_children_ids=judge_children_ids,
-        seed_randomness=True
+        seed_randomness=True,
+        spots_per_event=spots_per_event
     )
 
     tz = pytz.timezone('US/Eastern')
