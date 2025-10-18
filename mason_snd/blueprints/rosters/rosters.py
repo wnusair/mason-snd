@@ -1212,6 +1212,14 @@ def view_roster(roster_id):
     if all_judge_user_ids:
         judge_users = {u.id: u for u in User.query.filter(User.id.in_(all_judge_user_ids)).all()}
 
+    # Get all children from Judges table for dropdown (not just those in current roster)
+    from mason_snd.models.auth import Judges as JudgesRelationship
+    all_children_relationships = JudgesRelationship.query.all()
+    all_children = {}
+    for rel in all_children_relationships:
+        if rel.child_id and rel.child:
+            all_children[rel.child_id] = rel.child
+
     # Debug information
     print(f"Roster {roster_id}: {len(competitors)} competitors, {len(judges)} judges")
     print(f"Event view has {len(event_view)} entries")
@@ -1229,12 +1237,313 @@ def view_roster(roster_id):
                           events=events,
                           judges=judges,
                           judge_users=judge_users,
+                          all_children=all_children,
                           penalty_info=penalty_info,
                           tournament_weight=tournament_weight,
                           effort_weight=effort_weight,
                           upcoming_tournaments=[],
                           tournaments=[],
                           rosters=[])
+
+
+# AJAX endpoint: search judges (parents) for autocomplete on view_roster
+@rosters_bp.route('/search_judges')
+def search_judges():
+    from flask import jsonify
+    q = request.args.get('q', '').strip()
+    roster_id = request.args.get('roster_id')
+
+    if not q or len(q) < 1:
+        return jsonify({'users': []})
+
+    # Search for users who are parents (is_parent=True) matching name
+    # Include ghost accounts (account_claimed=False) so admins can add placeholders
+    users = User.query.filter(
+        db.and_(
+            User.is_parent == True,
+            db.or_(
+                User.first_name.ilike(f'%{q}%'),
+                User.last_name.ilike(f'%{q}%'),
+                db.func.concat(User.first_name, ' ', User.last_name).ilike(f'%{q}%')
+            )
+        )
+    ).limit(20).all()
+
+    return jsonify({'users': [{'id': u.id, 'first_name': u.first_name, 'last_name': u.last_name} for u in users]})
+
+
+def _auto_fill_roster_from_signups(roster_id):
+    """Auto-fill roster with additional competitors from tournament signups.
+    
+    When judges are added and there's additional capacity, this function:
+    1. Calculates total judge capacity per event type
+    2. Finds how many competitor slots are available
+    3. Pulls additional competitors from Tournament_Signups (ranked by weighted_points)
+    4. Adds them to fill the available capacity
+    
+    Only adds competitors if roster has a tournament_id.
+    """
+    roster = Roster.query.get(roster_id)
+    if not roster or not roster.tournament_id:
+        return
+    
+    # Get current judges and their capacities per event
+    judges = Roster_Judge.query.filter_by(roster_id=roster_id).all()
+    capacity_by_event_type = {0: 0, 1: 0, 2: 0}  # Speech, LD, PF
+    
+    for judge in judges:
+        if judge.event_id:
+            event = Event.query.get(judge.event_id)
+            if event:
+                capacity_by_event_type[event.event_type] += (judge.people_bringing or 0)
+    
+    # Get current competitors count per event type
+    competitors = Roster_Competitors.query.filter_by(roster_id=roster_id).all()
+    current_by_event_type = {0: 0, 1: 0, 2: 0}
+    
+    for comp in competitors:
+        if comp.event_id:
+            event = Event.query.get(comp.event_id)
+            if event:
+                current_by_event_type[event.event_type] += 1
+    
+    # For each event type, add competitors if we have capacity
+    for event_type in [0, 1, 2]:
+        capacity = capacity_by_event_type[event_type]
+        current = current_by_event_type[event_type]
+        needed = capacity - current
+        
+        if needed <= 0:
+            continue
+        
+        # Get events of this type
+        events_of_type = Event.query.filter_by(event_type=event_type).all()
+        event_ids = [e.id for e in events_of_type]
+        
+        if not event_ids:
+            continue
+        
+        # Get signups for this tournament and these events, not already in roster
+        existing_user_ids = set([c.user_id for c in competitors])
+        
+        # Get signups ranked by weighted_points
+        signups = Tournament_Signups.query.filter(
+            Tournament_Signups.tournament_id == roster.tournament_id,
+            Tournament_Signups.event_id.in_(event_ids),
+            Tournament_Signups.is_going == True,
+            ~Tournament_Signups.user_id.in_(existing_user_ids)
+        ).all()
+        
+        # Sort by weighted_points (highest first)
+        signups_sorted = sorted(signups, 
+                               key=lambda s: getattr(s.user, 'weighted_points', getattr(s.user, 'points', 0)),
+                               reverse=True)
+        
+        # Add top N signups to fill capacity
+        for signup in signups_sorted[:needed]:
+            rc = Roster_Competitors(
+                user_id=signup.user_id,
+                event_id=signup.event_id,
+                judge_id=None,
+                roster_id=roster_id
+            )
+            db.session.add(rc)
+            print(f"Auto-filled: Added {signup.user.first_name} {signup.user.last_name} to event {signup.event_id}")
+    
+    db.session.flush()
+
+
+def _redistribute_competitors_for_roster(roster_id):
+    """Simple redistribution algorithm for saved roster when judges change.
+
+    For each event in the roster, assign competitors (in current saved order)
+    to available Roster_Judge entries for that event based on people_bringing.
+    This preserves ordering while ensuring judge capacities are respected.
+    """
+    # Load current competitors and judges
+    competitors = Roster_Competitors.query.filter_by(roster_id=roster_id).all()
+    judges = Roster_Judge.query.filter_by(roster_id=roster_id).all()
+
+    # Group judges by event
+    judges_by_event = {}
+    for j in judges:
+        judges_by_event.setdefault(j.event_id, []).append(j)
+
+    # Clear existing judge assignments
+    for comp in competitors:
+        comp.judge_id = None
+    db.session.flush()
+
+    # Assign per event
+    for event_id, comps in {}.items():
+        pass
+
+    # Build mapping of event -> competitors (preserve saved order)
+    comps_by_event = {}
+    for comp in competitors:
+        comps_by_event.setdefault(comp.event_id, []).append(comp)
+
+    # For each event, assign sequentially to judges respecting capacity
+    for event_id, comps in comps_by_event.items():
+        available_judges = judges_by_event.get(event_id, [])
+        if not available_judges:
+            # No judges for this event; leave judge_id as None
+            continue
+
+        # Expand judge slots into a list of judge ids repeated by capacity
+        slot_judge_ids = []
+        for j in available_judges:
+            cap = j.people_bringing or 0
+            # If people_bringing is 0, treat as 1 (judge themselves)
+            if cap <= 0:
+                cap = 1
+            # We store judge.user_id as the judge identifier
+            slot_judge_ids.extend([j.user_id] * cap)
+
+        # Assign each competitor to the next available judge slot
+        slot_index = 0
+        for comp in comps:
+            if slot_index >= len(slot_judge_ids):
+                # No more capacity; leave unassigned
+                comp.judge_id = None
+            else:
+                comp.judge_id = slot_judge_ids[slot_index]
+                slot_index += 1
+
+    db.session.commit()
+
+
+@rosters_bp.route('/add_roster_judge', methods=['POST'])
+def add_roster_judge():
+    """Add a judge to a saved roster and redistribute competitors.
+
+    Expects form data: roster_id, user_id (judge), child_id (optional), event_id (optional)
+    """
+    user_id = session.get('user_id')
+    user = User.query.filter_by(id=user_id).first()
+
+    if not user_id:
+        flash('Log In First')
+        return redirect(url_for('auth.login'))
+
+    if user.role < 2:
+        flash('You are not authorized to perform this action')
+        return redirect(url_for('main.index'))
+
+    roster_id = request.form.get('roster_id')
+    judge_user_id = request.form.get('user_id')
+    child_id = request.form.get('child_id')
+    event_type = request.form.get('event_type')  # Get event_type directly (0=Speech, 1=LD, 2=PF)
+
+    if not roster_id or not judge_user_id:
+        flash('Missing parameters: roster_id or judge user_id')
+        return redirect(request.referrer or url_for('rosters.view_roster', roster_id=roster_id))
+
+    if not event_type:
+        flash('Missing category selection (Speech/LD/PF)')
+        return redirect(request.referrer or url_for('rosters.view_roster', roster_id=roster_id))
+
+    roster = Roster.query.get(roster_id)
+    if not roster:
+        flash('Roster not found')
+        return redirect(request.referrer or url_for('rosters.index'))
+
+    # Determine people_bringing based on event_type
+    try:
+        event_type_int = int(event_type)
+    except (ValueError, TypeError):
+        flash('Invalid category')
+        return redirect(url_for('rosters.view_roster', roster_id=roster_id))
+
+    if event_type_int == 0:  # Speech
+        people_bringing = 6
+    elif event_type_int == 1:  # LD
+        people_bringing = 2
+    elif event_type_int == 2:  # PF
+        people_bringing = 4
+    else:
+        flash('Invalid category type')
+        return redirect(url_for('rosters.view_roster', roster_id=roster_id))
+
+    # Find an actual event of this type if possible, or set event_id to None
+    # For roster purposes, we may need to find or create a matching event
+    # For now, find first event matching the event_type
+    event_id = None
+    if child_id and roster.tournament_id:
+        # Try to find child's signup event first
+        ts = Tournament_Signups.query.filter_by(user_id=child_id, tournament_id=roster.tournament_id, is_going=True).first()
+        if ts and ts.event_id:
+            ev = Event.query.get(ts.event_id)
+            if ev and ev.event_type == event_type_int:
+                event_id = ts.event_id
+    
+    # If still no event_id, find any event of this type
+    if not event_id:
+        ev = Event.query.filter_by(event_type=event_type_int).first()
+        if ev:
+            event_id = ev.id
+
+    # Check for duplicate with same judge/child/event_type (allow multiple if different events)
+    # Since we're now using event_type, check if judge already exists with same type
+    existing_judges = Roster_Judge.query.filter_by(roster_id=roster_id, user_id=judge_user_id, child_id=child_id).all()
+    for existing in existing_judges:
+        if existing.event_id:
+            existing_event = Event.query.get(existing.event_id)
+            if existing_event and existing_event.event_type == event_type_int:
+                flash('Judge already exists for this roster with this category')
+                return redirect(url_for('rosters.view_roster', roster_id=roster_id))
+
+    new_j = Roster_Judge(user_id=judge_user_id, child_id=child_id or None, event_id=event_id, roster_id=roster_id, people_bringing=people_bringing)
+    db.session.add(new_j)
+    db.session.commit()
+
+    # Auto-fill roster with additional competitors if capacity available
+    _auto_fill_roster_from_signups(roster_id)
+    
+    # Redistribute competitors for roster
+    _redistribute_competitors_for_roster(roster_id)
+
+    flash('Judge added, roster auto-filled, and competitors redistributed')
+    return redirect(url_for('rosters.view_roster', roster_id=roster_id))
+
+
+@rosters_bp.route('/remove_roster_judge', methods=['POST'])
+def remove_roster_judge():
+    """Remove a judge from a saved roster and redistribute competitors.
+
+    Expects form data: roster_id, roster_judge_id
+    """
+    user_id = session.get('user_id')
+    user = User.query.filter_by(id=user_id).first()
+
+    if not user_id:
+        flash('Log In First')
+        return redirect(url_for('auth.login'))
+
+    if user.role < 2:
+        flash('You are not authorized to perform this action')
+        return redirect(url_for('main.index'))
+
+    roster_id = request.form.get('roster_id')
+    roster_judge_id = request.form.get('roster_judge_id')
+
+    if not roster_id or not roster_judge_id:
+        flash('Missing parameters')
+        return redirect(request.referrer or url_for('rosters.view_roster', roster_id=roster_id))
+
+    rj = Roster_Judge.query.filter_by(id=roster_judge_id, roster_id=roster_id).first()
+    if not rj:
+        flash('Judge entry not found')
+        return redirect(url_for('rosters.view_roster', roster_id=roster_id))
+
+    db.session.delete(rj)
+    db.session.commit()
+
+    # Redistribute competitors for roster
+    _redistribute_competitors_for_roster(roster_id)
+
+    flash('Judge removed and competitors redistributed')
+    return redirect(url_for('rosters.view_roster', roster_id=roster_id))
 
 @rosters_bp.route('/download_roster/<int:roster_id>')
 def download_roster(roster_id):
@@ -1973,6 +2282,11 @@ def upload_roster():
                                 )
                                 db.session.add(rc)
 
+            # Auto-fill roster with additional competitors to use all judge capacity
+            db.session.flush()  # Ensure judges and existing competitors are saved
+            _auto_fill_roster_from_signups(new_roster.id)
+            _redistribute_competitors_for_roster(new_roster.id)
+            
             db.session.commit()
             
             # Show success message with changes summary

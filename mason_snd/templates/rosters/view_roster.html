@@ -54,6 +54,9 @@
     <!-- Judges Table -->
     <div class="mt-8">
         <h2 class="text-xl font-semibold text-gray-900">Judges</h2>
+        <div class="mt-2">
+            <button id="open-add-judge" class="inline-flex items-center justify-center rounded-md border border-transparent bg-indigo-600 px-3 py-1 text-sm font-medium text-white shadow-sm hover:bg-indigo-700">Add Judge</button>
+        </div>
         {% if judges %}
         <div class="overflow-x-auto">
             <table class="min-w-full divide-y divide-gray-200 border">
@@ -77,6 +80,14 @@
                             {% else %}Unknown{% endif %}
                         </td>
                         <td class="px-4 py-2">{{ judge.people_bringing or 0 }}</td>
+                        <td class="px-4 py-2">
+                            <form method="POST" action="{{ url_for('rosters.remove_roster_judge') }}" onsubmit="return confirm('Remove this judge?');">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+                                <input type="hidden" name="roster_id" value="{{ roster.id }}" />
+                                <input type="hidden" name="roster_judge_id" value="{{ judge.id }}" />
+                                <button type="submit" class="inline-flex items-center justify-center rounded-md border border-transparent bg-red-600 px-2 py-1 text-xs font-medium text-white shadow-sm hover:bg-red-700">Remove</button>
+                            </form>
+                        </td>
                     </tr>
                     {% endfor %}
                 </tbody>
@@ -209,4 +220,93 @@
     </div>
     {% endif %}
 </div>
+
+<!-- Add Judge Modal (hidden by default) -->
+<div id="add-judge-modal" class="fixed inset-0 flex items-center justify-center z-50 hidden">
+    <div class="absolute inset-0 bg-black opacity-30"></div>
+    <div class="bg-white rounded-lg shadow-lg max-w-md w-full p-6 relative">
+        <h3 class="text-lg font-medium">Add Judge</h3>
+        <p class="text-sm text-gray-500 mb-3">Search for a parent/guardian and select an event (optional).</p>
+        <div>
+            <input id="judge-search" type="text" placeholder="Search judge by name" class="w-full border rounded px-3 py-2" />
+            <div id="judge-suggestions" class="mt-1 border rounded bg-white max-h-40 overflow-auto hidden"></div>
+        </div>
+        <form id="add-judge-form" method="POST" action="{{ url_for('rosters.add_roster_judge') }}" class="mt-4">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+            <input type="hidden" name="roster_id" value="{{ roster.id }}" />
+            <input id="selected-judge-id" type="hidden" name="user_id" />
+            <div class="mt-2">
+                <label for="child_id" class="block text-sm font-medium text-gray-700">Child (optional)</label>
+                <select name="child_id" id="child_id" class="mt-1 block w-full border rounded px-2 py-1">
+                    <option value="">-- None --</option>
+                    {% for child_id, child in all_children.items() %}
+                        <option value="{{ child_id }}">{{ child.first_name }} {{ child.last_name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="mt-2">
+                <label for="event_type" class="block text-sm font-medium text-gray-700">Category (required)</label>
+                <select name="event_type" id="event_type" class="mt-1 block w-full border rounded px-2 py-1" required>
+                    <option value="">-- Select Category --</option>
+                    <option value="0">Speech (6 people)</option>
+                    <option value="1">LD (2 people)</option>
+                    <option value="2">PF (4 people)</option>
+                </select>
+            </div>
+            <div class="mt-4 flex justify-end space-x-2">
+                <button type="button" id="cancel-add-judge" class="inline-flex items-center justify-center rounded-md border border-gray-300 bg-white px-3 py-1 text-sm font-medium text-gray-700">Cancel</button>
+                <button type="submit" class="inline-flex items-center justify-center rounded-md border border-transparent bg-indigo-600 px-3 py-1 text-sm font-medium text-white">Add</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function(){
+    const openBtn = document.getElementById('open-add-judge');
+    const modal = document.getElementById('add-judge-modal');
+    const cancelBtn = document.getElementById('cancel-add-judge');
+    const searchInput = document.getElementById('judge-search');
+    const suggestions = document.getElementById('judge-suggestions');
+    const selectedJudgeId = document.getElementById('selected-judge-id');
+
+    openBtn && openBtn.addEventListener('click', function(){
+        modal.classList.remove('hidden');
+    });
+    cancelBtn && cancelBtn.addEventListener('click', function(){
+        modal.classList.add('hidden');
+        suggestions.classList.add('hidden');
+        searchInput.value = '';
+        selectedJudgeId.value = '';
+    });
+
+    let typingTimer = null;
+    searchInput && searchInput.addEventListener('input', function(e){
+        const q = e.target.value;
+        if(typingTimer) clearTimeout(typingTimer);
+        if(!q || q.length < 1){ suggestions.classList.add('hidden'); return; }
+        typingTimer = setTimeout(()=>{
+            fetch(`{{ url_for('rosters.search_judges') }}?q=`+encodeURIComponent(q)+`&roster_id={{ roster.id }}`)
+            .then(r=>r.json())
+            .then(data=>{
+                suggestions.innerHTML = '';
+                if(!data.users || data.users.length === 0){ suggestions.classList.add('hidden'); return; }
+                data.users.forEach(u=>{
+                    const el = document.createElement('div');
+                    el.className = 'px-3 py-2 hover:bg-gray-100 cursor-pointer';
+                    el.textContent = u.first_name + ' ' + u.last_name;
+                    el.dataset.userid = u.id;
+                    el.addEventListener('click', function(){
+                        selectedJudgeId.value = this.dataset.userid;
+                        searchInput.value = this.textContent;
+                        suggestions.classList.add('hidden');
+                    });
+                    suggestions.appendChild(el);
+                });
+                suggestions.classList.remove('hidden');
+            }).catch(err=>{ console.error(err); });
+        }, 250);
+    });
+});
+</script>
 {% endblock %}
