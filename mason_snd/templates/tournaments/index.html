@@ -50,8 +50,9 @@
                                 <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500">{{ tournament.signup_deadline.strftime('%b %d, %Y') }}</td>
                                 {% if user.role >= 2 %}
                                 <td class="relative whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium sm:pr-6 space-x-2">
-                                    <a href="{{ url_for('admin.view_tournament_signups', tournament_id=tournament.id) }}" class="text-blue-600 hover:text-blue-900">View Signups</a>
+                                    <a href="{{ url_for('tournaments.view_form_responses', tournament_id=tournament.id) }}" class="text-indigo-600 hover:text-indigo-900">Form Responses</a>
                                     <a href="{{ url_for('admin.download_tournament_signups', tournament_id=tournament.id) }}" class="text-green-600 hover:text-green-900">Download</a>
+                                    <a href="{{ url_for('tournaments.download_ranked_signups', tournament_id=tournament.id) }}" class="text-blue-600 hover:text-blue-900">Ranked</a>
                                     <a href="{{ url_for('tournaments.delete_tournament', tournament_id=tournament.id) }}" class="text-red-600 hover:text-red-900">Delete</a>
                                 </td>
                                 {% endif %}
@@ -109,7 +110,9 @@
                                     {% endif %}
                                     {% if user.role >= 2 %}
                                         <a href="{{ url_for('admin.view_tournament_signups', tournament_id=tournament.id) }}" class="text-purple-600 hover:text-purple-900">View Signups</a>
+                                        <a href="{{ url_for('tournaments.view_form_responses', tournament_id=tournament.id) }}" class="text-indigo-600 hover:text-indigo-900">Form Responses</a>
                                         <a href="{{ url_for('admin.download_tournament_signups', tournament_id=tournament.id) }}" class="text-green-600 hover:text-green-900">📥 Download</a>
+                                        <a href="{{ url_for('tournaments.download_ranked_signups', tournament_id=tournament.id) }}" class="text-blue-600 hover:text-blue-900">📊 Ranked</a>
                                         <a href="{{ url_for('tournaments.delete_tournament', tournament_id=tournament.id) }}" class="text-red-600 hover:text-red-900">Delete</a>
                                     {% endif %}
                                 </td>

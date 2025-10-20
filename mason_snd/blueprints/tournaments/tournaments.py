@@ -21,7 +21,7 @@ Workflow:
     6. Admin finalizes and publishes results
 """
 
-from flask import Blueprint, render_template, request, redirect, url_for, flash, session
+from flask import Blueprint, render_template, request, redirect, url_for, flash, session, send_file
 
 from mason_snd.extensions import db
 from mason_snd.models.auth import User, Judges
@@ -34,7 +34,15 @@ from mason_snd.utils.race_protection import prevent_race_condition
 
 from werkzeug.security import generate_password_hash, check_password_hash
 from datetime import datetime
+from io import BytesIO
 import pytz
+
+try:
+    import pandas as pd
+    import openpyxl
+except ImportError:
+    pd = None
+    openpyxl = None
 
 # Timezone constant
 EST = pytz.timezone('US/Eastern')
@@ -1080,3 +1088,325 @@ def search_partners():
             for user in users
         ]
     })
+
+@tournaments_bp.route('/view_form_responses/<int:tournament_id>')
+def view_form_responses(tournament_id):
+    user_id = session.get('user_id')
+    
+    if not user_id:
+        flash("Please Log in", "error")
+        return redirect(url_for('auth.login'))
+    
+    user = User.query.filter_by(id=user_id).first()
+    if not user or user.role < 2:
+        flash("You are not authorized to access this page", "error")
+        return redirect(url_for('tournaments.index'))
+    
+    tournament = Tournament.query.get_or_404(tournament_id)
+    
+    form_fields = Form_Fields.query.filter_by(tournament_id=tournament_id).order_by(Form_Fields.id).all()
+    
+    if not form_fields:
+        flash(f"No form fields found for {tournament.name}", "warning")
+        return redirect(url_for('tournaments.index'))
+    
+    signups = Tournament_Signups.query.filter_by(tournament_id=tournament_id).all()
+    
+    user_responses = {}
+    user_responses_json = {}
+    
+    for signup in signups:
+        user_obj = User.query.get(signup.user_id)
+        if not user_obj:
+            continue
+            
+        if signup.user_id not in user_responses:
+            user_responses[signup.user_id] = {
+                'user': user_obj,
+                'signup': signup,
+                'responses': {}
+            }
+            user_responses_json[signup.user_id] = {
+                'user': {
+                    'first_name': user_obj.first_name,
+                    'last_name': user_obj.last_name,
+                    'email': user_obj.email
+                },
+                'signup': {
+                    'created_at': signup.created_at.strftime('%Y-%m-%d %H:%M:%S') if signup.created_at else ''
+                },
+                'responses': {}
+            }
+        
+        responses = Form_Responses.query.filter_by(
+            tournament_id=tournament_id,
+            user_id=signup.user_id
+        ).all()
+        
+        for response in responses:
+            field = Form_Fields.query.get(response.field_id)
+            if field:
+                user_responses[signup.user_id]['responses'][field.id] = response.response
+                user_responses_json[signup.user_id]['responses'][field.id] = response.response
+    
+    form_fields_json = [
+        {
+            'id': field.id,
+            'label': field.label,
+            'type': field.type,
+            'required': field.required
+        }
+        for field in form_fields
+    ]
+    
+    return render_template('tournaments/view_form_responses.html',
+                         tournament=tournament,
+                         form_fields=form_fields,
+                         form_fields_json=form_fields_json,
+                         user_responses=user_responses,
+                         user_responses_json=user_responses_json,
+                         user=user)
+
+
+@tournaments_bp.route('/download_form_responses/<int:tournament_id>')
+def download_form_responses(tournament_id):
+    user_id = session.get('user_id')
+    
+    if not user_id:
+        flash("Please Log in", "error")
+        return redirect(url_for('auth.login'))
+    
+    user = User.query.filter_by(id=user_id).first()
+    if not user or user.role < 2:
+        flash("You are not authorized to access this page", "error")
+        return redirect(url_for('tournaments.index'))
+    
+    if pd is None or openpyxl is None:
+        flash("Excel functionality not available. Please install pandas and openpyxl.", "error")
+        return redirect(url_for('tournaments.view_form_responses', tournament_id=tournament_id))
+    
+    tournament = Tournament.query.get_or_404(tournament_id)
+    
+    form_fields = Form_Fields.query.filter_by(tournament_id=tournament_id).order_by(Form_Fields.id).all()
+    
+    if not form_fields:
+        flash(f"No form fields found for {tournament.name}", "warning")
+        return redirect(url_for('tournaments.view_form_responses', tournament_id=tournament_id))
+    
+    signups = Tournament_Signups.query.filter_by(tournament_id=tournament_id).all()
+    
+    response_data = []
+    
+    for signup in signups:
+        user_obj = User.query.get(signup.user_id)
+        if not user_obj:
+            continue
+        
+        row = {
+            'Signup Timestamp': signup.created_at.strftime('%Y-%m-%d %H:%M:%S') if signup.created_at else '',
+            'Student Name': f"{user_obj.first_name} {user_obj.last_name}",
+            'Email': user_obj.email
+        }
+        
+        responses = Form_Responses.query.filter_by(
+            tournament_id=tournament_id,
+            user_id=signup.user_id
+        ).all()
+        
+        response_dict = {r.field_id: r.response for r in responses}
+        
+        for field in form_fields:
+            row[field.label] = response_dict.get(field.id, '')
+        
+        response_data.append(row)
+    
+    if not response_data:
+        flash(f"No form responses found for {tournament.name}", "warning")
+        return redirect(url_for('tournaments.view_form_responses', tournament_id=tournament_id))
+    
+    df = pd.DataFrame(response_data)
+    
+    output = BytesIO()
+    writer = pd.ExcelWriter(output, engine='openpyxl')
+    
+    df.to_excel(writer, sheet_name=f'{tournament.name} Responses', index=False)
+    
+    from openpyxl.styles import PatternFill, Font, Alignment
+    
+    workbook = writer.book
+    worksheet = workbook.active
+    
+    header_fill = PatternFill(start_color="1F4E79", end_color="1F4E79", fill_type="solid")
+    header_font = Font(color="FFFFFF", bold=True)
+    
+    for cell in worksheet[1]:
+        cell.fill = header_fill
+        cell.font = header_font
+        cell.alignment = Alignment(horizontal='center', vertical='center')
+    
+    for column in worksheet.columns:
+        max_length = 0
+        column_letter = column[0].column_letter
+        for cell in column:
+            try:
+                if len(str(cell.value)) > max_length:
+                    max_length = len(str(cell.value))
+            except:
+                pass
+        adjusted_width = min(max_length + 2, 50)
+        worksheet.column_dimensions[column_letter].width = adjusted_width
+    
+    writer.close()
+    output.seek(0)
+    
+    safe_tournament_name = "".join(c for c in tournament.name if c.isalnum() or c in (' ', '-', '_')).strip()
+    safe_tournament_name = safe_tournament_name.replace(' ', '_')
+    filename = f"{safe_tournament_name}_form_responses_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
+    
+    return send_file(output, 
+                     as_attachment=True, 
+                     download_name=filename,
+                     mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+
+
+@tournaments_bp.route('/download_ranked_signups/<int:tournament_id>')
+def download_ranked_signups(tournament_id):
+    user_id = session.get('user_id')
+    
+    if not user_id:
+        flash("Please Log in", "error")
+        return redirect(url_for('auth.login'))
+    
+    user = User.query.filter_by(id=user_id).first()
+    if not user or user.role < 2:
+        flash("You are not authorized to access this page", "error")
+        return redirect(url_for('tournaments.index'))
+    
+    if pd is None or openpyxl is None:
+        flash("Excel functionality not available. Please install pandas and openpyxl.", "error")
+        return redirect(url_for('tournaments.index'))
+    
+    tournament = Tournament.query.get_or_404(tournament_id)
+    
+    signups = Tournament_Signups.query.filter_by(tournament_id=tournament_id, is_going=True).all()
+    
+    if not signups:
+        flash(f"No signups found for {tournament.name}", "warning")
+        return redirect(url_for('tournaments.index'))
+    
+    from mason_snd.models.metrics import MetricsSettings
+    
+    settings = MetricsSettings.query.first()
+    if not settings:
+        settings = MetricsSettings()
+        db.session.add(settings)
+        db.session.commit()
+    tournament_weight = settings.tournament_weight
+    effort_weight = settings.effort_weight
+    
+    ranked_data = []
+    
+    for signup in signups:
+        user_obj = User.query.get(signup.user_id)
+        if not user_obj:
+            continue
+        
+        event = Event.query.get(signup.event_id) if signup.event_id else None
+        event_name = event.event_name if event else 'Unknown Event'
+        
+        event_type = 'Unknown'
+        if event:
+            if event.event_type == 0:
+                event_type = 'Speech'
+            elif event.event_type == 1:
+                event_type = 'LD'
+            elif event.event_type == 2:
+                event_type = 'PF'
+        
+        partner = User.query.get(signup.partner_id) if signup.partner_id else None
+        partner_name = f"{partner.first_name} {partner.last_name}" if partner else ''
+        
+        tournament_pts = user_obj.tournament_points if hasattr(user_obj, 'tournament_points') else 0
+        effort_pts = user_obj.effort_points if hasattr(user_obj, 'effort_points') else 0
+        weighted_pts = round((tournament_pts * tournament_weight) + (effort_pts * effort_weight), 2)
+        
+        ranked_data.append({
+            'Event': event_name,
+            'Category': event_type,
+            'Competitor Name': f"{user_obj.first_name} {user_obj.last_name}",
+            'Partner': partner_name,
+            'Weighted Points': weighted_pts,
+            'Tournament Points': tournament_pts,
+            'Effort Points': effort_pts,
+            'Email': user_obj.email,
+            'User ID': user_obj.id,
+            'Event ID': signup.event_id if signup.event_id else ''
+        })
+    
+    ranked_data.sort(key=lambda x: (-x['Weighted Points'], x['Event'], x['Competitor Name']))
+    
+    event_groups = {}
+    for row in ranked_data:
+        event_key = (row['Event'], row['Event ID'])
+        if event_key not in event_groups:
+            event_groups[event_key] = []
+        event_groups[event_key].append(row)
+    
+    for event_key, rows in event_groups.items():
+        rows.sort(key=lambda x: -x['Weighted Points'])
+        for idx, row in enumerate(rows, 1):
+            row['Rank'] = idx
+    
+    final_data = []
+    for event_key in sorted(event_groups.keys(), key=lambda x: x[0]):
+        final_data.extend(event_groups[event_key])
+    
+    column_order = [
+        'Rank', 'Event', 'Category', 'Competitor Name', 'Partner', 
+        'Weighted Points', 'Tournament Points', 'Effort Points', 
+        'Email', 'User ID', 'Event ID'
+    ]
+    
+    df = pd.DataFrame(final_data, columns=column_order)
+    
+    output = BytesIO()
+    writer = pd.ExcelWriter(output, engine='openpyxl')
+    
+    df.to_excel(writer, sheet_name='Ranked Signups', index=False)
+    
+    from openpyxl.styles import PatternFill, Font, Alignment
+    
+    workbook = writer.book
+    worksheet = workbook.active
+    
+    header_fill = PatternFill(start_color="1F4E79", end_color="1F4E79", fill_type="solid")
+    header_font = Font(color="FFFFFF", bold=True)
+    
+    for cell in worksheet[1]:
+        cell.fill = header_fill
+        cell.font = header_font
+        cell.alignment = Alignment(horizontal='center', vertical='center')
+    
+    for column in worksheet.columns:
+        max_length = 0
+        column_letter = column[0].column_letter
+        for cell in column:
+            try:
+                if len(str(cell.value)) > max_length:
+                    max_length = len(str(cell.value))
+            except:
+                pass
+        adjusted_width = min(max_length + 2, 50)
+        worksheet.column_dimensions[column_letter].width = adjusted_width
+    
+    writer.close()
+    output.seek(0)
+    
+    safe_tournament_name = "".join(c for c in tournament.name if c.isalnum() or c in (' ', '-', '_')).strip()
+    safe_tournament_name = safe_tournament_name.replace(' ', '_')
+    filename = f"{safe_tournament_name}_ranked_signups_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
+    
+    return send_file(output, 
+                     as_attachment=True, 
+                     download_name=filename,
+                     mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')

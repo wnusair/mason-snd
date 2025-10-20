@@ -194,9 +194,11 @@ def edit_event(event_id):
             return redirect(url_for("events.edit_event", event_id=event_id))
 
         # Validate event_type
+        from mason_snd.models.event_types import Event_Type
         try:
             event_type_int = int(event_type)
-            if event_type_int not in [0, 1, 2]:
+            event_type_obj = Event_Type.query.get(event_type_int)
+            if not event_type_obj:
                 flash("Invalid event type selected", "error")
                 return redirect(url_for("events.edit_event", event_id=event_id))
         except (ValueError, TypeError):
@@ -214,7 +216,9 @@ def edit_event(event_id):
         flash('Event updated successfully', 'success')
         return redirect(url_for('events.index'))
 
-    return render_template('events/edit_event.html', event=event)
+    from mason_snd.models.event_types import Event_Type
+    event_types = Event_Type.query.order_by(Event_Type.name).all()
+    return render_template('events/edit_event.html', event=event, event_types=event_types)
 
 
 @events_bp.route('/manage_members/<int:event_id>', methods=['POST', 'GET'])
@@ -510,9 +514,11 @@ def add_event():
             return redirect(url_for("events.add_event"))
 
         # Validate event_type
+        from mason_snd.models.event_types import Event_Type
         try:
             event_type_int = int(event_type)
-            if event_type_int not in [0, 1, 2]:
+            event_type_obj = Event_Type.query.get(event_type_int)
+            if not event_type_obj:
                 flash("Invalid event type selected", "error")
                 return redirect(url_for("events.add_event"))
         except (ValueError, TypeError):
@@ -538,7 +544,9 @@ def add_event():
         db.session.commit()
         return redirect(url_for('events.index'))
 
-    return render_template('events/add_event.html')
+    from mason_snd.models.event_types import Event_Type
+    event_types = Event_Type.query.order_by(Event_Type.name).all()
+    return render_template('events/add_event.html', event_types=event_types)
 
 @events_bp.route('/delete_event/<int:event_id>', methods=['POST'])
 @prevent_race_condition('delete_event', min_interval=1.0, redirect_on_duplicate=lambda uid, form: redirect(url_for('events.index')))

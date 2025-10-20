@@ -316,6 +316,7 @@ class Tournament_Signups(db.Model):
         id: Primary key
         bringing_judge: Boolean indicating judge commitment
         is_going: Boolean indicating confirmed attendance
+        created_at: When signup was created (DateTime, EST)
         user_id: User registering (foreign key to User)
         tournament_id: Tournament context (foreign key to Tournament)
         event_id: Event registering for (foreign key to Event)
@@ -354,6 +355,7 @@ class Tournament_Signups(db.Model):
 
     bringing_judge = db.Column(db.Boolean, default=False)
     is_going = db.Column(db.Boolean, default=False)
+    created_at = db.Column(db.DateTime, default=lambda: datetime.now(EST), nullable=False)
 
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'))
     tournament_id = db.Column(db.Integer, db.ForeignKey('tournament.id'))

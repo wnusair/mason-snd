@@ -20,6 +20,10 @@
 			<div class="text-xl font-semibold text-gray-800 mb-2">Events Management</div>
 			<div class="text-gray-500">Manage event leaders and settings</div>
 		</a>
+		<a href="{{ url_for('admin.event_types') }}" class="bg-white shadow rounded-lg p-6 hover:shadow-lg transition">
+			<div class="text-xl font-semibold text-gray-800 mb-2">Event Types</div>
+			<div class="text-gray-500">Manage event types and judge ratios</div>
+		</a>
 		<a href="{{ url_for('admin.download_all_signups') }}" class="bg-white shadow rounded-lg p-6 hover:shadow-lg transition border-2 border-indigo-200">
 			<div class="text-xl font-semibold text-indigo-800 mb-2">📥 Download ALL Signups</div>
 			<div class="text-indigo-600">Export signups from ALL tournaments as Excel file</div>

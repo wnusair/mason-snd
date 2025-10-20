@@ -579,54 +579,33 @@ def register():
         last_name = request.form.get('last_name')
         email = request.form.get('email')
         phone_number = request.form.get('phone_number')
-        is_parent_form_value = request.form.get('is_parent')
         password = request.form.get('password')
         confirm_password = request.form.get('confirm_password')
+        
+        # Force is_parent to False - only student registration allowed
+        is_parent = False
 
         # Validate basic required fields
         if not all([first_name, last_name, email, phone_number, password, confirm_password]):
             flash("All basic information fields are required.", 'error')
             return render_template('auth/register.html')
 
-        # Validate that is_parent is actually selected
-        if is_parent_form_value not in ['yes', 'no']:
-            flash("Please select whether you are a parent or not.", 'error')
+        # Extract student-specific fields (emergency contact)
+        emergency_first_name = request.form.get('emergency_first_name')
+        emergency_last_name = request.form.get('emergency_last_name')
+        emergency_email = request.form.get('emergency_email')
+        emergency_phone = request.form.get('emergency_phone')
+        emergency_relationship = request.form.get('emergency_relationship')
+        
+        if not all([emergency_first_name, emergency_last_name, emergency_email,
+                   emergency_phone, emergency_relationship]):
+            flash("All emergency contact information is required.", 'error')
             return render_template('auth/register.html')
-
-        is_parent = is_parent_form_value == 'yes'
-
-        # Initialize role-specific fields
-        emergency_first_name = emergency_last_name = None
-        emergency_email = emergency_phone = emergency_relationship = None
-        child_first_name = child_last_name = None
-
-        # Validate and extract role-specific fields
-        if is_parent:
-            child_first_name = request.form.get('child_first_name')
-            child_last_name = request.form.get('child_last_name')
-            
-            if not child_first_name or not child_last_name:
-                flash("Child's first name and last name are required when "
-                      "registering as a parent.", 'error')
-                return render_template('auth/register.html')
-        else:
-            emergency_first_name = request.form.get('emergency_first_name')
-            emergency_last_name = request.form.get('emergency_last_name')
-            emergency_email = request.form.get('emergency_email')
-            emergency_phone = request.form.get('emergency_phone')
-            emergency_relationship = request.form.get('emergency_relationship')
-            
-            if not all([emergency_first_name, emergency_last_name, emergency_email,
-                       emergency_phone, emergency_relationship]):
-                flash("All emergency contact information is required when "
-                      "registering as a student.", 'error')
-                return render_template('auth/register.html')
         
         # Debug logging
-        print(first_name, last_name, email, phone_number, is_parent, password,
+        print(first_name, last_name, email, phone_number, password,
               confirm_password, emergency_first_name, emergency_last_name,
-              emergency_email, emergency_phone, emergency_relationship,
-              child_first_name, child_last_name)
+              emergency_email, emergency_phone, emergency_relationship)
 
         # Validate password match
         if password != confirm_password:
@@ -648,66 +627,38 @@ def register():
                       "Please use a different email or try logging in.", 'error')
                 return render_template('auth/register.html')
 
-        # Handle parent registration
-        if is_parent:
-            parent_user_data = {
-                'email': email,
-                'password': generate_password_hash(password),
-                'phone_number': phone_number,
-                'judging_reqs': "test",
-                'child_first_name': child_first_name.lower() if child_first_name else None,
-                'child_last_name': child_last_name.lower() if child_last_name else None
-            }
-            
-            # Find or create parent user
-            parent_user = find_or_create_user(first_name, last_name, True, **parent_user_data)
-            
-            # Find or create child user (as ghost account if not exists)
-            child_user_data = {}  # Child gets minimal data initially
-            child_user = find_or_create_user(
-                child_first_name,
-                child_last_name,
-                False,
-                **child_user_data
-            )
-            
-            # Create or update judge relationship
-            create_or_update_judge_relationship(parent_user.id, child_user.id)
-            make_judge_reqs(parent_user)
-            
-        # Handle student registration
-        else:
-            child_user_data = {
-                'email': email,
-                'password': generate_password_hash(password),
-                'phone_number': phone_number,
-                'emergency_contact_first_name': emergency_first_name.lower(),
-                'emergency_contact_last_name': emergency_last_name.lower(),
-                'emergency_contact_number': emergency_phone,
-                'emergency_contact_relationship': emergency_relationship,
-                'emergency_contact_email': emergency_email
-            }
-            
-            # Find or create child user
-            child_user = find_or_create_user(first_name, last_name, False, **child_user_data)
-            
-            # Find or create parent user (as ghost account if not exists)
-            parent_user_data = {
-                'phone_number': emergency_phone,
-                'email': emergency_email,
-                'child_first_name': first_name.lower(),
-                'child_last_name': last_name.lower()
-            }
-            parent_user = find_or_create_user(
-                emergency_first_name,
-                emergency_last_name,
-                True,
-                **parent_user_data
-            )
-            
-            # Create or update judge relationship
-            create_or_update_judge_relationship(parent_user.id, child_user.id)
-            make_child_reqs(child_user)
+        # Handle student registration only
+        child_user_data = {
+            'email': email,
+            'password': generate_password_hash(password),
+            'phone_number': phone_number,
+            'emergency_contact_first_name': emergency_first_name.lower(),
+            'emergency_contact_last_name': emergency_last_name.lower(),
+            'emergency_contact_number': emergency_phone,
+            'emergency_contact_relationship': emergency_relationship,
+            'emergency_contact_email': emergency_email
+        }
+        
+        # Find or create student user
+        child_user = find_or_create_user(first_name, last_name, False, **child_user_data)
+        
+        # Find or create parent user (as ghost account if not exists)
+        parent_user_data = {
+            'phone_number': emergency_phone,
+            'email': emergency_email,
+            'child_first_name': first_name.lower(),
+            'child_last_name': last_name.lower()
+        }
+        parent_user = find_or_create_user(
+            emergency_first_name,
+            emergency_last_name,
+            True,
+            **parent_user_data
+        )
+        
+        # Create or update judge relationship
+        create_or_update_judge_relationship(parent_user.id, child_user.id)
+        make_child_reqs(child_user)
 
         flash("Registration successful!", "success")
         return redirect(url_for("auth.login"))

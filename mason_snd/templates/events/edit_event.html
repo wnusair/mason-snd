@@ -25,9 +25,9 @@
                     <label for="event_type" class="block text-sm font-medium text-gray-700">Event Type</label>
                     <select id="event_type" name="event_type" required class="mt-1 appearance-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-md focus:outline-none focus:ring-[color:var(--color-primary-500)] focus:border-[color:var(--color-primary-500)] sm:text-sm">
                         <option value="">Select an event type...</option>
-                        <option value="0" {% if event.event_type == 0 %}selected{% endif %}>Speech</option>
-                        <option value="1" {% if event.event_type == 1 %}selected{% endif %}>Lincoln-Douglas (LD)</option>
-                        <option value="2" {% if event.event_type == 2 %}selected{% endif %}>Public Forum (PF)</option>
+                        {% for et in event_types %}
+                        <option value="{{ et.id }}" {% if event.event_type == et.id %}selected{% endif %}>{{ et.name }} (1:{{ et.judge_ratio }})</option>
+                        {% endfor %}
                     </select>
                 </div>
                 <div>
