@@ -126,6 +126,26 @@ def calculate_weighted_points(user):
     effort_pts = user.effort_points if hasattr(user, 'effort_points') else 0
     return round((tournament_pts * tournament_weight) + (effort_pts * effort_weight), 2)
 
+def get_event_type_name(event):
+    """Get the event type name from the database based on event's event_type ID.
+    
+    Args:
+        event: Event object with event_type attribute
+    
+    Returns:
+        str: Event type name from database, or 'Unknown' if not found
+    """
+    from mason_snd.models.event_types import Event_Type
+    
+    if not event or event.event_type is None:
+        return 'Unknown'
+    
+    event_type_obj = Event_Type.query.get(event.event_type)
+    if event_type_obj:
+        return event_type_obj.name
+    
+    return 'Unknown'
+
 @rosters_bp.route('/')
 def index():
     """Rosters dashboard showing upcoming tournaments and saved rosters.
@@ -738,14 +758,7 @@ def download_tournament(tournament_id):
         user = users.get(row['user_id'])
         user_name = f"{user.first_name} {user.last_name}" if user else 'Unknown'
         event_name = events[row['event_id']].event_name if row['event_id'] in events else 'Unknown Event'
-        event_type = 'Unknown'
-        if row['event_id'] in events:
-            if events[row['event_id']].event_type == 0:
-                event_type = 'Speech'
-            elif events[row['event_id']].event_type == 1:
-                event_type = 'LD'
-            elif events[row['event_id']].event_type == 2:
-                event_type = 'PF'
+        event_type = get_event_type_name(events.get(row['event_id']))
         weighted_points = calculate_weighted_points(user)
         rank_data.append({
             'Rank': row['rank'],
@@ -768,14 +781,7 @@ def download_tournament(tournament_id):
         for comp in competitors_list:
             user = users.get(comp['user_id'])
             user_name = f"{user.first_name} {user.last_name}" if user else 'Unknown'
-            event_type = 'Unknown'
-            if event_id in events:
-                if events[event_id].event_type == 0:
-                    event_type = 'Speech'
-                elif events[event_id].event_type == 1:
-                    event_type = 'LD'
-                elif events[event_id].event_type == 2:
-                    event_type = 'PF'
+            event_type = get_event_type_name(events.get(event_id))
             weighted_points = calculate_weighted_points(user)
             event_data.append({
                 'Event': event_name,
@@ -940,15 +946,14 @@ def save_tournament(tournament_id):
     # Save judges using the current Tournament_Judges with proper people_bringing calculation
     judges = Tournament_Judges.query.filter_by(tournament_id=tournament_id, accepted=True).all()
     for judge in judges:
-        # Calculate people_bringing based on event type
+        from mason_snd.models.event_types import Event_Type
+        
+        # Calculate people_bringing based on event type from database
         people_bringing = 0
-        if judge.event:
-            if judge.event.event_type == 0:  # Speech
-                people_bringing = 6
-            elif judge.event.event_type == 1:  # LD
-                people_bringing = 2
-            elif judge.event.event_type == 2:  # PF
-                people_bringing = 4
+        if judge.event and judge.event.event_type is not None:
+            event_type_obj = Event_Type.query.get(judge.event.event_type)
+            if event_type_obj:
+                people_bringing = event_type_obj.judge_ratio
         
         rj = Roster_Judge(
             user_id=judge.judge_id,
@@ -1702,14 +1707,7 @@ def download_roster(roster_id):
         judge_name = f"{judge_users[judge.user_id].first_name} {judge_users[judge.user_id].last_name}" if judge.user_id in judge_users else 'Unknown'
         child_name = f"{judge.child.first_name} {judge.child.last_name}" if judge.child else ''
         event_name = judge.event.event_name if judge.event else 'Unknown'
-        event_type = 'Unknown'
-        if judge.event:
-            if judge.event.event_type == 0:
-                event_type = 'Speech'
-            elif judge.event.event_type == 1:
-                event_type = 'LD'
-            elif judge.event.event_type == 2:
-                event_type = 'PF'
+        event_type = get_event_type_name(judge.event)
         
         judges_data.append({
             'Judge Name': judge_name,
@@ -1758,14 +1756,7 @@ def download_roster(roster_id):
         
         user_name = f"{user.first_name} {user.last_name}" if user else 'Unknown'
         event_name = event.event_name if event else 'Unknown Event'
-        event_type = 'Unknown'
-        if event:
-            if event.event_type == 0:
-                event_type = 'Speech'
-            elif event.event_type == 1:
-                event_type = 'LD'
-            elif event.event_type == 2:
-                event_type = 'PF'
+        event_type = get_event_type_name(event)
         
         # Get partner information
         partner_name = ''
@@ -1795,14 +1786,7 @@ def download_roster(roster_id):
     for event_id, comps in event_competitors_dict.items():
         event = events.get(event_id)
         event_name = event.event_name if event else f'Event {event_id}'
-        event_type = 'Unknown'
-        if event:
-            if event.event_type == 0:
-                event_type = 'Speech'
-            elif event.event_type == 1:
-                event_type = 'LD'
-            elif event.event_type == 2:
-                event_type = 'PF'
+        event_type = get_event_type_name(event)
         
         # Sort by weighted points for ranking
         sorted_comps = sorted(
@@ -2222,13 +2206,11 @@ def upload_roster():
                     people_bringing = 0
                     if 'Number People Bringing' in row and pd.notna(row['Number People Bringing']):
                         people_bringing = int(row['Number People Bringing'])
-                    elif event:
-                        if event.event_type == 0:
-                            people_bringing = 6
-                        elif event.event_type == 1:
-                            people_bringing = 2
-                        elif event.event_type == 2:
-                            people_bringing = 4
+                    elif event and event.event_type is not None:
+                        from mason_snd.models.event_types import Event_Type
+                        event_type_obj = Event_Type.query.get(event.event_type)
+                        if event_type_obj:
+                            people_bringing = event_type_obj.judge_ratio
                     
                     if judge_user:
                         rj = Roster_Judge(
