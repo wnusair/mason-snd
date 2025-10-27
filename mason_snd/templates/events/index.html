@@ -46,15 +46,24 @@
                         {% endif %}
                     </div>
                 </div>
-                 <p class="mt-1 text-sm text-gray-500">Led by: {{ event.owner.first_name }} {{ event.owner.last_name }}</p>
+                {% if event.leader_users %}
+                <p class="mt-1 text-sm text-gray-500">
+                    Led by: 
+                    {% for leader in event.leader_users %}
+                        {{ leader.first_name }} {{ leader.last_name }}{% if not loop.last %}, {% endif %}
+                    {% endfor %}
+                </p>
+                {% elif event.owner %}
+                <p class="mt-1 text-sm text-gray-500">Led by: {{ event.owner.first_name }} {{ event.owner.last_name }}</p>
+                {% endif %}
             </div>
             <div class="px-4 py-5 sm:p-6">
                 <p class="text-sm text-gray-700">{{ event.event_description }}</p>
             </div>
-            {% if event.owner_id == user.id or user.role >= 2 %}
+            {% if event.id in user_led_events or user.role >= 2 %}
             <div class="px-4 py-4 sm:px-6 bg-gray-50">
                 <div class="flex items-center justify-end space-x-3">
-                    {% if event.owner_id == user.id or user.role >= 2 %}
+                    {% if event.id in user_led_events or user.role >= 2 %}
                     <a href="{{ url_for('events.edit_event', event_id=event.id) }}" class="text-sm font-medium text-gray-600 hover:text-gray-900">Edit</a>
                     <a href="{{ url_for('events.manage_members', event_id=event.id) }}" class="text-sm font-medium text-gray-600 hover:text-gray-900">Manage Members</a>
                     {% endif %}

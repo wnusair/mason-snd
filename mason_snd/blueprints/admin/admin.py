@@ -696,7 +696,12 @@ def change_event_leader(event_id):
             else:
                 flash('Please select a leader to remove', 'error')
     
-    return render_template('admin/change_event_leader.html', event=event)
+    # For GET requests and POST requests that don't return early, 
+    # ensure search_query and search_results are defined
+    return render_template('admin/change_event_leader.html', 
+                         event=event,
+                         search_query=None,
+                         search_results=None)
 
 
 @admin_bp.route('/test_data', methods=['GET', 'POST'])

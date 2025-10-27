@@ -32,7 +32,7 @@ import csv
 from io import StringIO
 
 from mason_snd.extensions import db
-from mason_snd.models.events import Event, User_Event, Effort_Score
+from mason_snd.models.events import Event, User_Event, Effort_Score, Event_Leader
 from mason_snd.models.auth import User
 from mason_snd.models.metrics import MetricsSettings
 from mason_snd.utils.race_protection import prevent_race_condition
@@ -40,6 +40,44 @@ from mason_snd.utils.race_protection import prevent_race_condition
 from werkzeug.security import generate_password_hash, check_password_hash
 
 events_bp = Blueprint('events', __name__, template_folder='templates')
+
+def is_event_leader(user_id, event_id):
+    """
+    Check if a user is an event leader for a specific event.
+    
+    Args:
+        user_id (int): The user ID to check
+        event_id (int): The event ID to check
+    
+    Returns:
+        bool: True if user is an event leader for this event, False otherwise
+    """
+    return Event_Leader.query.filter_by(
+        event_id=event_id,
+        user_id=user_id
+    ).first() is not None
+
+def can_manage_event(user_id, event_id):
+    """
+    Check if a user can manage an event (is event leader or admin).
+    
+    Args:
+        user_id (int): The user ID to check
+        event_id (int): The event ID to check
+    
+    Returns:
+        bool: True if user can manage the event, False otherwise
+    """
+    user = User.query.get(user_id)
+    if not user:
+        return False
+    
+    # Admins can manage all events
+    if user.role >= 2:
+        return True
+    
+    # Check if user is an event leader for this event
+    return is_event_leader(user_id, event_id)
 
 @events_bp.route('/')
 def index():
@@ -85,7 +123,14 @@ def index():
             user_events.append(event.event_name)
     print(user_events)
 
-    return render_template('events/index.html', events=events, user=user, user_events=user_events)
+    # Get events where user is a leader
+    user_led_events = []
+    if user_id:
+        event_leader_relationships = Event_Leader.query.filter_by(user_id=user_id).all()
+        for el in event_leader_relationships:
+            user_led_events.append(el.event_id)
+
+    return render_template('events/index.html', events=events, user=user, user_events=user_events, user_led_events=user_led_events)
 
 @events_bp.route('/leave_event/<int:event_id>', methods=['POST'])
 @prevent_race_condition('leave_event', min_interval=0.5, redirect_on_duplicate=lambda uid, form: redirect(url_for('events.index')))
@@ -175,8 +220,8 @@ def edit_event(event_id):
         flash('Event not found', 'error')
         return redirect(url_for('events.index'))
 
-    # Ensure the logged-in user is either the owner of the event or an admin (role >= 2)
-    if not (event.owner_id == user_id or (user and user.role >= 2)):
+    # Ensure the logged-in user is either an event leader or an admin (role >= 2)
+    if not can_manage_event(user_id, event_id):
         flash('You are not authorized to edit this event', 'error')
         return redirect(url_for('events.index'))
 
@@ -291,8 +336,8 @@ def manage_members(event_id):
         flash('Event not found.', 'error')
         return redirect(url_for('events.index'))
 
-    # Ensure the logged-in user is either the owner of the event or an admin (role >= 2)
-    if not (event.owner_id == user_id or (user and user.role >= 2)):
+    # Ensure the logged-in user is either an event leader or an admin (role >= 2)
+    if not can_manage_event(user_id, event_id):
         flash('You are not authorized to manage this event.', 'error')
         return redirect(url_for('events.index'))
 
