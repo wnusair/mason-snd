@@ -169,12 +169,14 @@ def add_tournament():
         users = User.query.all()
         current_tournament = Tournament.query.filter_by(name=name).first()
         events = Event.query.all()
+        signup_time = datetime.now(EST)
         for user in users:
             for event in events:
                 tournament_signup = Tournament_Signups(
                     user_id = user.id,
                     tournament_id = current_tournament.id,
-                    event_id = event.id
+                    event_id = event.id,
+                    created_at = signup_time
                 )
                 db.session.add(tournament_signup)
         db.session.commit()
@@ -352,7 +354,8 @@ def signup():
                     tournament_id=tournament_id,
                     event_id=event_id,
                     is_going=True,
-                    partner_id=partner_id
+                    partner_id=partner_id,
+                    created_at=datetime.now(EST)
                 )
                 db.session.add(signup)
             else:
@@ -369,14 +372,14 @@ def signup():
                         tournament_id=tournament_id,
                         event_id=event_id,
                         is_going=True,
-                        partner_id=user_id
+                        partner_id=user_id,
+                        created_at=datetime.now(EST)
                     )
                     db.session.add(partner_signup)
                 else:
                     partner_signup.partner_id = user_id
                     if not partner_signup.is_going:
                         partner_signup.is_going = True
-                        # Update the signup timestamp to reflect when they actually signed up
                         partner_signup.created_at = datetime.now(EST)
 
         # For each field in the selected tournament, capture the user's response
