@@ -1672,12 +1672,23 @@ def view_tournament_signups(tournament_id):
     
     tournament = Tournament.query.get_or_404(tournament_id)
     
-    # Get all signups for this tournament
+    # Get all signups for this tournament where users have actually filled out the form
+    # Only include users who have submitted form responses (indicating they completed signup)
     signups = Tournament_Signups.query.filter_by(tournament_id=tournament_id, is_going=True).all()
+    
+    # Filter to only include signups where the user has submitted form responses
+    user_ids_with_responses = db.session.query(Form_Responses.user_id).filter_by(
+        tournament_id=tournament_id
+    ).distinct().all()
+    user_ids_with_responses = [uid[0] for uid in user_ids_with_responses]
     
     # Prepare signup data with related information
     signup_data = []
     for signup in signups:
+        # Skip signups where user hasn't submitted form responses
+        if signup.user_id not in user_ids_with_responses:
+            continue
+        
         # Get user information
         user_obj = User.query.get(signup.user_id) if signup.user_id else None
         user_name = f"{user_obj.first_name} {user_obj.last_name}" if user_obj else 'Unknown'
@@ -1768,6 +1779,15 @@ def download_tournament_signups(tournament_id):
     
     # Get signups for this specific tournament
     signups = Tournament_Signups.query.filter_by(tournament_id=tournament_id, is_going=True).all()
+    
+    # Filter to only include signups where the user has submitted form responses
+    user_ids_with_responses = db.session.query(Form_Responses.user_id).filter_by(
+        tournament_id=tournament_id
+    ).distinct().all()
+    user_ids_with_responses = [uid[0] for uid in user_ids_with_responses]
+    
+    # Filter signups to only those with form responses
+    signups = [s for s in signups if s.user_id in user_ids_with_responses]
     
     if not signups:
         flash(f"No signups found for {tournament.name}")
