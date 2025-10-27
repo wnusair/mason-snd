@@ -131,6 +131,17 @@
     </div>
 
     <!-- Charts Section -->
+    <div class="mt-8 grid grid-cols-1 gap-6">
+        <!-- Bell Curve -->
+        <div class="bg-white p-6 rounded-lg shadow">
+            <h3 class="text-lg font-medium text-gray-900 mb-4">Performance Bell Curve</h3>
+            <p class="text-sm text-gray-500 mb-4">Distribution of participants by percentile, showing count and average points per percentile</p>
+            <div style="position: relative; height: 400px;">
+                <canvas id="bellCurveChart"></canvas>
+            </div>
+        </div>
+    </div>
+
     <div class="mt-8 grid grid-cols-1 gap-6 lg:grid-cols-2">
         <!-- Stage Distribution -->
         <div class="bg-white p-6 rounded-lg shadow">
@@ -333,4 +344,102 @@
     </div>
     {% endif %}
 </div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+const bellCurveCtx = document.getElementById('bellCurveChart').getContext('2d');
+const bellCurveChart = new Chart(bellCurveCtx, {
+    type: 'bar',
+    data: {
+        labels: {{ bell_curve_percentiles | safe }},
+        datasets: [{
+            label: 'Number of Participants',
+            data: {{ bell_curve_counts | safe }},
+            backgroundColor: 'rgba(79, 70, 229, 0.6)',
+            borderColor: 'rgba(79, 70, 229, 1)',
+            borderWidth: 2,
+            yAxisID: 'y'
+        }, {
+            label: 'Average Points',
+            data: {{ bell_curve_avg_points | safe }},
+            backgroundColor: 'rgba(16, 185, 129, 0.6)',
+            borderColor: 'rgba(16, 185, 129, 1)',
+            borderWidth: 2,
+            type: 'line',
+            yAxisID: 'y1',
+            tension: 0.4
+        }]
+    },
+    options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        interaction: {
+            mode: 'index',
+            intersect: false
+        },
+        plugins: {
+            title: {
+                display: false
+            },
+            tooltip: {
+                callbacks: {
+                    label: function(context) {
+                        let label = context.dataset.label || '';
+                        if (label) {
+                            label += ': ';
+                        }
+                        if (context.parsed.y !== null) {
+                            if (context.datasetIndex === 0) {
+                                label += context.parsed.y + ' participant' + (context.parsed.y !== 1 ? 's' : '');
+                            } else {
+                                label += context.parsed.y + ' pts (avg)';
+                            }
+                        }
+                        return label;
+                    }
+                }
+            },
+            legend: {
+                display: true,
+                position: 'top'
+            }
+        },
+        scales: {
+            x: {
+                title: {
+                    display: true,
+                    text: 'Percentile'
+                },
+                grid: {
+                    display: false
+                }
+            },
+            y: {
+                type: 'linear',
+                display: true,
+                position: 'left',
+                title: {
+                    display: true,
+                    text: 'Number of Participants'
+                },
+                ticks: {
+                    stepSize: 1
+                }
+            },
+            y1: {
+                type: 'linear',
+                display: true,
+                position: 'right',
+                title: {
+                    display: true,
+                    text: 'Average Points'
+                },
+                grid: {
+                    drawOnChartArea: false
+                }
+            }
+        }
+    }
+});
+</script>
 {% endblock %}

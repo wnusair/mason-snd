@@ -116,7 +116,6 @@ def index():
     events = Event.query.all()
 
     user_events = []
-    # Only consider events where the User_Event row is active
     active_event_relationships = User_Event.query.filter_by(user_id=user_id, active=True).all()
     for row in active_event_relationships:
         event = Event.query.filter_by(id=row.event_id).first()
@@ -124,14 +123,22 @@ def index():
             user_events.append(event.event_name)
     print(user_events)
 
-    # Get events where user is a leader
     user_led_events = []
     if user_id:
         event_leader_relationships = Event_Leader.query.filter_by(user_id=user_id).all()
         for el in event_leader_relationships:
             user_led_events.append(el.event_id)
 
-    return render_template('events/index.html', events=events, user=user, user_events=user_events, user_led_events=user_led_events)
+    event_avg_scores = {}
+    for event in events:
+        effort_scores = Effort_Score.query.filter_by(event_id=event.id).all()
+        if effort_scores:
+            avg_score = sum([es.score or 0 for es in effort_scores]) / len(effort_scores)
+            event_avg_scores[event.id] = round(avg_score, 1)
+        else:
+            event_avg_scores[event.id] = 0
+
+    return render_template('events/index.html', events=events, user=user, user_events=user_events, user_led_events=user_led_events, event_avg_scores=event_avg_scores)
 
 @events_bp.route('/leave_event/<int:event_id>', methods=['POST'])
 @prevent_race_condition('leave_event', min_interval=0.5, redirect_on_duplicate=lambda uid, form: redirect(url_for('events.index')))

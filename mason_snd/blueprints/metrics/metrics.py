@@ -320,23 +320,17 @@ def get_user_performance_distribution():
             - mid_performers: Middle 60% by weighted points
             - low_performers: Bottom 20% by weighted points
             - inactive: Users with 0 weighted points (no tournament or effort activity)
-    
-    Note:
-        Uses current tournament_weight and effort_weight from MetricsSettings.
-        Weighted score = (tournament_pts * weight) + (effort_pts * weight).
-        Only users with weighted_score > 0 are distributed into performance tiers.
     """
     users = User.query.all()
     tournament_weight, effort_weight = get_point_weights()
     
     performance_buckets = {
-        'high_performers': [],      # Top 20%
-        'mid_performers': [],       # Middle 60%
-        'low_performers': [],       # Bottom 20%
-        'inactive': []             # No points
+        'high_performers': [],
+        'mid_performers': [],
+        'low_performers': [],
+        'inactive': []
     }
     
-    # Calculate weighted scores for all users
     user_scores = []
     for user in users:
         tournament_pts = user.tournament_points or 0
@@ -348,10 +342,8 @@ def get_user_performance_distribution():
         else:
             performance_buckets['inactive'].append(user)
     
-    # Sort by weighted score
     user_scores.sort(key=lambda x: x[1], reverse=True)
     
-    # Distribute into buckets
     total_active = len(user_scores)
     if total_active > 0:
         high_threshold = int(total_active * 0.2)
@@ -362,6 +354,57 @@ def get_user_performance_distribution():
         performance_buckets['low_performers'] = [u[0] for u in user_scores[low_threshold:]]
     
     return performance_buckets
+
+def get_tournament_percentile_distribution(tournament_id):
+    """Calculate bell curve percentile distribution for a specific tournament.
+    
+    Analyzes tournament performance data and creates percentile buckets showing
+    count and average points per percentile for visual bell curve display.
+    
+    Args:
+        tournament_id: The tournament to analyze
+    
+    Returns:
+        dict: Bell curve data containing:
+            - percentiles: List of percentile labels (0-10, 10-20, etc.)
+            - counts: Number of participants in each percentile
+            - avg_points: Average points earned in each percentile
+    """
+    performances = Tournament_Performance.query.filter_by(tournament_id=tournament_id).all()
+    
+    if not performances:
+        return {
+            'percentiles': [],
+            'counts': [],
+            'avg_points': []
+        }
+    
+    user_scores = [(p, p.points or 0) for p in performances]
+    user_scores.sort(key=lambda x: x[1], reverse=True)
+    
+    total = len(user_scores)
+    percentile_buckets = []
+    
+    for i in range(10):
+        start_idx = int(total * i / 10)
+        end_idx = int(total * (i + 1) / 10)
+        bucket_performances = user_scores[start_idx:end_idx]
+        
+        if bucket_performances:
+            avg_pts = sum(p[1] for p in bucket_performances) / len(bucket_performances)
+            percentile_buckets.append({
+                'label': f'{(9-i)*10}-{(10-i)*10}%',
+                'count': len(bucket_performances),
+                'avg_points': round(avg_pts, 1)
+            })
+    
+    percentile_buckets.reverse()
+    
+    return {
+        'percentiles': [b['label'] for b in percentile_buckets],
+        'counts': [b['count'] for b in percentile_buckets],
+        'avg_points': [b['avg_points'] for b in percentile_buckets]
+    }
 
 def next_direction(column, current_sort, current_direction):
     """Determine next sort direction for sortable table columns.
@@ -1475,6 +1518,8 @@ def tournament_detail(tournament_id):
                 'event': judge_entry.event.event_name if judge_entry.event else 'General'
             })
 
+    bell_curve_data = get_tournament_percentile_distribution(tournament_id)
+
     return render_template('metrics/tournament_detail.html', 
                          tournament=tournament,
                          stats={
@@ -1491,7 +1536,11 @@ def tournament_detail(tournament_id):
                          points_distribution=points_distribution,
                          event_breakdown=event_breakdown,
                          comparative_data=comparative_data,
-                         judge_info=judge_info)
+                         judge_info=judge_info,
+                         bell_curve_data=bell_curve_data,
+                         bell_curve_percentiles=json.dumps(bell_curve_data['percentiles']),
+                         bell_curve_counts=json.dumps(bell_curve_data['counts']),
+                         bell_curve_avg_points=json.dumps(bell_curve_data['avg_points']))
 
 @metrics_bp.route('/events')
 def events_overview():
