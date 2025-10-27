@@ -82,6 +82,7 @@ from mason_snd.models.rosters import Roster
 from mason_snd.models.tournaments import Tournament
 from mason_snd.models.events import Event
 from mason_snd.utils.race_protection import prevent_race_condition
+from mason_snd.utils.auth_helpers import redirect_to_login
 from datetime import datetime
 import pytz
 
@@ -219,7 +220,7 @@ def index(user_id):
     # Get the current logged-in user's ID from the session
     current_user_id = session.get('user_id')
     if not current_user_id:
-        return redirect(url_for('auth.login'))  # Redirect to login if not authenticated
+        return redirect_to_login()  # Redirect to login if not authenticated
 
     # Fetch the current logged-in user and the target user being viewed
     current_user = User.query.get(current_user_id)
@@ -403,7 +404,7 @@ def update():
         parent matching (emergency contact phone = parent phone).
     """
     if not session.get('user_id'):
-        return redirect(url_for('auth.login'))
+        return redirect_to_login()
     
     user = User.query.filter_by(id=session.get('user_id')).first()
 
@@ -623,7 +624,7 @@ def add_judge():
 
     if not user_id:
         flash('Log in first!')
-        return redirect(url_for('auth.login'))
+        return redirect_to_login()
     
     if user.is_parent:
         flash('You are not a child')
@@ -742,7 +743,7 @@ def add_child():
 
     if not user_id:
         flash('Log in first!')
-        return redirect(url_for('auth.login'))
+        return redirect_to_login()
     
     if not user.is_parent:
         flash('You are not a parent')
@@ -832,7 +833,7 @@ def dismiss_popup(popup_id):
         Expired popups (expires_at < now) still appear until dismissed.
     """
     if not session.get('user_id'):
-        return redirect(url_for('auth.login'))
+        return redirect_to_login()
     
     user_id = session.get('user_id')
     popup = Popups.query.filter_by(id=popup_id, user_id=user_id).first()

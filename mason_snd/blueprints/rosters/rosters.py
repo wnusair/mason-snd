@@ -94,6 +94,7 @@ from mason_snd.models.events import Event, User_Event, Effort_Score
 from mason_snd.models.metrics import MetricsSettings
 from mason_snd.blueprints.metrics.metrics import get_point_weights
 from mason_snd.utils.race_protection import prevent_race_condition
+from mason_snd.utils.auth_helpers import redirect_to_login
 
 # Create a new Roster entry
 from mason_snd.models.rosters import Roster, Roster_Competitors, Roster_Judge
@@ -599,7 +600,7 @@ def view_tournament(tournament_id):
 
     if not user_id:
         flash("Log In First")
-        return redirect(url_for('auth.login'))
+        return redirect_to_login()
 
     if user.role < 2:
         flash("You are not authorized to access this page")
@@ -745,7 +746,7 @@ def download_tournament(tournament_id):
 
     if not user_id:
         flash("Log In First")
-        return redirect(url_for('auth.login'))
+        return redirect_to_login()
 
     if user.role < 2:
         flash("You are not authorized to access this page")
@@ -965,7 +966,7 @@ def save_tournament(tournament_id):
 
     if not user_id:
         flash("Log In First")
-        return redirect(url_for('auth.login'))
+        return redirect_to_login()
 
     if user.role < 2:
         flash("You are not authorized to access this page")
@@ -1137,7 +1138,7 @@ def publish_roster(roster_id):
 
     if not user_id:
         flash("Log In First")
-        return redirect(url_for('auth.login'))
+        return redirect_to_login()
 
     if user.role < 2:
         flash("You are not authorized to access this page")
@@ -1217,7 +1218,7 @@ def unpublish_roster(roster_id):
 
     if not user_id:
         flash("Log In First")
-        return redirect(url_for('auth.login'))
+        return redirect_to_login()
 
     if user.role < 2:
         flash("You are not authorized to access this page")
@@ -1280,7 +1281,7 @@ def view_roster(roster_id):
 
     if not user_id:
         flash("Log In First")
-        return redirect(url_for('auth.login'))
+        return redirect_to_login()
 
     if user.role < 2:
         flash("You are not authorized to access this page")
@@ -1588,7 +1589,7 @@ def add_roster_judge():
 
     if not user_id:
         flash('Log In First')
-        return redirect(url_for('auth.login'))
+        return redirect_to_login()
 
     if user.role < 2:
         flash('You are not authorized to perform this action')
@@ -1693,7 +1694,7 @@ def remove_roster_judge():
 
     if not user_id:
         flash('Log In First')
-        return redirect(url_for('auth.login'))
+        return redirect_to_login()
 
     if user.role < 2:
         flash('You are not authorized to perform this action')
@@ -1788,7 +1789,7 @@ def download_roster(roster_id):
 
     if not user_id:
         flash("Log In First")
-        return redirect(url_for('auth.login'))
+        return redirect_to_login()
 
     if user.role < 2:
         flash("You are not authorized to access this page")
@@ -2078,7 +2079,7 @@ def rename_roster(roster_id):
 
     if not user_id:
         flash("Log In First")
-        return redirect(url_for('auth.login'))
+        return redirect_to_login()
 
     if user.role < 2:
         flash("You are not authorized to access this page")
@@ -2142,7 +2143,7 @@ def delete_roster(roster_id):
 
     if not user_id:
         flash("Log In First")
-        return redirect(url_for('auth.login'))
+        return redirect_to_login()
 
     if user.role < 2:
         flash("You are not authorized to access this page")
@@ -2242,7 +2243,7 @@ def upload_roster():
 
     if not user_id:
         flash("Log In First")
-        return redirect(url_for('auth.login'))
+        return redirect_to_login()
 
     if user.role < 2:
         flash("You are not authorized to access this page")

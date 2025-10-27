@@ -36,6 +36,7 @@ from mason_snd.models.events import Event, User_Event, Effort_Score, Event_Leade
 from mason_snd.models.auth import User
 from mason_snd.models.metrics import MetricsSettings
 from mason_snd.utils.race_protection import prevent_race_condition
+from mason_snd.utils.auth_helpers import redirect_to_login
 
 from werkzeug.security import generate_password_hash, check_password_hash
 
@@ -107,7 +108,7 @@ def index():
     user_id = session.get('user_id')
     if not user_id:
         flash('Bruzz is not logged in')
-        return redirect(url_for('auth.login'))
+        return redirect_to_login()
 
     user_id = session.get('user_id')
     user = User.query.filter_by(id=user_id).first() if user_id else None
@@ -158,7 +159,7 @@ def leave_event(event_id):
     user_id = session.get('user_id')
     if not user_id:
         flash("You must be logged in to leave an event", "error")
-        return redirect(url_for('auth.login'))
+        return redirect_to_login()
     
     existing_entry = User_Event.query.filter_by(user_id=user_id, event_id=event_id).first()
     if not existing_entry or not existing_entry.active:
@@ -209,7 +210,7 @@ def edit_event(event_id):
     user_id = session.get('user_id')
     if not user_id:
         flash('You must be logged in to edit an event', 'error')
-        return redirect(url_for('auth.login'))
+        return redirect_to_login()
 
 
     user = User.query.filter_by(id=user_id).first()
@@ -325,7 +326,7 @@ def manage_members(event_id):
     user_id = session.get('user_id')
     if not user_id:
         flash('You must be logged in to manage members.', 'error')
-        return redirect(url_for('auth.login'))
+        return redirect_to_login()
 
     # Get the logged-in user
     user = User.query.filter_by(id=user_id).first()
@@ -470,7 +471,7 @@ def join_event(event_id):
     user_id = session.get('user_id')
     if not user_id:
         flash('You must be logged in to join an event', 'error')
-        return redirect(url_for('auth.login'))
+        return redirect_to_login()
 
     existing_entry = User_Event.query.filter_by(user_id=user_id, event_id=event_id).first()
     if existing_entry:
@@ -542,7 +543,7 @@ def add_event():
 
     if not user_id or user is None or user.role < 2:
         flash('Bruzz is not logged in and/or isn\'t an admin')
-        return redirect(url_for('auth.login'))
+        return redirect_to_login()
     
     if request.method == 'POST':
         event_name = request.form.get('event_name')
@@ -623,11 +624,11 @@ def delete_event(event_id):
     user = User.query.filter_by(id=user_id).first()
     if not user_id:
         flash("You must be logged in to delete an event", "error")
-        return redirect(url_for('auth.login'))
+        return redirect_to_login()
     
     if user.role < 2:
         flash("You do not have admin permissions to delete event.", "error")
-        return redirect(url_for('auth.login'))
+        return redirect_to_login()
     
     event = Event.query.filter_by(id=event_id).first()
 

@@ -416,7 +416,7 @@ def index():
     user_id = session.get('user_id')
     if not user_id:
         flash("Log in first!")
-        return redirect(url_for('auth.login'))
+        return redirect_to_login()
     user = User.query.filter_by(id=user_id).first()
     if not user or user.role < 2:
         flash("Restricted Access!")
@@ -509,7 +509,7 @@ def user_metrics():
     user_id = session.get('user_id')
     if not user_id:
         flash("Log in first!")
-        return redirect(url_for('auth.login'))
+        return redirect_to_login()
     user = User.query.filter_by(id=user_id).first()
     if not user or user.role < 2:
         flash("Restricted Access!")
@@ -622,7 +622,7 @@ def download_user_metrics():
     user_id = session.get('user_id')
     if not user_id:
         flash("Log in first!")
-        return redirect(url_for('auth.login'))
+        return redirect_to_login()
     user = User.query.filter_by(id=user_id).first()
     if not user or user.role < 2:
         flash("Restricted Access!")
@@ -765,7 +765,7 @@ def event_detail(event_id):
     user_id = session.get('user_id')
     if not user_id:
         flash("Log in first!")
-        return redirect(url_for('auth.login'))
+        return redirect_to_login()
     user = User.query.filter_by(id=user_id).first()
     if not user or user.role < 2:
         flash("Restricted Access!")
@@ -940,7 +940,7 @@ def user_detail(user_id):
     current_user_id = session.get('user_id')
     if not current_user_id:
         flash("Log in first!")
-        return redirect(url_for('auth.login'))
+        return redirect_to_login()
     current_user = User.query.filter_by(id=current_user_id).first()
     if not current_user or current_user.role < 2:
         flash("Restricted Access!")
@@ -1164,7 +1164,7 @@ def tournaments_overview():
     user_id = session.get('user_id')
     if not user_id:
         flash("Log in first!")
-        return redirect(url_for('auth.login'))
+        return redirect_to_login()
     user = User.query.filter_by(id=user_id).first()
     if not user or user.role < 2:
         flash("Restricted Access!")
@@ -1348,7 +1348,7 @@ def tournament_detail(tournament_id):
     user_id = session.get('user_id')
     if not user_id:
         flash("Log in first!")
-        return redirect(url_for('auth.login'))
+        return redirect_to_login()
     user = User.query.filter_by(id=user_id).first()
     if not user or user.role < 2:
         flash("Restricted Access!")
@@ -1539,7 +1539,7 @@ def events_overview():
     user_id = session.get('user_id')
     if not user_id:
         flash("Log in first!")
-        return redirect(url_for('auth.login'))
+        return redirect_to_login()
     user = User.query.filter_by(id=user_id).first()
     if not user or user.role < 2:
         flash("Restricted Access!")
@@ -1790,7 +1790,7 @@ def download_events():
     user_id = session.get('user_id')
     if not user_id:
         flash("Log in first!")
-        return redirect(url_for('auth.login'))
+        return redirect_to_login()
     user = User.query.filter_by(id=user_id).first()
     if not user or user.role < 2:
         flash("Restricted Access!")
@@ -1890,7 +1890,7 @@ def download_tournaments():
     user_id = session.get('user_id')
     if not user_id:
         flash("Log in first!")
-        return redirect(url_for('auth.login'))
+        return redirect_to_login()
     user = User.query.filter_by(id=user_id).first()
     if not user or user.role < 2:
         flash("Restricted Access!")
@@ -1984,7 +1984,7 @@ def my_metrics():
     user_id = session.get('user_id')
     if not user_id:
         flash("Log in first!")
-        return redirect(url_for('auth.login'))
+        return redirect_to_login()
     
     user = User.query.get_or_404(user_id)
     tournament_weight, effort_weight = get_point_weights()
@@ -2132,7 +2132,7 @@ def my_performance_trends():
     user_id = session.get('user_id')
     if not user_id:
         flash("Log in first!")
-        return redirect(url_for('auth.login'))
+        return redirect_to_login()
     
     user = User.query.get_or_404(user_id)
     
@@ -2260,7 +2260,7 @@ def my_ranking():
     user_id = session.get('user_id')
     if not user_id:
         flash("Log in first!")
-        return redirect(url_for('auth.login'))
+        return redirect_to_login()
     
     user = User.query.get_or_404(user_id)
     tournament_weight, effort_weight = get_point_weights()
@@ -2298,6 +2298,7 @@ def my_ranking():
     
     # Event-specific rankings
     from mason_snd.models.events import User_Event
+    from mason_snd.utils.auth_helpers import redirect_to_login
     user_events = User_Event.query.filter_by(user_id=user_id, active=True).all()
     event_rankings = []
     
@@ -2400,7 +2401,7 @@ def download_user_metrics_for_tournament(tournament_id):
     user_id = session.get('user_id')
     if not user_id:
         flash("Log in first!")
-        return redirect(url_for('auth.login'))
+        return redirect_to_login()
     user = User.query.filter_by(id=user_id).first()
     if not user or user.role < 2:
         flash("Restricted Access!")

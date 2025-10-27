@@ -21,6 +21,7 @@ from mason_snd.models.admin import User_Requirements, Requirements
 from mason_snd.models.events import User_Event
 from mason_snd.models.tournaments import Tournament_Judges, Tournaments_Attended, Tournament, Tournament_Performance
 from mason_snd.utils.race_protection import prevent_race_condition
+from mason_snd.utils.auth_helpers import redirect_to_login
 
 from werkzeug.security import generate_password_hash, check_password_hash
 import datetime
@@ -42,6 +43,21 @@ REQ_PAY_TOURNAMENT_FEES = "6"
 REQ_BACKGROUND_CHECK = "7"
 REQ_RESPOND_TO_JUDGE_REQUEST = "8"
 REQ_COMPLETE_JUDGE_TRAINING = "9"
+
+
+def redirect_to_login(next_url=None):
+    """
+    Helper function to redirect to login with optional next parameter.
+    
+    Args:
+        next_url (str, optional): URL to redirect to after successful login
+    
+    Returns:
+        redirect: Redirect response to login page with next parameter if provided
+    """
+    if next_url:
+        return redirect(url_for('auth.login', next=next_url))
+    return redirect(url_for('auth.login'))
 
 
 def make_all_requirements():
@@ -394,12 +410,18 @@ def login():
         - Creates user session with user_id and role
         - Ensures all requirements exist and are assigned
         - Updates requirement status based on current user state
-        - Redirects to user profile
+        - Redirects to the 'next' URL parameter if provided, otherwise to user profile
+    
+    Query Parameters:
+        next (str, optional): URL to redirect to after successful login
     
     Returns:
         GET: Rendered login template
-        POST: Redirect to profile on success, or login page with error on failure
+        POST: Redirect to next URL or profile on success, or login page with error on failure
     """
+    # Get the 'next' parameter from the query string
+    next_page = request.args.get('next')
+    
     if request.method == 'POST':
         email = request.form.get('email')
         password = request.form.get('password')
@@ -422,11 +444,16 @@ def login():
                 make_child_reqs(user)
             
             flash("Logged in successfully!")
-            return redirect(url_for('profile.index', user_id=user.id))
+            
+            # Validate that next_page is safe (relative URL, not absolute)
+            if next_page and next_page.startswith('/'):
+                return redirect(next_page)
+            else:
+                return redirect(url_for('profile.index', user_id=user.id))
         else:
             flash("Invalid email or password")
 
-    return render_template('auth/login.html')
+    return render_template('auth/login.html', next=next_page)
 
 
 

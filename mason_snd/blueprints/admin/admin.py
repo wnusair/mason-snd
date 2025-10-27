@@ -85,7 +85,7 @@ def index():
     user_id = session.get('user_id')
     if not user_id:
         flash('Please log in to access this page.', 'error')
-        return redirect(url_for('auth.login'))
+        return redirect_to_login()
         
     user = User.query.filter_by(id=user_id).first()
     if not user or user.role <= 1:
@@ -129,7 +129,7 @@ def requirements():
     user_id = session.get('user_id')
     if not user_id:
         flash('Please log in to access this page.', 'error')
-        return redirect(url_for('auth.login'))
+        return redirect_to_login()
         
     user = User.query.filter_by(id=user_id).first()
     if not user or user.role <= 1:
@@ -303,7 +303,7 @@ def add_popup():
     user_id = session.get('user_id')
     if not user_id:
         flash('Please log in to access this page.', 'error')
-        return redirect(url_for('auth.login'))
+        return redirect_to_login()
         
     user = User.query.filter_by(id=user_id).first()
     if not user or user.role <= 1:
@@ -529,7 +529,7 @@ def add_drop(user_id):
     admin_user_id = session.get('user_id')
     if not admin_user_id:
         flash('Please log in to access this page.', 'error')
-        return redirect(url_for('auth.login'))
+        return redirect_to_login()
         
     admin_user = User.query.filter_by(id=admin_user_id).first()
     if not admin_user or admin_user.role <= 1:
@@ -565,7 +565,7 @@ def events_management():
     user_id = session.get('user_id')
     if not user_id:
         flash('Please log in to access this page.', 'error')
-        return redirect(url_for('auth.login'))
+        return redirect_to_login()
         
     user = User.query.filter_by(id=user_id).first()
     if not user or user.role <= 1:
@@ -620,7 +620,7 @@ def change_event_leader(event_id):
     user_id = session.get('user_id')
     if not user_id:
         flash('Please log in to access this page.', 'error')
-        return redirect(url_for('auth.login'))
+        return redirect_to_login()
         
     user = User.query.filter_by(id=user_id).first()
     if not user or user.role <= 1:
@@ -744,7 +744,7 @@ def test_data():
     user_id = session.get('user_id')
     if not user_id:
         flash('Please log in to access this page.', 'error')
-        return redirect(url_for('auth.login'))
+        return redirect_to_login()
         
     user = User.query.filter_by(id=user_id).first()
     if not user or user.role <= 1:
@@ -1007,7 +1007,7 @@ def delete_management():
     user_id = session.get('user_id')
     if not user_id:
         flash('Please log in to access this page.', 'error')
-        return redirect(url_for('auth.login'))
+        return redirect_to_login()
         
     user = User.query.filter_by(id=user_id).first()
     if not user or user.role <= 1:
@@ -1047,7 +1047,7 @@ def delete_users():
     user_id = session.get('user_id')
     if not user_id:
         flash('Please log in to access this page.', 'error')
-        return redirect(url_for('auth.login'))
+        return redirect_to_login()
         
     user = User.query.filter_by(id=user_id).first()
     if not user or user.role <= 1:
@@ -1161,7 +1161,7 @@ def delete_tournaments():
     user_id = session.get('user_id')
     if not user_id:
         flash('Please log in to access this page.', 'error')
-        return redirect(url_for('auth.login'))
+        return redirect_to_login()
         
     user = User.query.filter_by(id=user_id).first()
     if not user or user.role <= 1:
@@ -1239,7 +1239,7 @@ def delete_single_user(user_id):
     current_user_id = session.get('user_id')
     if not current_user_id:
         flash('Please log in to access this page.', 'error')
-        return redirect(url_for('auth.login'))
+        return redirect_to_login()
         
     current_user = User.query.filter_by(id=current_user_id).first()
     if not current_user or current_user.role <= 1:
@@ -1291,7 +1291,7 @@ def delete_events():
     user_id = session.get('user_id')
     if not user_id:
         flash('Please log in to access this page.', 'error')
-        return redirect(url_for('auth.login'))
+        return redirect_to_login()
         
     user = User.query.filter_by(id=user_id).first()
     if not user or user.role <= 1:
@@ -1372,7 +1372,7 @@ def delete_requirements():
     user_id = session.get('user_id')
     if not user_id:
         flash('Please log in to access this page.', 'error')
-        return redirect(url_for('auth.login'))
+        return redirect_to_login()
         
     user = User.query.filter_by(id=user_id).first()
     if not user or user.role <= 1:
@@ -1442,7 +1442,7 @@ def view_requirement_assignments(requirement_id):
     user_id = session.get('user_id')
     if not user_id:
         flash('Please log in to access this page.', 'error')
-        return redirect(url_for('auth.login'))
+        return redirect_to_login()
         
     user = User.query.filter_by(id=user_id).first()
     if not user or user.role <= 1:
@@ -1509,7 +1509,7 @@ def download_all_signups():
     
     if not user_id:
         flash("Log In First")
-        return redirect(url_for('auth.login'))
+        return redirect_to_login()
     
     user = User.query.filter_by(id=user_id).first()
     if not user or user.role < 2:
@@ -1663,7 +1663,7 @@ def view_tournament_signups(tournament_id):
     
     if not user_id:
         flash("Log In First")
-        return redirect(url_for('auth.login'))
+        return redirect_to_login()
     
     user = User.query.filter_by(id=user_id).first()
     if not user or user.role < 2:
@@ -1753,7 +1753,7 @@ def download_tournament_signups(tournament_id):
     
     if not user_id:
         flash("Log In First")
-        return redirect(url_for('auth.login'))
+        return redirect_to_login()
     
     user = User.query.filter_by(id=user_id).first()
     if not user or user.role < 2:
@@ -1886,7 +1886,7 @@ def view_tournament_form_responses(tournament_id):
     
     if not user_id:
         flash("Log In First")
-        return redirect(url_for('auth.login'))
+        return redirect_to_login()
     
     user = User.query.filter_by(id=user_id).first()
     if not user or user.role < 2:
@@ -1938,7 +1938,7 @@ def download_tournament_form_responses(tournament_id):
     
     if not user_id:
         flash("Log In First")
-        return redirect(url_for('auth.login'))
+        return redirect_to_login()
     
     user = User.query.filter_by(id=user_id).first()
     if not user or user.role < 2:
@@ -2067,7 +2067,7 @@ def testing_suite():
     user_id = session.get('user_id')
     if not user_id:
         flash('Please log in to access this page.', 'error')
-        return redirect(url_for('auth.login'))
+        return redirect_to_login()
         
     user = User.query.filter_by(id=user_id).first()
     if not user or user.role <= 1:
@@ -2130,7 +2130,7 @@ def run_quick_test():
     user_id = session.get('user_id')
     if not user_id:
         flash('Please log in to access this page.', 'error')
-        return redirect(url_for('auth.login'))
+        return redirect_to_login()
         
     user = User.query.filter_by(id=user_id).first()
     if not user or user.role <= 1:
@@ -2208,7 +2208,7 @@ def run_full_test():
     user_id = session.get('user_id')
     if not user_id:
         flash('Please log in to access this page.', 'error')
-        return redirect(url_for('auth.login'))
+        return redirect_to_login()
         
     user = User.query.filter_by(id=user_id).first()
     if not user or user.role <= 1:
@@ -2287,7 +2287,7 @@ def verify_system():
     user_id = session.get('user_id')
     if not user_id:
         flash('Please log in to access this page.', 'error')
-        return redirect(url_for('auth.login'))
+        return redirect_to_login()
         
     user = User.query.filter_by(id=user_id).first()
     if not user or user.role <= 1:
@@ -2360,7 +2360,7 @@ def cleanup_test_data():
     user_id = session.get('user_id')
     if not user_id:
         flash('Please log in to access this page.', 'error')
-        return redirect(url_for('auth.login'))
+        return redirect_to_login()
         
     user = User.query.filter_by(id=user_id).first()
     if not user or user.role <= 1:
@@ -2423,7 +2423,7 @@ def test_results():
     user_id = session.get('user_id')
     if not user_id:
         flash('Please log in to access this page.', 'error')
-        return redirect(url_for('auth.login'))
+        return redirect_to_login()
         
     user = User.query.filter_by(id=user_id).first()
     if not user or user.role <= 1:
@@ -2473,7 +2473,7 @@ def testing_dashboard():
     user_id = session.get('user_id')
     if not user_id:
         flash('Please log in to access this page.', 'error')
-        return redirect(url_for('auth.login'))
+        return redirect_to_login()
         
     user = User.query.filter_by(id=user_id).first()
     if not user or user.role <= 1:
@@ -3718,7 +3718,7 @@ def event_types():
     user_id = session.get('user_id')
     if not user_id:
         flash('Please log in to access this page.', 'error')
-        return redirect(url_for('auth.login'))
+        return redirect_to_login()
     
     user = User.query.filter_by(id=user_id).first()
     if not user or user.role < 2:
@@ -3736,7 +3736,7 @@ def add_event_type():
     user_id = session.get('user_id')
     if not user_id:
         flash('Please log in', 'error')
-        return redirect(url_for('auth.login'))
+        return redirect_to_login()
     
     user = User.query.filter_by(id=user_id).first()
     if not user or user.role < 2:
@@ -3785,7 +3785,7 @@ def edit_event_type(type_id):
     user_id = session.get('user_id')
     if not user_id:
         flash('Please log in', 'error')
-        return redirect(url_for('auth.login'))
+        return redirect_to_login()
     
     user = User.query.filter_by(id=user_id).first()
     if not user or user.role < 2:
@@ -3833,7 +3833,7 @@ def delete_event_type(type_id):
     user_id = session.get('user_id')
     if not user_id:
         flash('Please log in', 'error')
-        return redirect(url_for('auth.login'))
+        return redirect_to_login()
     
     user = User.query.filter_by(id=user_id).first()
     if not user or user.role < 2:
@@ -3841,6 +3841,7 @@ def delete_event_type(type_id):
         return redirect(url_for('main.index'))
     
     from mason_snd.models.event_types import Event_Type
+    from mason_snd.utils.auth_helpers import redirect_to_login
     
     event_type = Event_Type.query.get_or_404(type_id)
     

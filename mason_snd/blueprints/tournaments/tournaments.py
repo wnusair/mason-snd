@@ -31,6 +31,7 @@ from mason_snd.models.tournaments import (
 )
 from mason_snd.models.events import User_Event, Event
 from mason_snd.utils.race_protection import prevent_race_condition
+from mason_snd.utils.auth_helpers import redirect_to_login
 
 from werkzeug.security import generate_password_hash, check_password_hash
 from datetime import datetime
@@ -68,8 +69,7 @@ def index():
     user = User.query.filter_by(id=user_id).first()
 
     if not user_id:
-        flash("Please Log in", "error")
-        return redirect(url_for('auth.login'))
+        return redirect_to_login("Please log in")
 
     now = datetime.now(EST)
     
@@ -130,8 +130,7 @@ def add_tournament():
     """
     user_id = session.get('user_id')
     if not user_id:
-        flash("Please Log in", "error")
-        return redirect(url_for('auth.login'))
+        return redirect_to_login("Please log in")
     
     user = User.query.filter_by(id=user_id).first()
     if not user or user.role < 2:
@@ -223,8 +222,7 @@ def add_form():
     """
     user_id = session.get('user_id')
     if not user_id:
-        flash("Please log in", "error")
-        return redirect(url_for('auth.login'))
+        return redirect_to_login("Please log in")
         
     user = User.query.filter_by(id=user_id).first()
     if not user or user.role < 2:
@@ -301,8 +299,7 @@ def signup():
     now = datetime.now(EST)  # Get the current time in EST
 
     if not user_id:
-        flash("Please Log in", "error")
-        return redirect(url_for('auth.login'))
+        return redirect_to_login("Please log in")
 
     # Get all events the user is signed up for
     user_events = Event.query.join(User_Event, Event.id == User_Event.event_id).filter(User_Event.user_id == user_id).all()
@@ -493,7 +490,7 @@ def bringing_judge(tournament_id):
 
     if not user_id:
         flash("Log in first")
-        return redirect(url_for('auth.login'))
+        return redirect_to_login()
 
     # Get all Judges entries where the current user is the child
     judges = Judges.query.filter_by(child_id=user_id).all()
@@ -562,8 +559,7 @@ def delete_tournament(tournament_id):
     """
     user_id = session.get('user_id')
     if not user_id:
-        flash("Please Log in", "error")
-        return redirect(url_for('auth.login'))
+        return redirect_to_login("Please log in")
         
     user = User.query.filter_by(id=user_id).first()
     if not user or user.role < 2:
@@ -617,7 +613,7 @@ def judge_requests():
 
     if not user_id:
         flash("Must Be Logged In")
-        return redirect(url_for('auth.login'))
+        return redirect_to_login()
 
     if not user.is_parent:
         flash("Must be a parent")
@@ -683,7 +679,7 @@ def my_tournaments():
     user_id = session.get('user_id')
     if not user_id:
         flash("Must Be Logged In")
-        return redirect(url_for('auth.login'))
+        return redirect_to_login()
 
     user = User.query.filter_by(id=user_id).first()
     tournaments = Tournament.query.order_by(Tournament.date.desc()).all()
@@ -756,8 +752,7 @@ def submit_results(tournament_id):
     """
     user_id = session.get('user_id')
     if not user_id:
-        flash("Please log in", "error")
-        return redirect(url_for('auth.login'))
+        return redirect_to_login("Please log in")
     
     user = User.query.filter_by(id=user_id).first()
     if not user or user.role < 2:  # Only admins can submit results
@@ -840,8 +835,7 @@ def view_results(tournament_id):
     """
     user_id = session.get('user_id')
     if not user_id:
-        flash("Please log in", "error")
-        return redirect(url_for('auth.login'))
+        return redirect_to_login("Please log in")
     
     tournament = Tournament.query.get_or_404(tournament_id)
     
@@ -920,7 +914,7 @@ def tournament_results(tournament_id):
     user_id = session.get('user_id')
     if not user_id:
         flash("Must Be Logged In")
-        return redirect(url_for('auth.login'))
+        return redirect_to_login()
 
     tournament = Tournament.query.get_or_404(tournament_id)
     
@@ -1097,8 +1091,7 @@ def view_form_responses(tournament_id):
     user_id = session.get('user_id')
     
     if not user_id:
-        flash("Please Log in", "error")
-        return redirect(url_for('auth.login'))
+        return redirect_to_login("Please log in")
     
     user = User.query.filter_by(id=user_id).first()
     if not user or user.role < 2:
@@ -1176,8 +1169,7 @@ def download_form_responses(tournament_id):
     user_id = session.get('user_id')
     
     if not user_id:
-        flash("Please Log in", "error")
-        return redirect(url_for('auth.login'))
+        return redirect_to_login("Please log in")
     
     user = User.query.filter_by(id=user_id).first()
     if not user or user.role < 2:
@@ -1277,8 +1269,7 @@ def download_ranked_signups(tournament_id):
     user_id = session.get('user_id')
     
     if not user_id:
-        flash("Please Log in", "error")
-        return redirect(url_for('auth.login'))
+        return redirect_to_login("Please log in")
     
     user = User.query.filter_by(id=user_id).first()
     if not user or user.role < 2:
