@@ -361,7 +361,6 @@ def signup():
             else:
                 signup.is_going = True
                 signup.partner_id = partner_id
-                # Update the signup timestamp to reflect when they actually signed up
                 signup.created_at = datetime.now(EST)
             
             # If this is a partner event and a partner was selected, create/update the partner's signup too

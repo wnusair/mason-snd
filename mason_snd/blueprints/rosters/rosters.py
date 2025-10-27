@@ -126,26 +126,6 @@ def calculate_weighted_points(user):
     effort_pts = user.effort_points if hasattr(user, 'effort_points') else 0
     return round((tournament_pts * tournament_weight) + (effort_pts * effort_weight), 2)
 
-def get_event_type_name(event):
-    """Get the event type name from the database based on event's event_type ID.
-    
-    Args:
-        event: Event object with event_type attribute
-    
-    Returns:
-        str: Event type name from database, or 'Unknown' if not found
-    """
-    from mason_snd.models.event_types import Event_Type
-    
-    if not event or event.event_type is None:
-        return 'Unknown'
-    
-    event_type_obj = Event_Type.query.get(event.event_type)
-    if event_type_obj:
-        return event_type_obj.name
-    
-    return 'Unknown'
-
 @rosters_bp.route('/')
 def index():
     """Rosters dashboard showing upcoming tournaments and saved rosters.
@@ -185,39 +165,44 @@ def index():
 def get_roster_count(tournament_id):
     """Calculate total competitor spots based on judge commitments.
     
-    Uses dynamic event types from the database to determine competitor ratios.
-    Each judge brings a number of competitors based on their event type's ratio.
+    Each judge brings a fixed number of competitors based on their event type:
+    - Speech (event_type=0): 6 competitors per judge
+    - Lincoln-Douglas (event_type=1): 2 competitors per judge
+    - Public Forum (event_type=2): 4 competitors per judge
     
     Args:
         tournament_id (int): Tournament primary key.
     
     Returns:
-        tuple: (event_type_totals, spots_per_event) where:
-            event_type_totals: dict mapping event_type_id to total competitors
+        tuple: (speech_competitors, LD_competitors, PF_competitors, spots_per_event) - total spots available.
             spots_per_event: dict mapping event_id to number of spots for that specific event
     
     Note:
         Only counts accepted judges (Tournament_Judges.accepted=True).
     """
-    from mason_snd.models.event_types import Event_Type
-    
     judges = Tournament_Judges.query.filter_by(tournament_id=tournament_id, accepted=True).all()
 
-    event_type_totals = {}
+    speech_competitors = 0
+    LD_competitors = 0
+    PF_competitors = 0
     spots_per_event = {}
 
     for judge in judges:
         event_id = judge.event_id
-        event = Event.query.filter_by(id=event_id).first()
-        
-        if event and event.event_type is not None:
-            event_type_obj = Event_Type.query.get(event.event_type)
-            if event_type_obj:
-                ratio = event_type_obj.judge_ratio
-                event_type_totals[event.event_type] = event_type_totals.get(event.event_type, 0) + ratio
-                spots_per_event[event_id] = spots_per_event.get(event_id, 0) + ratio
 
-    return event_type_totals, spots_per_event
+        event = Event.query.filter_by(id=event_id).first()
+
+        if event.event_type == 0:
+            speech_competitors += 6
+            spots_per_event[event_id] = spots_per_event.get(event_id, 0) + 6
+        elif event.event_type == 1:
+            LD_competitors += 2
+            spots_per_event[event_id] = spots_per_event.get(event_id, 0) + 2
+        else:
+            PF_competitors += 4
+            spots_per_event[event_id] = spots_per_event.get(event_id, 0) + 4
+
+    return speech_competitors, LD_competitors, PF_competitors, spots_per_event
 
 # Helper: Get all signups for a tournament, grouped by event
 from mason_snd.models.tournaments import Tournament_Signups
@@ -225,7 +210,8 @@ from mason_snd.models.tournaments import Tournament_Signups
 def get_signups_by_event(tournament_id):
     """Group tournament signups by event.
     
-    Retrieves all confirmed signups (is_going=True) and organizes them
+    Retrieves all confirmed signups (is_going=True) where users are actively
+    enrolled in the event (User_Event.active=True) and organizes them
     into a dictionary keyed by event_id.
     
     Args:
@@ -235,9 +221,26 @@ def get_signups_by_event(tournament_id):
         dict: {event_id: [Tournament_Signups, ...]} - signups grouped by event.
     
     Note:
-        Only includes signups with is_going=True (confirmed attendance).
+        Only includes signups with:
+        - is_going=True (confirmed attendance)
+        - User_Event.active=True (active enrollment in the event)
+    
+    Bug Fix:
+        Previously didn't check User_Event.active, causing users to appear
+        in roster for events they were no longer active in.
     """
-    signups = Tournament_Signups.query.filter_by(tournament_id=tournament_id, is_going=True).all()
+    signups = Tournament_Signups.query.join(
+        User_Event,
+        db.and_(
+            User_Event.user_id == Tournament_Signups.user_id,
+            User_Event.event_id == Tournament_Signups.event_id
+        )
+    ).filter(
+        Tournament_Signups.tournament_id == tournament_id,
+        Tournament_Signups.is_going == True,
+        User_Event.active == True
+    ).all()
+    
     event_dict = {}
     for signup in signups:
         if signup.event_id not in event_dict:
@@ -333,24 +336,62 @@ def filter_drops_and_track_penalties(ranked):
     
     return filtered_ranked, penalty_info
 
-def select_competitors_by_event_type(ranked, event_type_totals, event_type_map, judge_children_ids=None, seed_randomness=True, spots_per_event=None):
+def select_competitors_by_event_type(ranked, speech_spots, ld_spots, pf_spots, event_type_map, judge_children_ids=None, seed_randomness=True, spots_per_event=None):
     """Select competitors using event-type-specific algorithms.
     
-    Implements selection strategies based on event type with dynamic ratios.
+    Implements three different selection strategies based on event type:
+    
+    Speech Events (type 0) - Rotation with Randomness:
+        - Rotate through speech events selecting top-ranked competitors
+        - If 4+ speech judges: Every 5th selection is random from middle third
+        - Ensures fair distribution across speech events
+        - Randomness adds variety and gives mid-tier competitors opportunities
+    
+    Lincoln-Douglas Events (type 1) - Top-N or Middle:
+        - If 1 judge: Select top 2 competitors by rank
+        - If 2+ judges: Select from middle of rankings (fairness)
+        - Middle selection prevents same top competitors dominating
+    
+    Public Forum Events (type 2) - Top-N or Middle:
+        - If 1 judge: Select top 4 competitors by rank
+        - If 2+ judges: Select from middle of rankings (fairness)
+        - Similar fairness logic as LD
     
     Args:
         ranked (dict): {event_id: [Tournament_Signups, ...]} sorted by weighted_points.
-        event_type_totals (dict): {event_type_id: total_spots} from judge commitments.
-        event_type_map (dict): {event_id: event_type_id} mapping events to types.
-        judge_children_ids (set): User IDs of judges' children for consideration.
-        seed_randomness (bool): Whether to use random selections (default: True).
-        spots_per_event (dict): {event_id: spots} per-event spot allocation.
+        speech_spots (int): Total speech competitor slots from judge commitments.
+        ld_spots (int): Total LD competitor slots.
+        pf_spots (int): Total PF competitor slots.
+        event_type_map (dict): {event_id: event_type} - 0=Speech, 1=LD, 2=PF.
+        seed_randomness (bool): Whether to use random selections for speech (default: True).
     
     Returns:
         tuple: (event_view, rank_view, random_selections)
-    """
-    from mason_snd.models.event_types import Event_Type
+            - event_view (list): [{'user_id': int, 'event_id': int}, ...] selected competitors
+            - rank_view (list): [{'user_id': int, 'event_id': int, 'rank': int}, ...] with rankings
+            - random_selections (set): {(user_id, event_id), ...} randomly selected competitors
     
+    Algorithm Details:
+        Speech Rotation:
+            - Cycles through speech events in order
+            - Maintains index counter per event
+            - Every 5th overall selection: pick random from middle third (if 4+ judges)
+            - Stops when all spots filled or all events exhausted
+        
+        LD/PF Selection:
+            - If 2+ judges: middle_index = len(competitors) // 2, select from middle
+            - Otherwise: select top N by rank
+        
+        Random Selection (Speech):
+            - Condition: 4+ speech judges AND position % 5 == 4 AND 2+ competitors in event
+            - Range: middle third (start = len//3, end = 2*len//3)
+            - Tracked in random_selections set for transparency
+    
+    Note:
+        Randomness provides opportunities for mid-tier competitors and prevents
+        roster predictability. Middle selection (LD/PF) ensures fairness when
+        multiple judges are available.
+    """
     event_view = []
     rank_view = []
     random_selections = set()
@@ -392,87 +433,131 @@ def select_competitors_by_event_type(ranked, event_type_totals, event_type_map, 
         
         return True
     
-    event_types_info = Event_Type.query.all()
-    event_types_dict = {et.id: et for et in event_types_info}
+    speech_event_ids = [eid for eid, etype in event_type_map.items() if etype == 0]
+    speech_judges_count = len(speech_event_ids)
     
-    for event_type_id, total_spots in event_type_totals.items():
-        event_ids_of_type = [eid for eid, etype in event_type_map.items() if etype == event_type_id]
-        judges_count = len(event_ids_of_type)
-        
-        for eid in event_ids_of_type:
+    for eid in speech_event_ids:
+        competitors = ranked.get(eid, [])
+        event_max = spots_per_event.get(eid, speech_spots)
+        for signup in competitors:
+            if signup.user_id in judge_children_ids:
+                current_filled = len([e for e in event_view if e['event_id'] == eid])
+                if current_filled < event_max:
+                    add_competitor(signup, eid, competitors.index(signup) + 1)
+    
+    speech_indices = {eid: 0 for eid in speech_event_ids}
+    speech_filled = len([e for e in event_view if e['event_id'] in speech_event_ids])
+    random_counter = 0
+    
+    while speech_filled < speech_spots and speech_event_ids:
+        for eid in speech_event_ids:
             competitors = ranked.get(eid, [])
-            event_max = spots_per_event.get(eid, 0)
-            for signup in competitors:
-                if signup.user_id in judge_children_ids:
-                    current_filled = len([e for e in event_view if e['event_id'] == eid])
-                    if current_filled < event_max:
-                        add_competitor(signup, eid, competitors.index(signup) + 1)
-        
-        event_type_obj = event_types_dict.get(event_type_id)
-        is_speech_like = event_type_obj and event_type_obj.judge_ratio >= 5 if event_type_obj else False
-        
-        if is_speech_like:
-            indices = {eid: 0 for eid in event_ids_of_type}
-            filled = len([e for e in event_view if e['event_id'] in event_ids_of_type])
-            random_counter = 0
-            
-            while filled < total_spots and event_ids_of_type:
-                for eid in event_ids_of_type:
-                    competitors = ranked.get(eid, [])
-                    if indices[eid] < len(competitors):
-                        should_be_random = (judges_count >= 4 and random_counter % 5 == 4)
-                        
-                        if should_be_random and len(competitors) > 2:
-                            mid_start = len(competitors) // 3
-                            mid_end = 2 * len(competitors) // 3
-                            idx = random.randint(mid_start, mid_end)
-                            random_selections.add((competitors[idx].user_id, eid))
-                        else:
-                            idx = indices[eid]
-                        
-                        while idx < len(competitors):
-                            signup = competitors[idx]
-                            if add_competitor(signup, eid, idx + 1):
-                                indices[eid] = idx + 1
-                                filled = len([e for e in event_view if e['event_id'] in event_ids_of_type])
-                                random_counter += 1
-                                break
-                            idx += 1
-                            indices[eid] = idx
-                        
-                        if filled >= total_spots:
-                            break
+            if speech_indices[eid] < len(competitors):
+                should_be_random = (speech_judges_count >= 4 and random_counter % 5 == 4)
                 
-                if all(indices[eid] >= len(ranked.get(eid, [])) for eid in event_ids_of_type):
-                    break
-        else:
-            for eid in event_ids_of_type:
-                competitors = ranked.get(eid, [])
-                event_max = spots_per_event.get(eid, 0)
-                filled = len([e for e in event_view if e['event_id'] == eid])
+                if should_be_random and len(competitors) > 2:
+                    mid_start = len(competitors) // 3
+                    mid_end = 2 * len(competitors) // 3
+                    idx = random.randint(mid_start, mid_end)
+                    random_selections.add((competitors[idx].user_id, eid))
+                else:
+                    idx = speech_indices[eid]
                 
-                idx = 0
-                while filled < event_max and idx < len(competitors):
-                    if judges_count >= 2 and len(competitors) > 2:
-                        mid_idx = len(competitors) // 2
-                        calc_idx = min(idx + mid_idx, len(competitors) - 1)
-                        random_selections.add((competitors[calc_idx].user_id, eid))
-                    else:
-                        calc_idx = idx
-                    
-                    attempt = 0
-                    search_idx = calc_idx
-                    while search_idx < len(competitors) and attempt < len(competitors):
-                        signup = competitors[search_idx]
-                        if add_competitor(signup, eid, search_idx + 1):
-                            filled = len([e for e in event_view if e['event_id'] == eid])
-                            break
-                        search_idx += 1
-                        attempt += 1
-                    
-                    idx += 1
-                    if attempt >= len(competitors):
+                while idx < len(competitors):
+                    signup = competitors[idx]
+                    if add_competitor(signup, eid, idx + 1):
+                        speech_indices[eid] = idx + 1
+                        speech_filled = len([e for e in event_view if e['event_id'] in speech_event_ids])
+                        random_counter += 1
                         break
+                    idx += 1
+                    speech_indices[eid] = idx
+                
+                if speech_filled >= speech_spots:
+                    break
+        
+        if all(speech_indices[eid] >= len(ranked.get(eid, [])) for eid in speech_event_ids):
+            break
+    
+    ld_event_ids = [eid for eid, etype in event_type_map.items() if etype == 1]
+    ld_judges_count = len(ld_event_ids)
+    
+    for eid in ld_event_ids:
+        competitors = ranked.get(eid, [])
+        event_max = spots_per_event.get(eid, ld_spots)
+        for signup in competitors:
+            if signup.user_id in judge_children_ids:
+                current_filled = len([e for e in event_view if e['event_id'] == eid])
+                if current_filled < event_max:
+                    add_competitor(signup, eid, competitors.index(signup) + 1)
+    
+    for eid in ld_event_ids:
+        competitors = ranked.get(eid, [])
+        event_max = spots_per_event.get(eid, ld_spots)
+        filled = len([e for e in event_view if e['event_id'] == eid])
+        
+        idx = 0
+        while filled < event_max and idx < len(competitors):
+            if ld_judges_count >= 2 and len(competitors) > 2:
+                mid_idx = len(competitors) // 2
+                calc_idx = min(idx + mid_idx, len(competitors) - 1)
+                random_selections.add((competitors[calc_idx].user_id, eid))
+            else:
+                calc_idx = idx
+            
+            attempt = 0
+            search_idx = calc_idx
+            while search_idx < len(competitors) and attempt < len(competitors):
+                signup = competitors[search_idx]
+                if add_competitor(signup, eid, search_idx + 1):
+                    filled = len([e for e in event_view if e['event_id'] == eid])
+                    break
+                search_idx += 1
+                attempt += 1
+            
+            idx += 1
+            if attempt >= len(competitors):
+                break
+    
+    pf_event_ids = [eid for eid, etype in event_type_map.items() if etype == 2]
+    pf_judges_count = len(pf_event_ids)
+    
+    for eid in pf_event_ids:
+        competitors = ranked.get(eid, [])
+        event_max = spots_per_event.get(eid, pf_spots)
+        for signup in competitors:
+            if signup.user_id in judge_children_ids:
+                current_filled = len([e for e in event_view if e['event_id'] == eid])
+                if current_filled < event_max:
+                    add_competitor(signup, eid, competitors.index(signup) + 1)
+    
+    for eid in pf_event_ids:
+        competitors = ranked.get(eid, [])
+        event_max = spots_per_event.get(eid, pf_spots)
+        filled = len([e for e in event_view if e['event_id'] == eid])
+        
+        idx = 0
+        while filled < event_max and idx < len(competitors):
+            if pf_judges_count >= 2 and len(competitors) > 2:
+                mid_idx = len(competitors) // 2
+                calc_idx = min(idx + mid_idx, len(competitors) - 1)
+                random_selections.add((competitors[calc_idx].user_id, eid))
+            else:
+                calc_idx = idx
+            
+            attempt = 0
+            search_idx = calc_idx
+            while search_idx < len(competitors) and attempt < len(competitors):
+                signup = competitors[search_idx]
+                if add_competitor(signup, eid, search_idx + 1):
+                    filled = len([e for e in event_view if e['event_id'] == eid])
+                    break
+                search_idx += 1
+                attempt += 1
+            
+            idx += 1
+            if attempt >= len(competitors):
+                break
     
     return event_view, rank_view, random_selections
 
@@ -520,7 +605,7 @@ def view_tournament(tournament_id):
         flash("You are not authorized to access this page")
         return redirect(url_for('main.index'))
     
-    event_type_totals, spots_per_event = get_roster_count(tournament_id)
+    speech_competitors, LD_competitors, PF_competitors, spots_per_event = get_roster_count(tournament_id)
 
     event_dict = get_signups_by_event(tournament_id)
     ranked = rank_signups(event_dict)
@@ -538,7 +623,9 @@ def view_tournament(tournament_id):
     
     event_view, rank_view, random_selections = select_competitors_by_event_type(
         filtered_ranked,
-        event_type_totals=event_type_totals,
+        speech_spots=speech_competitors,
+        ld_spots=LD_competitors,
+        pf_spots=PF_competitors,
         event_type_map=event_type_map,
         judge_children_ids=judge_children_ids,
         seed_randomness=True,
@@ -673,7 +760,7 @@ def download_tournament(tournament_id):
         flash("Excel functionality not available. Please install pandas and openpyxl.")
         return redirect(url_for('rosters.view_tournament', tournament_id=tournament_id))
 
-    event_type_totals, spots_per_event = get_roster_count(tournament_id)
+    speech_competitors, LD_competitors, PF_competitors, spots_per_event = get_roster_count(tournament_id)
     event_dict = get_signups_by_event(tournament_id)
     ranked = rank_signups(event_dict)
     event_type_map = {}
@@ -687,7 +774,9 @@ def download_tournament(tournament_id):
     
     event_view, rank_view, random_selections = select_competitors_by_event_type(
         ranked,
-        event_type_totals=event_type_totals,
+        speech_spots=speech_competitors,
+        ld_spots=LD_competitors,
+        pf_spots=PF_competitors,
         event_type_map=event_type_map,
         judge_children_ids=judge_children_ids,
         seed_randomness=True,
@@ -727,22 +816,25 @@ def download_tournament(tournament_id):
     # Judges sheet
     judges_data = []
     for judge in judges:
-        from mason_snd.models.event_types import Event_Type
-        
         judge_name = f"{judge_users[judge.judge_id].first_name} {judge_users[judge.judge_id].last_name}" if judge.judge_id in judge_users else 'Unknown'
         child_name = f"{judge.child.first_name} {judge.child.last_name}" if judge.child else ''
-        event_type_name = 'Unknown'
+        event_type = 'Unknown'
         people_bringing = 0
-        if judge.event and judge.event.event_type is not None:
-            event_type_obj = Event_Type.query.get(judge.event.event_type)
-            if event_type_obj:
-                event_type_name = event_type_obj.name
-                people_bringing = event_type_obj.judge_ratio
+        if judge.event:
+            if judge.event.event_type == 0:
+                event_type = 'Speech'
+                people_bringing = 6
+            elif judge.event.event_type == 1:
+                event_type = 'LD'
+                people_bringing = 2
+            elif judge.event.event_type == 2:
+                event_type = 'PF'
+                people_bringing = 4
         
         judges_data.append({
             'Judge Name': judge_name,
             'Child': child_name,
-            'Category': event_type_name,
+            'Category': event_type,
             'Number People Bringing': people_bringing,
             'Judge ID': judge.judge_id,
             'Child ID': judge.child_id,
@@ -758,7 +850,14 @@ def download_tournament(tournament_id):
         user = users.get(row['user_id'])
         user_name = f"{user.first_name} {user.last_name}" if user else 'Unknown'
         event_name = events[row['event_id']].event_name if row['event_id'] in events else 'Unknown Event'
-        event_type = get_event_type_name(events.get(row['event_id']))
+        event_type = 'Unknown'
+        if row['event_id'] in events:
+            if events[row['event_id']].event_type == 0:
+                event_type = 'Speech'
+            elif events[row['event_id']].event_type == 1:
+                event_type = 'LD'
+            elif events[row['event_id']].event_type == 2:
+                event_type = 'PF'
         weighted_points = calculate_weighted_points(user)
         rank_data.append({
             'Rank': row['rank'],
@@ -781,7 +880,14 @@ def download_tournament(tournament_id):
         for comp in competitors_list:
             user = users.get(comp['user_id'])
             user_name = f"{user.first_name} {user.last_name}" if user else 'Unknown'
-            event_type = get_event_type_name(events.get(event_id))
+            event_type = 'Unknown'
+            if event_id in events:
+                if events[event_id].event_type == 0:
+                    event_type = 'Speech'
+                elif events[event_id].event_type == 1:
+                    event_type = 'LD'
+                elif events[event_id].event_type == 2:
+                    event_type = 'PF'
             weighted_points = calculate_weighted_points(user)
             event_data.append({
                 'Event': event_name,
@@ -917,11 +1023,18 @@ def save_tournament(tournament_id):
         event = Event.query.get(comp['event_id'])
         if event and event.is_partner_event:
             # Find the signup to get partner information
-            signup = Tournament_Signups.query.filter_by(
-                tournament_id=tournament_id,
-                user_id=comp['user_id'],
-                event_id=comp['event_id'],
-                is_going=True
+            signup = Tournament_Signups.query.join(
+                User_Event,
+                db.and_(
+                    User_Event.user_id == Tournament_Signups.user_id,
+                    User_Event.event_id == Tournament_Signups.event_id
+                )
+            ).filter(
+                Tournament_Signups.tournament_id == tournament_id,
+                Tournament_Signups.user_id == comp['user_id'],
+                Tournament_Signups.event_id == comp['event_id'],
+                Tournament_Signups.is_going == True,
+                User_Event.active == True
             ).first()
             
             if signup and signup.partner_id:
@@ -946,14 +1059,15 @@ def save_tournament(tournament_id):
     # Save judges using the current Tournament_Judges with proper people_bringing calculation
     judges = Tournament_Judges.query.filter_by(tournament_id=tournament_id, accepted=True).all()
     for judge in judges:
-        from mason_snd.models.event_types import Event_Type
-        
-        # Calculate people_bringing based on event type from database
+        # Calculate people_bringing based on event type
         people_bringing = 0
-        if judge.event and judge.event.event_type is not None:
-            event_type_obj = Event_Type.query.get(judge.event.event_type)
-            if event_type_obj:
-                people_bringing = event_type_obj.judge_ratio
+        if judge.event:
+            if judge.event.event_type == 0:  # Speech
+                people_bringing = 6
+            elif judge.event.event_type == 1:  # LD
+                people_bringing = 2
+            elif judge.event.event_type == 2:  # PF
+                people_bringing = 4
         
         rj = Roster_Judge(
             user_id=judge.judge_id,
@@ -1369,11 +1483,18 @@ def _auto_fill_roster_from_signups(roster_id):
         # Get signups for this tournament and these events, not already in roster
         existing_user_ids = set([c.user_id for c in competitors])
         
-        # Get signups ranked by weighted_points
-        signups = Tournament_Signups.query.filter(
+        # Get signups ranked by weighted_points (only active users in events)
+        signups = Tournament_Signups.query.join(
+            User_Event,
+            db.and_(
+                User_Event.user_id == Tournament_Signups.user_id,
+                User_Event.event_id == Tournament_Signups.event_id
+            )
+        ).filter(
             Tournament_Signups.tournament_id == roster.tournament_id,
             Tournament_Signups.event_id.in_(event_ids),
             Tournament_Signups.is_going == True,
+            User_Event.active == True,
             ~Tournament_Signups.user_id.in_(existing_user_ids)
         ).all()
         
@@ -1513,8 +1634,19 @@ def add_roster_judge():
     # For now, find first event matching the event_type
     event_id = None
     if child_id and roster.tournament_id:
-        # Try to find child's signup event first
-        ts = Tournament_Signups.query.filter_by(user_id=child_id, tournament_id=roster.tournament_id, is_going=True).first()
+        # Try to find child's signup event first (only if actively enrolled)
+        ts = Tournament_Signups.query.join(
+            User_Event,
+            db.and_(
+                User_Event.user_id == Tournament_Signups.user_id,
+                User_Event.event_id == Tournament_Signups.event_id
+            )
+        ).filter(
+            Tournament_Signups.user_id == child_id,
+            Tournament_Signups.tournament_id == roster.tournament_id,
+            Tournament_Signups.is_going == True,
+            User_Event.active == True
+        ).first()
         if ts and ts.event_id:
             ev = Event.query.get(ts.event_id)
             if ev and ev.event_type == event_type_int:
@@ -1707,7 +1839,14 @@ def download_roster(roster_id):
         judge_name = f"{judge_users[judge.user_id].first_name} {judge_users[judge.user_id].last_name}" if judge.user_id in judge_users else 'Unknown'
         child_name = f"{judge.child.first_name} {judge.child.last_name}" if judge.child else ''
         event_name = judge.event.event_name if judge.event else 'Unknown'
-        event_type = get_event_type_name(judge.event)
+        event_type = 'Unknown'
+        if judge.event:
+            if judge.event.event_type == 0:
+                event_type = 'Speech'
+            elif judge.event.event_type == 1:
+                event_type = 'LD'
+            elif judge.event.event_type == 2:
+                event_type = 'PF'
         
         judges_data.append({
             'Judge Name': judge_name,
@@ -1756,7 +1895,14 @@ def download_roster(roster_id):
         
         user_name = f"{user.first_name} {user.last_name}" if user else 'Unknown'
         event_name = event.event_name if event else 'Unknown Event'
-        event_type = get_event_type_name(event)
+        event_type = 'Unknown'
+        if event:
+            if event.event_type == 0:
+                event_type = 'Speech'
+            elif event.event_type == 1:
+                event_type = 'LD'
+            elif event.event_type == 2:
+                event_type = 'PF'
         
         # Get partner information
         partner_name = ''
@@ -1786,7 +1932,14 @@ def download_roster(roster_id):
     for event_id, comps in event_competitors_dict.items():
         event = events.get(event_id)
         event_name = event.event_name if event else f'Event {event_id}'
-        event_type = get_event_type_name(event)
+        event_type = 'Unknown'
+        if event:
+            if event.event_type == 0:
+                event_type = 'Speech'
+            elif event.event_type == 1:
+                event_type = 'LD'
+            elif event.event_type == 2:
+                event_type = 'PF'
         
         # Sort by weighted points for ranking
         sorted_comps = sorted(
@@ -2206,11 +2359,13 @@ def upload_roster():
                     people_bringing = 0
                     if 'Number People Bringing' in row and pd.notna(row['Number People Bringing']):
                         people_bringing = int(row['Number People Bringing'])
-                    elif event and event.event_type is not None:
-                        from mason_snd.models.event_types import Event_Type
-                        event_type_obj = Event_Type.query.get(event.event_type)
-                        if event_type_obj:
-                            people_bringing = event_type_obj.judge_ratio
+                    elif event:
+                        if event.event_type == 0:
+                            people_bringing = 6
+                        elif event.event_type == 1:
+                            people_bringing = 2
+                        elif event.event_type == 2:
+                            people_bringing = 4
                     
                     if judge_user:
                         rj = Roster_Judge(
