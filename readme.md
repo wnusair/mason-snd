@@ -1,4 +1,4 @@
-# Mason-SND - Project Documentation
+# Mason-SND
 
 ---
 
