@@ -1,171 +1,29 @@
 {% extends "main/base.html" %}
 {% block title %}Home{% endblock %}
 
+{% block full_width %}
+
+<section class="relative min-h-screen full-bleed">
+	<!-- Background image (img used to avoid inline CSS parsing issues) -->
+	<img src="{{ url_for('static', filename='images/hero.jpg') }}" alt="" class="absolute inset-0 w-full h-full object-cover block">
+	<!-- Dark overlay to ensure text contrast -->
+	<div class="absolute inset-0 bg-black/60"></div>
+
+	<!-- Content -->
+	<div class="relative z-10 flex items-center justify-center min-h-screen px-4">
+		<div class="text-center max-w-3xl">
+			<h1 class="text-white font-extrabold leading-tight text-4xl sm:text-5xl md:text-6xl lg:text-7xl">Mason S&amp;D</h1>
+
+			<div class="mt-8 flex flex-col sm:flex-row gap-4 justify-center">
+				<a href="{{ url_for('auth.login') }}" class="inline-flex items-center justify-center px-8 py-3 rounded-md bg-white bg-opacity-95 text-gray-900 font-semibold shadow-lg hover:bg-opacity-100 focus:outline-none focus:ring-2 focus:ring-white/60">Log in</a>
+				<a href="{{ url_for('auth.register') }}" class="inline-flex items-center justify-center px-8 py-3 rounded-md border border-white text-white bg-white/5 hover:bg-white/10 focus:outline-none focus:ring-2 focus:ring-white/60">Create an account</a>
+			</div>
+		</div>
+	</div>
+</section>
+
+{% endblock %}
+
 {% block content %}
-<div class="relative bg-gray-50 overflow-hidden">
-    <!-- Parallax Background -->
-    <div id="parallax-bg" class="hidden sm:block sm:absolute sm:inset-y-0 sm:h-full sm:w-full" aria-hidden="true">
-        <div class="relative h-full max-w-7xl mx-auto">
-            <svg class="absolute right-full transform translate-y-1/4 translate-x-1/4 lg:translate-x-1/2" width="404" height="784" fill="none" viewBox="0 0 404 784">
-                <defs>
-                    <pattern id="f210dbf6-a58d-4871-961e-36d5016a0f49" x="0" y="0" width="20" height="20" patternUnits="userSpaceOnUse">
-                        <rect x="0" y="0" width="4" height="4" class="text-gray-200" fill="currentColor" />
-                    </pattern>
-                </defs>
-                <rect width="404" height="784" fill="url(#f210dbf6-a58d-4871-961e-36d5016a0f49)" />
-            </svg>
-            <svg class="absolute left-full transform -translate-y-3/4 -translate-x-1/4 md:-translate-y-1/2 lg:-translate-x-1/2" width="404" height="784" fill="none" viewBox="0 0 404 784">
-                 <defs>
-                    <pattern id="5d0dd344-b041-4d26-bec4-8d33ea57ec9b" x="0" y="0" width="20" height="20" patternUnits="userSpaceOnUse">
-                        <rect x="0" y="0" width="4" height="4" class="text-gray-200" fill="currentColor" />
-                    </pattern>
-                </defs>
-                <rect width="404" height="784" fill="url(#5d0dd344-b041-4d26-bec4-8d33ea57ec9b)" />
-            </svg>
-        </div>
-    </div>
 
-    <div class="relative pt-6 pb-16 sm:pb-24">
-        <main class="mt-16 mx-auto max-w-7xl px-4 sm:mt-24">
-            <div class="text-center">
-                <h1 class="text-4xl tracking-tight font-extrabold text-gray-900 sm:text-5xl md:text-6xl">
-                    <span class="block xl:inline">Mason Speech & Debate</span>
-                    <span class="block text-[color:var(--color-primary-600)] xl:inline">Metrics System</span>
-                </h1>
-                <p class="mt-3 max-w-md mx-auto text-base text-gray-500 sm:text-lg md:mt-5 md:text-xl md:max-w-3xl">
-                    Track your progress, analyze performance, and achieve excellence. Your comprehensive platform for tournament data, personal growth, and team success.
-                </p>
-                <div class="mt-5 max-w-md mx-auto sm:flex sm:justify-center md:mt-8">
-                    <div class="rounded-md shadow">
-                        <a href="{{ url_for('auth.login') }}" class="w-full flex items-center justify-center px-8 py-3 border border-transparent text-base font-medium rounded-md text-white bg-[color:var(--color-primary-600)] hover:bg-[color:var(--color-primary-700)] md:py-4 md:text-lg md:px-10">
-                            Get started
-                        </a>
-                    </div>
-                    <div class="mt-3 rounded-md shadow sm:mt-0 sm:ml-3">
-                        <a href="{{ url_for('auth.register') }}" class="w-full flex items-center justify-center px-8 py-3 border border-transparent text-base font-medium rounded-md text-[color:var(--color-primary-600)] bg-white hover:bg-gray-50 md:py-4 md:text-lg md:px-10">
-                            Register
-                        </a>
-                    </div>
-                </div>
-            </div>
-        </main>
-    </div>
-</div>
-
-<!-- Feature Section -->
-<div class="py-12 bg-white">
-    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div class="lg:text-center">
-            <h2 class="text-base text-[color:var(--color-primary-600)] font-semibold tracking-wide uppercase">Features</h2>
-            <p class="mt-2 text-3xl leading-8 font-extrabold tracking-tight text-gray-900 sm:text-4xl">
-                A better way to track success
-            </p>
-            <p class="mt-4 max-w-2xl text-xl text-gray-500 lg:mx-auto">
-                Our system provides everything you need to stay organized and focused on what matters most: your performance.
-            </p>
-        </div>
-
-        <div class="mt-10">
-            <dl class="space-y-10 md:space-y-0 md:grid md:grid-cols-2 md:gap-x-8 md:gap-y-10">
-                <div class="relative">
-                    <dt>
-                        <div class="absolute flex items-center justify-center h-12 w-12 rounded-md bg-[color:var(--color-primary-500)] text-white">
-                            <svg class="h-6 w-6" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
-                        </div>
-                        <p class="ml-16 text-lg leading-6 font-medium text-gray-900">Comprehensive Metrics</p>
-                    </dt>
-                    <dd class="mt-2 ml-16 text-base text-gray-500">
-                        Dive deep into your tournament results, track bids, and see how your effort scores contribute to your overall standing.
-                    </dd>
-                </div>
-
-                <div class="relative">
-                    <dt>
-                        <div class="absolute flex items-center justify-center h-12 w-12 rounded-md bg-[color:var(--color-primary-500)] text-white">
-                            <svg class="h-6 w-6" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-                        </div>
-                        <p class="ml-16 text-lg leading-6 font-medium text-gray-900">Tournament Management</p>
-                    </dt>
-                    <dd class="mt-2 ml-16 text-base text-gray-500">
-                        Easily sign up for upcoming tournaments, view deadlines, and submit your results all in one place.
-                    </dd>
-                </div>
-
-                <div class="relative">
-                    <dt>
-                        <div class="absolute flex items-center justify-center h-12 w-12 rounded-md bg-[color:var(--color-primary-500)] text-white">
-                             <svg class="h-6 w-6" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" /></svg>
-                        </div>
-                        <p class="ml-16 text-lg leading-6 font-medium text-gray-900">Roster Generation</p>
-                    </dt>
-                    <dd class="mt-2 ml-16 text-base text-gray-500">
-                        Coaches and admins can generate detailed tournament rosters, including judges and event breakdowns, with a single click.
-                    </dd>
-                </div>
-
-                <div class="relative">
-                    <dt>
-                        <div class="absolute flex items-center justify-center h-12 w-12 rounded-md bg-[color:var(--color-primary-500)] text-white">
-                            <svg class="h-6 w-6" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-                        </div>
-                        <p class="ml-16 text-lg leading-6 font-medium text-gray-900">Requirement Tracking</p>
-                    </dt>
-                    <dd class="mt-2 ml-16 text-base text-gray-500">
-                        Stay on top of your responsibilities with a personalized checklist of requirements, from paying fees to completing judge training.
-                    </dd>
-                </div>
-            </dl>
-        </div>
-    </div>
-</div>
-
-<!-- Footer Section -->
-<footer class="bg-gray-800">
-    <div class="max-w-7xl mx-auto py-12 px-4 sm:px-6 lg:px-8">
-        <div class="xl:grid xl:grid-cols-3 xl:gap-8">
-            <div class="space-y-8 xl:col-span-1">
-                <div class="text-white text-xl font-bold">Mason Speech & Debate</div>
-                <p class="text-gray-300 text-base">
-                    Your comprehensive platform for tournament data, personal growth, and team success.
-                </p>
-            </div>
-            <div class="mt-12 grid grid-cols-2 gap-8 xl:mt-0 xl:col-span-2">
-                <div class="md:grid md:grid-cols-2 md:gap-8">
-                    <div>
-                        <h3 class="text-sm font-semibold text-gray-400 tracking-wider uppercase">Navigation</h3>
-                        <ul class="mt-4 space-y-4">
-                            <li><a href="{{ url_for('auth.login') }}" class="text-base text-gray-300 hover:text-white">Login</a></li>
-                            <li><a href="{{ url_for('auth.register') }}" class="text-base text-gray-300 hover:text-white">Register</a></li>
-                            <li><a href="{{ url_for('main.life') }}" class="text-base text-gray-300 hover:text-white">Life</a></li>
-                        </ul>
-                    </div>
-                    <div class="mt-12 md:mt-0">
-                        <h3 class="text-sm font-semibold text-gray-400 tracking-wider uppercase">Resources</h3>
-                        <ul class="mt-4 space-y-4">
-                            <li><a href="/sitemap.xml" class="text-base text-gray-300 hover:text-white">Sitemap</a></li>
-                            <li><a href="/robots.txt" class="text-base text-gray-300 hover:text-white">Robots.txt</a></li>
-                        </ul>
-                    </div>
-                </div>
-            </div>
-        </div>
-        <div class="mt-12 border-t border-gray-700 pt-8">
-            <p class="text-base text-gray-400 xl:text-center">
-                &copy; 2025 Mason Speech & Debate. Building champions through competitive excellence.
-            </p>
-        </div>
-    </div>
-</footer>
-
-<script>
-    // Simple parallax effect
-    window.addEventListener('scroll', function() {
-        const parallax = document.getElementById('parallax-bg');
-        if (parallax) {
-            const scrolled = window.pageYOffset;
-            const rate = scrolled * 0.3;
-            parallax.style.transform = 'translate3d(0px, ' + rate + 'px, 0px)';
-        }
-    });
-</script>
 {% endblock %}

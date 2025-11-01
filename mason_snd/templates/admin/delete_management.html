@@ -2,7 +2,7 @@
 {% block title %}Deletion Management{% endblock %}
 {% block content %}
 <div class="py-8 px-4 sm:px-6 lg:px-8">
-    <h1 class="text-3xl font-bold text-red-900 mb-6">🗑️ Deletion Management</h1>
+    <h1 class="text-3xl font-bold text-red-900 mb-6">Deletion Management</h1>
     
     <div class="bg-red-50 border-l-4 border-red-400 p-4 mb-8">
         <div class="flex">
@@ -12,7 +12,7 @@
                 </svg>
             </div>
             <div class="ml-3">
-                <h3 class="text-sm font-medium text-red-800">⚠️ DANGER ZONE</h3>
+                <h3 class="text-sm font-medium text-red-800">DANGER ZONE</h3>
                 <div class="mt-2 text-sm text-red-700">
                     <p>These operations permanently delete data and cannot be undone. Use with extreme caution.</p>
                     <p>All related records (signups, performances, rosters, etc.) will be automatically deleted to maintain database integrity.</p>
@@ -25,9 +25,6 @@
         <!-- User Deletion -->
         <div class="bg-white shadow rounded-lg p-6">
             <div class="flex items-center mb-4">
-                <svg class="h-6 w-6 text-red-600 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197m13.5-9a2.5 2.5 0 11-5 0 2.5 2.5 0 015 0z"></path>
-                </svg>
                 <h2 class="text-xl font-semibold text-gray-900">Delete Users</h2>
             </div>
             <p class="text-gray-600 mb-4">
@@ -42,16 +39,13 @@
             </div>
             <a href="{{ url_for('admin.delete_users') }}" 
                class="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-md text-sm font-medium transition">
-                Manage User Deletion
+                User Deletion
             </a>
         </div>
         
         <!-- Tournament Deletion -->
         <div class="bg-white shadow rounded-lg p-6">
             <div class="flex items-center mb-4">
-                <svg class="h-6 w-6 text-red-600 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-                </svg>
                 <h2 class="text-xl font-semibold text-gray-900">Delete Tournaments</h2>
             </div>
             <p class="text-gray-600 mb-4">
@@ -66,16 +60,13 @@
             </div>
             <a href="{{ url_for('admin.delete_tournaments') }}" 
                class="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-md text-sm font-medium transition">
-                Manage Tournament Deletion
+                Tournament Deletion
             </a>
         </div>
         
         <!-- Event Deletion -->
         <div class="bg-white shadow rounded-lg p-6">
             <div class="flex items-center mb-4">
-                <svg class="h-6 w-6 text-red-600 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3a2 2 0 012-2h4a2 2 0 012 2v4m-6 4h6m-6 4h6"></path>
-                </svg>
                 <h2 class="text-xl font-semibold text-gray-900">Delete Events</h2>
             </div>
             <p class="text-gray-600 mb-4">
@@ -90,16 +81,13 @@
             </div>
             <a href="{{ url_for('admin.delete_events') }}" 
                class="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-md text-sm font-medium transition">
-                Manage Event Deletion
+                Event Deletion
             </a>
         </div>
         
         <!-- Requirements Deletion -->
         <div class="bg-white shadow rounded-lg p-6">
             <div class="flex items-center mb-4">
-                <svg class="h-6 w-6 text-red-600 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
-                </svg>
                 <h2 class="text-xl font-semibold text-gray-900">Delete Requirements</h2>
             </div>
             <p class="text-gray-600 mb-4">
@@ -113,7 +101,7 @@
             </div>
             <a href="{{ url_for('admin.delete_requirements') }}" 
                class="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-md text-sm font-medium transition">
-                Manage Requirements Deletion
+                Requirements Deletion
             </a>
         </div>
     </div>
@@ -121,9 +109,6 @@
     <div class="mt-8 bg-blue-50 border-l-4 border-blue-400 p-4">
         <div class="flex">
             <div class="flex-shrink-0">
-                <svg class="h-5 w-5 text-blue-400" viewBox="0 0 20 20" fill="currentColor">
-                    <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd" />
-                </svg>
             </div>
             <div class="ml-3">
                 <h3 class="text-sm font-medium text-blue-800">How it works</h3>

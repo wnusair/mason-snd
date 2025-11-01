@@ -5,7 +5,7 @@
 <link rel="shortcut icon" href="{{ url_for('main.favicon') }}">
 <link rel="apple-touch-icon" href="{{ url_for('main.favicon') }}">
 <meta name="msapplication-TileImage" content="{{ url_for('main.favicon') }}">
-<nav class="bg-white shadow-sm">
+<nav class="bg-white shadow-sm relative z-50">
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div class="flex justify-between h-16 items-center">
             <!-- Home Link -->
@@ -111,8 +111,8 @@
                 </button>
             </div>
         </div>
-        <!-- Mobile menu, hidden by default -->
-        <div id="mobile-menu" class="md:hidden hidden mt-2">
+    <!-- Mobile menu, hidden by default -->
+    <div id="mobile-menu" class="md:hidden hidden mt-2 relative z-50">
             <div class="space-y-1 bg-white rounded-md shadow-lg p-2">
                 {% if session.get('user_id') %}
                     <a href="{{ url_for('profile.index', user_id=session.get('user_id')) }}" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 font-bold">Home</a>

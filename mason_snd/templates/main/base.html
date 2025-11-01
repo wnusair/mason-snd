@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Home - {% block title %}{% endblock %}</title>
+    <title>{% block title %}{% endblock %}</title>
     <!-- Favicon configurations for maximum browser compatibility -->
     <link rel="icon" type="image/png" sizes="32x32" href="{{ url_for('main.favicon') }}">
     <link rel="shortcut icon" href="{{ url_for('main.favicon') }}">
@@ -34,30 +34,24 @@
             from { opacity: 0; transform: translateY(-10px); }
             to { opacity: 1; transform: translateY(0); }
         }
+
+            .full-bleed + main {
+                padding-top: 0;
+            }
     </style>
 </head>
 <body class="h-full">
-    {% include 'partials/navbar.html' %}
 
-    <main class="py-10">
+    {# Allow pages to render a full-bleed block (hero, wide banners) outside the normal container. #}
+    {% block full_width %}{% endblock %}
+
+    <main>
         <div class="max-w-7xl mx-auto sm:px-6 lg:px-8">
-            {% with messages = get_flashed_messages(with_categories=true) %}
-                {% if messages %}
-                    {% for category, message in messages %}
-                        <div class="bg-blue-100 border-l-4 border-blue-500 text-blue-700 p-4 mb-6 rounded-md fade-in" role="alert">
-                            <p>{{ message }}</p>
-                        </div>
-                    {% endfor %}
-                {% endif %}
-            {% endwith %}
-
             <div class="fade-in">
                 {% block content %}
                 {% endblock %}
             </div>
         </div>
     </main>
-
-    <!-- Alpine.js handles dropdowns; no extra JS needed here -->
 </body>
 </html>
