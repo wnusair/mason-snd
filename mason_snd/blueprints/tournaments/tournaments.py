@@ -240,16 +240,14 @@ def add_form():
         labels = request.form.getlist('label')
         types = request.form.getlist('type')
         options_list = request.form.getlist('options')
-        # Note: for checkboxes, if not checked the value is not submitted.
-        required_vals = request.form.getlist('required')
-
+        
         # Create a field entry for each input group
         for i in range(len(labels)):
             label = labels[i]
             field_type = types[i]
-            options = options_list[i] if options_list[i] != "" else None
-            # Each field row has its own checkbox input. If checkbox exists, its value (e.g. "on") appears
-            required = (str(required_vals[i]).lower() in ["on", "true", "1"]) if i < len(required_vals) else False
+            options = options_list[i] if i < len(options_list) and options_list[i] != "" else None
+            # Check if checkbox for this specific field is checked using unique name
+            required = request.form.get(f'required_{i}') == '1'
 
             new_field = Form_Fields(
                 label=label,
@@ -264,6 +262,84 @@ def add_form():
         return redirect(url_for('tournaments.index'))
 
     return render_template("tournaments/add_form.html", tournaments=tournaments)
+
+@tournaments_bp.route('/edit_form/<int:tournament_id>', methods=['GET', 'POST'])
+@prevent_race_condition('edit_form', min_interval=1.5, redirect_on_duplicate=lambda uid, form: redirect(url_for('tournaments.index')))
+def edit_form(tournament_id):
+    """
+    Edit existing custom form fields for a tournament (admin only).
+    
+    Allows admins to modify or delete existing form fields, or add new ones
+    to a tournament that already has form fields.
+    
+    GET: Display current form fields with editing interface
+    POST: Update, delete, or add form fields
+    
+    Access: Requires role >= 2 (Admin)
+    
+    Returns:
+        GET: Rendered form editing interface with current fields
+        POST: Redirect to tournaments index with success message
+    """
+    user_id = session.get('user_id')
+    if not user_id:
+        return redirect_to_login("Please log in")
+        
+    user = User.query.filter_by(id=user_id).first()
+    if not user or user.role < 2:
+        flash("You are not authorized to access this page", "error")
+        return redirect(url_for('tournaments.index'))
+    
+    tournament = Tournament.query.get_or_404(tournament_id)
+    
+    if request.method == 'POST':
+        # Handle deletions first
+        delete_ids = request.form.getlist('delete')
+        for field_id in delete_ids:
+            field = Form_Fields.query.get(int(field_id))
+            if field and field.tournament_id == tournament_id:
+                # Also delete associated responses
+                Form_Responses.query.filter_by(field_id=field.id).delete()
+                db.session.delete(field)
+        
+        # Handle updates to existing fields
+        field_ids = request.form.getlist('field_id')
+        labels = request.form.getlist('label')
+        types = request.form.getlist('type')
+        options_list = request.form.getlist('options')
+        
+        for i in range(len(field_ids)):
+            field_id = int(field_ids[i])
+            field = Form_Fields.query.get(field_id)
+            if field and field.tournament_id == tournament_id:
+                field.label = labels[i]
+                field.type = types[i]
+                field.options = options_list[i] if i < len(options_list) and options_list[i] != "" else None
+                field.required = request.form.get(f'required_{i}') == '1'
+        
+        # Handle new fields (those without field_id)
+        new_labels = request.form.getlist('new_label')
+        new_types = request.form.getlist('new_type')
+        new_options = request.form.getlist('new_options')
+        
+        for i in range(len(new_labels)):
+            if new_labels[i]:  # Only create if label is provided
+                new_field = Form_Fields(
+                    label=new_labels[i],
+                    type=new_types[i],
+                    options=new_options[i] if i < len(new_options) and new_options[i] != "" else None,
+                    required=request.form.get(f'new_required_{i}') == '1',
+                    tournament_id=tournament_id
+                )
+                db.session.add(new_field)
+        
+        db.session.commit()
+        flash("Form fields updated successfully.", "success")
+        return redirect(url_for('tournaments.index'))
+    
+    # GET request - show existing fields
+    fields = Form_Fields.query.filter_by(tournament_id=tournament_id).order_by(Form_Fields.id).all()
+    return render_template("tournaments/edit_form.html", tournament=tournament, fields=fields)
 
 @tournaments_bp.route('/signup', methods=['GET', 'POST'])
 @prevent_race_condition(

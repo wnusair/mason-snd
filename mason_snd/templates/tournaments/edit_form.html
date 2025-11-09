@@ -1,0 +1,130 @@
+{% extends "tournaments/base.html" %}
+{% block title %}Edit Form Fields{% endblock %}
+
+{% block content %}
+<div class="min-h-full flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
+    <div class="max-w-xl w-full space-y-8">
+        <div>
+            <h2 class="mt-6 text-center text-3xl font-extrabold text-gray-900">
+                Edit Form Fields
+            </h2>
+            <p class="mt-2 text-center text-sm text-gray-600">
+                Tournament: {{ tournament.name }}
+            </p>
+        </div>
+        <form method="POST">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+            <div class="rounded-md shadow-sm bg-white p-6 space-y-4">
+                
+                {% if fields %}
+                <div class="space-y-4 border-b border-gray-200 pb-4">
+                    <h3 class="text-lg font-medium text-gray-900">Existing Fields</h3>
+                    {% for field in fields %}
+                    <div class="p-4 border border-gray-200 rounded-md space-y-3 bg-gray-50">
+                        <input type="hidden" name="field_id" value="{{ field.id }}">
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700">Field Label</label>
+                                <input type="text" name="label" value="{{ field.label }}" required class="mt-1 w-full rounded-md border-gray-300 shadow-sm sm:text-sm">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700">Field Type</label>
+                                <select name="type" required class="mt-1 w-full rounded-md border-gray-300 shadow-sm sm:text-sm">
+                                    <option value="text" {% if field.type == 'text' %}selected{% endif %}>Text</option>
+                                    <option value="radio" {% if field.type == 'radio' %}selected{% endif %}>Radio</option>
+                                    <option value="dropdown" {% if field.type == 'dropdown' %}selected{% endif %}>Dropdown</option>
+                                    <option value="checkbox" {% if field.type == 'checkbox' %}selected{% endif %}>Checkbox</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700">Options (comma-separated)</label>
+                            <input type="text" name="options" value="{{ field.options or '' }}" placeholder="e.g., Small, Medium, Large" class="mt-1 w-full rounded-md border-gray-300 shadow-sm sm:text-sm">
+                        </div>
+                        <div class="flex items-center justify-between">
+                            <div class="flex items-start">
+                                <div class="flex h-5 items-center">
+                                    <input name="required_{{ loop.index0 }}" type="checkbox" value="1" {% if field.required %}checked{% endif %} class="h-4 w-4 rounded border-gray-300 text-[color:var(--color-primary-600)] focus:ring-[color:var(--color-primary-500)]">
+                                </div>
+                                <div class="ml-3 text-sm">
+                                    <label class="font-medium text-gray-700">Required</label>
+                                </div>
+                            </div>
+                            <div class="flex items-center">
+                                <input type="checkbox" name="delete" value="{{ field.id }}" id="delete_{{ field.id }}" class="h-4 w-4 rounded border-gray-300 text-red-600 focus:ring-red-500">
+                                <label for="delete_{{ field.id }}" class="ml-2 text-sm font-medium text-red-600">Delete this field</label>
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <div class="text-center py-4 text-gray-500">
+                    No fields exist yet for this tournament.
+                </div>
+                {% endif %}
+
+                <div id="new-fields-container" class="space-y-4 border-t border-gray-200 pt-4">
+                    <h3 class="text-lg font-medium text-gray-900">Add New Fields</h3>
+                    <!-- New fields will be added here by JS -->
+                </div>
+            </div>
+            <div class="mt-4 flex items-center justify-between">
+                <button type="button" onclick="addNewField()" class="inline-flex items-center justify-center rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50">
+                    Add New Field
+                </button>
+                <div class="space-x-2">
+                    <a href="{{ url_for('tournaments.index') }}" class="inline-flex items-center justify-center rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50">
+                        Cancel
+                    </a>
+                    <button type="submit" class="group relative flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-[color:var(--color-primary-600)] hover:bg-[color:var(--color-primary-700)]">
+                        Save Changes
+                    </button>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+let newFieldCounter = 0;
+
+function addNewField() {
+    const container = document.getElementById("new-fields-container");
+    const fieldRow = document.createElement("div");
+    fieldRow.className = "p-4 border border-gray-200 rounded-md space-y-3 bg-blue-50";
+    const currentIndex = newFieldCounter++;
+    fieldRow.innerHTML = `
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+                <label class="block text-sm font-medium text-gray-700">Field Label</label>
+                <input type="text" name="new_label" placeholder="e.g., T-Shirt Size" class="mt-1 w-full rounded-md border-gray-300 shadow-sm sm:text-sm">
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700">Field Type</label>
+                <select name="new_type" class="mt-1 w-full rounded-md border-gray-300 shadow-sm sm:text-sm">
+                    <option value="text">Text</option>
+                    <option value="radio">Radio</option>
+                    <option value="dropdown">Dropdown</option>
+                    <option value="checkbox">Checkbox</option>
+                </select>
+            </div>
+        </div>
+        <div>
+            <label class="block text-sm font-medium text-gray-700">Options (comma-separated)</label>
+            <input type="text" name="new_options" placeholder="e.g., Small, Medium, Large" class="mt-1 w-full rounded-md border-gray-300 shadow-sm sm:text-sm">
+        </div>
+        <div class="flex items-start">
+            <div class="flex h-5 items-center">
+                <input name="new_required_${currentIndex}" type="checkbox" value="1" class="h-4 w-4 rounded border-gray-300 text-[color:var(--color-primary-600)] focus:ring-[color:var(--color-primary-500)]">
+            </div>
+            <div class="ml-3 text-sm">
+                <label class="font-medium text-gray-700">Required</label>
+            </div>
+        </div>
+        <div class="text-xs text-blue-600 font-medium">New field</div>
+    `;
+    container.appendChild(fieldRow);
+}
+</script>
+{% endblock %}

@@ -37,10 +37,13 @@
 </div>
 
 <script>
+let fieldCounter = 0;
+
 function addField() {
     const container = document.getElementById("fields-container");
     const fieldRow = document.createElement("div");
     fieldRow.className = "p-4 border border-gray-200 rounded-md space-y-3";
+    const currentIndex = fieldCounter++;
     fieldRow.innerHTML = `
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
@@ -63,7 +66,7 @@ function addField() {
         </div>
         <div class="flex items-start">
             <div class="flex h-5 items-center">
-                <input name="required" type="checkbox" class="h-4 w-4 rounded border-gray-300 text-[color:var(--color-primary-600)] focus:ring-[color:var(--color-primary-500)]">
+                <input name="required_${currentIndex}" type="checkbox" value="1" class="h-4 w-4 rounded border-gray-300 text-[color:var(--color-primary-600)] focus:ring-[color:var(--color-primary-500)]">
             </div>
             <div class="ml-3 text-sm">
                 <label class="font-medium text-gray-700">Required</label>
