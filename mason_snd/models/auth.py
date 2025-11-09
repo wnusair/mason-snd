@@ -156,7 +156,7 @@ class User(db.Model):
     bids = db.Column(db.Integer, default=0)
 
     tournaments_attended_number = db.Column(db.Integer, default=0)
-    #tournaments_attended_name = db.relationship('tournaments', backref='attendee')
+    #tournaments_attended_name = db.relationship('tournaments', backref='attendee') MAYBE NEEDED? wissam 5/12/25
 
     @property
     def tournament_points(self):

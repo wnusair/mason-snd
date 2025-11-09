@@ -523,6 +523,20 @@ class Tournament_Performance(db.Model):
     Note:
         Not all fields required for every tournament. Flexibility allows
         different tournament formats (some use points, some use ranks, etc.).
+    
+    Point System:
+        Points calculated using formula: 1 + 9 * ((n - r)/(n-1))^k
+        - n: total_competitors (how many people competed in the event)
+        - r: overall_rank (the user's overall placement)
+        - k: decay_coefficient (default 2, controls how steeply points drop off)
+        
+        This provides a fairer, more granular scoring system (1-10 points possible).
+        The minimum number of points is 1, and the max is 10.
+        
+        Legacy Support:
+        - Old results may not have total_competitors/overall_rank
+        - These display original points value without recalculation
+        - Users can edit old results to add competitor count for updated scoring
     """
     id = db.Column(db.Integer, primary_key=True)
 
@@ -531,6 +545,11 @@ class Tournament_Performance(db.Model):
     rank = db.Column(db.Integer)
     stage = db.Column(db.Integer)
     # 0 = nothing, 1 = double octas, 2 = octas, 3 = quarters, 4 = semis, 5 = finals
+    
+    # New fields for refined ranking system (added 2025)
+    overall_rank = db.Column(db.Integer, nullable=True)  # User's overall placement at tournament
+    total_competitors = db.Column(db.Integer, nullable=True)  # Total number of competitors in the event
+    decay_coefficient = db.Column(db.Float, default=2.0, nullable=True)  # K value for points formula
 
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'))
     tournament_id = db.Column(db.Integer, db.ForeignKey('tournament.id'))

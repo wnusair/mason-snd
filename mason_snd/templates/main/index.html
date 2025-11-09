@@ -4,12 +4,9 @@
 {% block full_width %}
 
 <section class="relative min-h-screen full-bleed">
-	<!-- Background image (img used to avoid inline CSS parsing issues) -->
 	<img src="{{ url_for('static', filename='images/hero.jpg') }}" alt="" class="absolute inset-0 w-full h-full object-cover block">
-	<!-- Dark overlay to ensure text contrast -->
 	<div class="absolute inset-0 bg-black/60"></div>
 
-	<!-- Content -->
 	<div class="relative z-10 flex items-center justify-center min-h-screen px-4">
 		<div class="text-center max-w-3xl">
 			<h1 class="text-white font-extrabold leading-tight text-4xl sm:text-5xl md:text-6xl lg:text-7xl">Mason S&amp;D</h1>

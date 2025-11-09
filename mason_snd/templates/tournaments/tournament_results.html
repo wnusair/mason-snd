@@ -8,46 +8,135 @@
             <h2 class="mt-6 text-center text-3xl font-extrabold text-gray-900">
                 Tournament Results
             </h2>
+            <p class="mt-2 text-center text-sm text-gray-600">
+                {{ tournament.name }}
+            </p>
         </div>
+        
+        {% if roster_warning %}
+        <div class="bg-yellow-50 border-l-4 border-yellow-400 p-4">
+            <div class="flex">
+                <div class="flex-shrink-0">
+                    <svg class="h-5 w-5 text-yellow-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                        <path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd" />
+                    </svg>
+                </div>
+                <div class="ml-3">
+                    <p class="text-sm text-yellow-700">
+                        <strong>Note:</strong> Rosters for the next tournament have already been generated without your performance at this tournament. Submitting now may negatively impact your chances for future tournaments.
+                    </p>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+        
+        {% if deadline_warning %}
+        <div class="bg-orange-50 border-l-4 border-orange-400 p-4">
+            <div class="flex">
+                <div class="flex-shrink-0">
+                    <svg class="h-5 w-5 text-orange-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                        <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clip-rule="evenodd" />
+                    </svg>
+                </div>
+                <div class="ml-3">
+                    <p class="text-sm text-orange-700">
+                        <strong>Deadline Passed:</strong> The performance deadline for this tournament ({{ tournament.performance_deadline.strftime('%b %d, %Y at %I:%M %p') }}) has passed. You can still submit results, but rosters have already been generated without your points.
+                    </p>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+        
         {% if performance %}
         <div class="bg-white p-6 rounded-md shadow">
             <h3 class="text-lg font-semibold text-gray-700 mb-2">Your Submitted Performance</h3>
-            <ul class="text-sm text-gray-600">
-                <li><span class="font-medium">Bid:</span> {{ 'Yes' if performance.bid else 'No' }}</li>
-                <li><span class="font-medium">Rank:</span> {{ performance.rank }}</li>
-                <li><span class="font-medium">Stage:</span> 
+            
+            {% if not performance.overall_rank or not performance.total_competitors %}
+            <div class="bg-blue-50 border-l-4 border-blue-400 p-3 mb-4">
+                <div class="flex">
+                    <div class="flex-shrink-0">
+                        
+                    </div>
+                    <div class="ml-3">
+                        <p class="text-sm text-blue-700">
+                            <strong>Old Submission Format:</strong> This result was submitted using the old system. Please edit it to add your overall rank and total competitors for a more accurate points calculation.
+                        </p>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+            
+            <ul class="text-sm text-gray-600 space-y-1">
+                {% if performance.overall_rank and performance.total_competitors %}
+                <li><span class="font-medium">Overall Rank:</span> {{ performance.overall_rank }} out of {{ performance.total_competitors }}</li>
+                {% else %}
+                <li class="text-gray-400 italic">Overall Rank: Not provided (old format)</li>
+                {% endif %}
+                <li><span class="font-medium">Stage Reached:</span> 
                     {% set stage_map = {0:'None',1:'Double Octafinals',2:'Octafinals',3:'Quarter Finals',4:'Semifinals',5:'Finals'} %}
                     {{ stage_map[performance.stage] if performance.stage in stage_map else 'Unknown' }}
                 </li>
-                <li><span class="font-medium">Points:</span> {{ performance.points }}</li>
+                <li><span class="font-medium">Bid:</span> {{ 'Yes' if performance.bid else 'No' }}</li>
+                <li><span class="font-medium">Points Earned:</span> {{ performance.points }}</li>
             </ul>
-            <p class="mt-2 text-xs text-center text-gray-400">Submitted</p>
+            <div class="mt-4 flex space-x-2">
+                <a href="{{ url_for('tournaments.edit_results', performance_id=performance.id) }}" 
+                   class="flex-1 text-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+                    Edit Results
+                </a>
+                <form method="POST" action="{{ url_for('tournaments.delete_results', performance_id=performance.id) }}" 
+                      onsubmit="return confirm('Are you sure you want to delete your tournament results? This will remove {{ performance.points }} points from your total.');"
+                      class="flex-1">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                    <button type="submit" 
+                            class="w-full py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500">
+                        Delete Results
+                    </button>
+                </form>
+            </div>
         </div>
         {% else %}
         <form class="mt-8 space-y-6" method="POST">
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
             <div class="rounded-md shadow-sm bg-white p-6 space-y-4">
                 <div>
-                    <label for="bid" class="block text-sm font-medium text-gray-700">Did you get a bid?</label>
-                    <select id="bid" name="bid" class="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-[color:var(--color-primary-500)] focus:border-[color:var(--color-primary-500)] sm:text-sm rounded-md">
-                        <option value="no">No</option>
-                        <option value="yes">Yes</option>
-                    </select>
+                    <label for="overall_rank" class="block text-sm font-medium text-gray-700">What was your overall rank? <span class="text-red-500">*</span></label>
+                    <input type="number" name="overall_rank" id="overall_rank" min="1" required 
+                           class="mt-1 w-full rounded-md border-gray-300 shadow-sm focus:border-[color:var(--color-primary-500)] focus:ring-[color:var(--color-primary-500)] sm:text-sm"
+                           placeholder="e.g., 5">
+                    <p class="mt-1 text-xs text-gray-500">Your placement in the tournament (1st, 2nd, 3rd, etc.)</p>
                 </div>
+                
                 <div>
-                    <label for="rank" class="block text-sm font-medium text-gray-700">What was your rank?</label>
-                    <input type="number" name="rank" id="rank" required class="mt-1 w-full rounded-md border-gray-300 shadow-sm focus:border-[color:var(--color-primary-500)] focus:ring-[color:var(--color-primary-500)] sm:text-sm">
+                    <label for="total_competitors" class="block text-sm font-medium text-gray-700">How many competitors were in your event? <span class="text-red-500">*</span></label>
+                    <input type="number" name="total_competitors" id="total_competitors" min="1" required 
+                           class="mt-1 w-full rounded-md border-gray-300 shadow-sm focus:border-[color:var(--color-primary-500)] focus:ring-[color:var(--color-primary-500)] sm:text-sm"
+                           placeholder="e.g., 20">
+                    <p class="mt-1 text-xs text-gray-500">Total number of people competing in your event</p>
                 </div>
-                <div>
-                    <label for="stage" class="block text-sm font-medium text-gray-700">What stage did you reach?</label>
-                    <select id="stage" name="stage" class="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-[color:var(--color-primary-500)] focus:border-[color:var(--color-primary-500)] sm:text-sm rounded-md">
-                        <option value="None">None</option>
-                        <option value="Double Octafinals">Double Octafinals</option>
-                        <option value="Octafinals">Octafinals</option>
-                        <option value="Quarter Finals">Quarter Finals</option>
-                        <option value="Semifinals">Semifinals</option>
-                        <option value="Finals">Finals</option>
-                    </select>
+                
+                <div class="border-t pt-4">
+                    <p class="text-xs text-gray-500 mb-3">Additional Information (Optional)</p>
+                    
+                    <div class="mb-3">
+                        <label for="bid" class="block text-sm font-medium text-gray-700">Did you get a bid?</label>
+                        <select id="bid" name="bid" class="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-[color:var(--color-primary-500)] focus:border-[color:var(--color-primary-500)] sm:text-sm rounded-md">
+                            <option value="no">No</option>
+                            <option value="yes">Yes</option>
+                        </select>
+                    </div>
+                    
+                    <div>
+                        <label for="stage" class="block text-sm font-medium text-gray-700">What stage did you reach?</label>
+                        <select id="stage" name="stage" class="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-[color:var(--color-primary-500)] focus:border-[color:var(--color-primary-500)] sm:text-sm rounded-md">
+                            <option value="None">None</option>
+                            <option value="Double Octafinals">Double Octafinals</option>
+                            <option value="Octafinals">Octafinals</option>
+                            <option value="Quarter Finals">Quarter Finals</option>
+                            <option value="Semifinals">Semifinals</option>
+                            <option value="Finals">Finals</option>
+                        </select>
+                    </div>
                 </div>
             </div>
             <div>

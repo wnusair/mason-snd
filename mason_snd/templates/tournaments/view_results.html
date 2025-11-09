@@ -39,10 +39,10 @@
                             <thead class="bg-gray-50">
                                 <tr>
                                     <th scope="col" class="py-3.5 pl-4 pr-3 text-left text-sm font-semibold text-gray-900 sm:pl-6">Participant</th>
-                                    <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Points</th>
-                                    <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Rank</th>
+                                    <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Overall Rank</th>
                                     <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Stage Reached</th>
                                     <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Bid</th>
+                                    <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Points</th>
                                 </tr>
                             </thead>
                             <tbody class="divide-y divide-gray-200 bg-white">
@@ -52,13 +52,10 @@
                                         {{ data.user.first_name }} {{ data.user.last_name }}
                                     </td>
                                     <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
-                                        {{ data.performance.points }}
-                                    </td>
-                                    <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
-                                        {% if data.performance.rank %}
-                                            {{ data.performance.rank }}
+                                        {% if data.performance.overall_rank and data.performance.total_competitors %}
+                                            {{ data.performance.overall_rank }} / {{ data.performance.total_competitors }}
                                         {% else %}
-                                            N/A
+                                            <span class="text-gray-400 italic">Not provided</span>
                                         {% endif %}
                                     </td>
                                     <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
@@ -71,6 +68,9 @@
                                         {% else %}
                                             <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">No</span>
                                         {% endif %}
+                                    </td>
+                                    <td class="whitespace-nowrap px-3 py-4 text-sm font-medium text-gray-900">
+                                        {{ data.performance.points }}
                                     </td>
                                 </tr>
                                 {% endfor %}

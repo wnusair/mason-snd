@@ -655,24 +655,23 @@ def my_tournaments():
     View list of tournaments the current user attended.
     
     Displays all past tournaments where the user signed up (is_going=True),
-    showing submission status and allowing result submission if deadline
-    hasn't passed.
+    showing submission status and allowing result submission if not already
+    submitted (deadline shows as warning, not blocker).
     
     Displayed Information:
         - Tournament name, date, location
         - Performance submission status
         - Whether user can still submit results
-        - Performance deadline
+        - Performance deadline (for reference)
     
     Submission Eligibility:
         - User must have signed up (Tournament_Signups.is_going=True)
-        - Tournament date must have passed
-        - Performance deadline must be in the future
         - User must not have already submitted results
+        - Deadline passed = warning only, not blocking
     
     Features:
         - View-only access to already-submitted results
-        - Direct link to submit results if eligible
+        - Direct link to submit results if not yet submitted
         - Visual indicators for submission status
         - Sorted by date (newest first)
     
@@ -703,8 +702,8 @@ def my_tournaments():
         # Check if user already submitted performance
         performance = Tournament_Performance.query.filter_by(user_id=user_id, tournament_id=tournament.id).first()
 
-        # Only allow submission if performance_deadline is in the future and not already submitted
-        can_submit = (tournament.performance_deadline and now < tournament.performance_deadline and not performance)
+        # Allow submission if not already submitted (deadline is just a warning now)
+        can_submit = not performance
 
         my_tournaments_data.append({
             'tournament': tournament,
@@ -718,11 +717,12 @@ def my_tournaments():
 @prevent_race_condition('submit_results', min_interval=2.0, redirect_on_duplicate=lambda uid, form: redirect(url_for('tournaments.view_results', tournament_id=request.view_args.get('tournament_id'))))
 def submit_results(tournament_id):
     """
-    Close results collection for a tournament (admin only).
+    Mark tournament results as finalized for roster generation (admin only).
     
-    Admin route to finalize a tournament by marking results_submitted=True,
-    which prevents additional result submissions and indicates the tournament
-    is complete.
+    Admin route to mark a tournament's results as "finalized" by setting 
+    results_submitted=True. This signals that rosters for the next tournament
+    can be generated. However, students can still submit/edit results after
+    this point - they just receive a warning about potential impact.
     
     Args:
         tournament_id (int): The tournament to finalize
@@ -741,11 +741,11 @@ def submit_results(tournament_id):
         - List of all signups
         - List of submitted performances
     
-    Effect of Closing Results:
+    Effect of Marking Results as Submitted:
         - Sets tournament.results_submitted = True
-        - Prevents students from submitting/editing results
-        - Marks tournament as officially complete
-        - Redirects future submissions to view-only page
+        - Enables roster generation for next tournament
+        - Shows warning to students submitting late results
+        - Does NOT prevent students from submitting/editing results
     
     Access: Requires role >= 2 (Admin)
     
@@ -780,11 +780,11 @@ def submit_results(tournament_id):
         return redirect(url_for('tournaments.view_results', tournament_id=tournament_id))
     
     if request.method == 'POST':
-        # Mark results as submitted (closes result collection)
+        # Mark results as submitted (enables roster generation)
         tournament.results_submitted = True
         db.session.commit()
         
-        flash("Tournament results collection has been closed successfully", "success")
+        flash("Tournament results have been finalized for roster generation. Students can still submit/edit results but will receive a warning.", "success")
         return redirect(url_for('tournaments.view_results', tournament_id=tournament_id))
     
     # Get tournament signups and performances for context
@@ -863,8 +863,7 @@ def tournament_results(tournament_id):
     Submit tournament performance results (students).
     
     Students use this route to submit their tournament performance after
-    competing. The system automatically calculates points based on bid,
-    speaker rank, and elimination stage.
+    competing. The system calculates points using a refined ranking formula.
     
     Args:
         tournament_id (int): The tournament to submit results for
@@ -874,28 +873,31 @@ def tournament_results(tournament_id):
     
     Form Fields:
         - bid: 'yes' or 'no' - Did student receive a bid?
-        - rank: 1-10+ - Speaker rank/placement
+        - overall_rank: User's overall placement at tournament
+        - total_competitors: Total number of competitors in the event
+        - rank: Speaker rank/placement (legacy, still tracked)
         - stage: Elimination round reached (None, Doubles, Octas, Quarters, Semis, Finals)
     
-    Points Calculation:
-        Bid Points:
-            - First-ever bid: +15 points
-            - Subsequent bids: +5 points each
+    Points Calculation (New System):
+        Formula: 1 + 9 * ((n - r)/(n-1))^k
+        - n: total_competitors
+        - r: overall_rank
+        - k: decay_coefficient (default 2.0)
         
-        Stage Points:
-            - None: 0
-            - Double Octafinals: 2 points
-            - Octafinals: 3 points
-            - Quarter Finals: 4 points
-            - Semifinals: 5 points
-            - Finals: 6 points
+        This provides 0-10 points based on relative placement.
         
-        Rank Points:
-            - Ranks 7-10: +1 point
-            - Ranks 4-6: +2 points
-            - Ranks 1-3: +3 points
+        Additional Points:
+        - Bid Points:
+            * First-ever bid: +15 points
+            * Subsequent bids: +5 points each
         
-        Base: +1 point for participation
+        - Stage Points:
+            * None: 0
+            * Double Octafinals: 2 points
+            * Octafinals: 3 points
+            * Quarter Finals: 4 points
+            * Semifinals: 5 points
+            * Finals: 6 points
     
     Database Updates:
         - Creates Tournament_Performance record
@@ -903,9 +905,12 @@ def tournament_results(tournament_id):
         - Updates user.bids counter if bid received
     
     Validation:
-        - Tournament results must not be closed (results_submitted=False)
-        - User cannot have already submitted for this tournament
         - User must be logged in
+        - User cannot have already submitted for this tournament (use edit instead)
+    
+    Note:
+        - Tournament closure no longer blocks submissions
+        - Warning shown if rosters already generated
     
     Returns:
         GET: Rendered result submission form
@@ -920,30 +925,54 @@ def tournament_results(tournament_id):
         return redirect_to_login()
 
     tournament = Tournament.query.get_or_404(tournament_id)
+    now = datetime.now(EST)
     
-    # Check if results collection has been closed
+    # Check if rosters have been generated or deadline passed (warning, not blocking)
+    roster_warning = False
+    deadline_warning = False
+    
     if tournament.results_submitted:
-        flash("Results collection for this tournament has been closed", "error")
-        return redirect(url_for('tournaments.view_results', tournament_id=tournament_id))
-
+        roster_warning = True
+    
+    # Check if performance deadline has passed
+    if tournament.performance_deadline:
+        performance_deadline = tournament.performance_deadline
+        if performance_deadline.tzinfo is None:
+            performance_deadline = EST.localize(performance_deadline)
+        if now > performance_deadline:
+            deadline_warning = True
+    
     # Check if user already submitted performance
     performance = Tournament_Performance.query.filter_by(user_id=user_id, tournament_id=tournament_id).first()
 
     if request.method == 'POST' and not performance:
         # Get form data
         bid_str = request.form.get('bid')  # 'yes' or 'no'
-        rank_str = request.form.get('rank')
         stage_str = request.form.get('stage')
+        overall_rank_str = request.form.get('overall_rank')
+        total_competitors_str = request.form.get('total_competitors')
 
         # Convert bid to boolean
         bid = True if bid_str == 'yes' else False
 
-        # Convert rank to int safely
+        # Convert overall_rank and total_competitors
         try:
-            rank = int(rank_str)
+            overall_rank = int(overall_rank_str) if overall_rank_str else None
+            total_competitors = int(total_competitors_str) if total_competitors_str else None
         except (ValueError, TypeError):
-            flash("Invalid rank submitted")
+            flash("Invalid overall rank or total competitors submitted", "error")
             return redirect(request.url)
+
+        # Validate that if one is provided, both are provided
+        if (overall_rank is None) != (total_competitors is None):
+            flash("Please provide both overall rank and total competitors", "error")
+            return redirect(request.url)
+
+        # Validate overall_rank is within valid range
+        if overall_rank is not None and total_competitors is not None:
+            if overall_rank < 1 or overall_rank > total_competitors:
+                flash(f"Overall rank must be between 1 and {total_competitors}", "error")
+                return redirect(request.url)
 
         # Convert stage to numeric value
         stage_map = {
@@ -957,42 +986,52 @@ def tournament_results(tournament_id):
         stage = stage_map.get(stage_str, 0)
 
         # Calculate points
-        points = 0
+        ranking_points = 0
         user = User.query.filter_by(id=user_id).first()
+        
+        # Calculate ranking points using new formula if data provided
+        if overall_rank is not None and total_competitors is not None and total_competitors > 1:
+            k = 2.0  # decay coefficient
+            n = total_competitors
+            r = overall_rank
+            # Formula: 1 + 9 * ((n - r)/(n-1))^k
+            ranking_points = 1 + 9 * (((n - r) / (n - 1)) ** k)
+            ranking_points = round(ranking_points, 2)  # Round to 2 decimal places
 
-        # Check if user has any previous bids in their tournament performance history
+        # Add bid points
+        bid_points = 0
         previous_bids = Tournament_Performance.query.filter_by(user_id=user_id, bid=True).first()
         
         if bid:
             if previous_bids is None:
                 # User has never received a bid before - award 15 points
-                points += 15
+                bid_points = 15
             else:
                 # User has received bid(s) before - award 5 points
-                points += 5
+                bid_points = 5
+        
+        # Add stage points
+        stage_points = 0
         if stage != 0:
-            points += (stage + 1)
+            stage_points = stage + 1
 
-        if rank in [10, 9, 8, 7]:
-            points += 1
-        elif rank in [6, 5, 4]:
-            points += 2
-        elif rank in [3, 2, 1]:
-            points += 3
-
-        points += 1  # General participation or submission point?
+        # Total points
+        total_points = int(ranking_points + bid_points + stage_points)
 
         # Save to DB
         tournament_performance = Tournament_Performance(
-            points=points,
+            points=total_points,
             bid=bid,
-            rank=rank,
+            rank=None,  # Legacy field, not used in new system
             stage=stage,
+            overall_rank=overall_rank,
+            total_competitors=total_competitors,
+            decay_coefficient=2.0 if (overall_rank is not None and total_competitors is not None) else None,
             user_id=user_id,
             tournament_id=tournament_id
         )
 
-        user.points += points
+        user.points += total_points
         # Update user's bid count if they received a bid
         if bid:
             user.bids = (user.bids or 0) + 1
@@ -1000,9 +1039,243 @@ def tournament_results(tournament_id):
         db.session.add(tournament_performance)
         db.session.commit()
 
+        flash(f"Tournament results submitted successfully! You earned {total_points} points.", "success")
         return redirect(url_for('profile.index', user_id=user_id))
 
-    return render_template("tournaments/tournament_results.html", performance=performance, tournament=tournament)
+    return render_template("tournaments/tournament_results.html", 
+                         performance=performance, 
+                         tournament=tournament,
+                         roster_warning=roster_warning,
+                         deadline_warning=deadline_warning)
+
+@tournaments_bp.route('/edit_results/<int:performance_id>', methods=['GET', 'POST'])
+@prevent_race_condition('edit_results', min_interval=2.0, redirect_on_duplicate=lambda uid, form: redirect(url_for('tournaments.view_results', tournament_id=request.view_args.get('tournament_id'))))
+def edit_results(performance_id):
+    """
+    Edit previously submitted tournament performance results.
+    
+    Allows users to update their tournament results. Points are recalculated
+    and the difference is applied to the user's total points.
+    
+    Args:
+        performance_id (int): The Tournament_Performance record to edit
+    
+    GET: Display edit form with current values
+    POST: Update performance record and recalculate points
+    
+    Form Fields:
+        - bid: 'yes' or 'no' - Did student receive a bid?
+        - overall_rank: User's overall placement at tournament
+        - total_competitors: Total number of competitors in the event
+        - rank: Speaker rank/placement (legacy, still tracked)
+        - stage: Elimination round reached
+    
+    Authorization:
+        - Only the user who submitted can edit their own results
+        - Admins cannot edit other users' results through this route
+    
+    Points Recalculation:
+        - Old points are subtracted from user.points
+        - New points are calculated using current formula
+        - New points are added to user.points
+        - Bid count is updated if bid status changed
+    
+    Returns:
+        GET: Rendered edit form
+        POST: Redirect to user profile with updated points
+    """
+    from mason_snd.models.tournaments import Tournament_Performance
+    
+    user_id = session.get('user_id')
+    if not user_id:
+        flash("Must Be Logged In", "error")
+        return redirect_to_login()
+    
+    performance = Tournament_Performance.query.get_or_404(performance_id)
+    
+    # Check authorization - only the user who submitted can edit
+    if performance.user_id != user_id:
+        flash("You can only edit your own tournament results", "error")
+        return redirect(url_for('tournaments.index'))
+    
+    tournament = Tournament.query.get_or_404(performance.tournament_id)
+    now = datetime.now(EST)
+    
+    # Check if rosters have been generated or deadline passed (warning, not blocking)
+    roster_warning = tournament.results_submitted
+    deadline_warning = False
+    
+    # Check if performance deadline has passed
+    if tournament.performance_deadline:
+        performance_deadline = tournament.performance_deadline
+        if performance_deadline.tzinfo is None:
+            performance_deadline = EST.localize(performance_deadline)
+        if now > performance_deadline:
+            deadline_warning = True
+    
+    if request.method == 'POST':
+        # Get form data
+        bid_str = request.form.get('bid')
+        stage_str = request.form.get('stage')
+        overall_rank_str = request.form.get('overall_rank')
+        total_competitors_str = request.form.get('total_competitors')
+        
+        # Convert values
+        new_bid = True if bid_str == 'yes' else False
+        
+        try:
+            new_overall_rank = int(overall_rank_str) if overall_rank_str else None
+            new_total_competitors = int(total_competitors_str) if total_competitors_str else None
+        except (ValueError, TypeError):
+            flash("Invalid overall rank or total competitors submitted", "error")
+            return redirect(request.url)
+        
+        # Validate that if one is provided, both are provided
+        if (new_overall_rank is None) != (new_total_competitors is None):
+            flash("Please provide both overall rank and total competitors", "error")
+            return redirect(request.url)
+        
+        # Validate overall_rank is within valid range
+        if new_overall_rank is not None and new_total_competitors is not None:
+            if new_overall_rank < 1 or new_overall_rank > new_total_competitors:
+                flash(f"Overall rank must be between 1 and {new_total_competitors}", "error")
+                return redirect(request.url)
+        
+        # Convert stage
+        stage_map = {
+            "None": 0,
+            "Double Octafinals": 1,
+            "Octafinals": 2,
+            "Quarter Finals": 3,
+            "Semifinals": 4,
+            "Finals": 5
+        }
+        new_stage = stage_map.get(stage_str, 0)
+        
+        # Get user
+        user = User.query.filter_by(id=user_id).first()
+        
+        # Store old values for point adjustment
+        old_points = performance.points or 0
+        old_bid = performance.bid
+        
+        # Calculate new ranking points using new formula if data provided
+        ranking_points = 0
+        if new_overall_rank is not None and new_total_competitors is not None and new_total_competitors > 1:
+            k = 2.0  # decay coefficient
+            n = new_total_competitors
+            r = new_overall_rank
+            ranking_points = 1 + 9 * (((n - r) / (n - 1)) ** k)
+            ranking_points = round(ranking_points, 2)
+        
+        # Calculate bid points
+        bid_points = 0
+        # Check for previous bids excluding this performance
+        previous_bids = Tournament_Performance.query.filter(
+            Tournament_Performance.user_id == user_id,
+            Tournament_Performance.bid == True,
+            Tournament_Performance.id != performance_id
+        ).first()
+        
+        if new_bid:
+            if previous_bids is None:
+                bid_points = 15  # First bid
+            else:
+                bid_points = 5  # Subsequent bid
+        
+        # Calculate stage points
+        stage_points = 0
+        if new_stage != 0:
+            stage_points = new_stage + 1
+        
+        # Total new points
+        new_total_points = int(ranking_points + bid_points + stage_points)
+        
+        # Update user points (remove old, add new)
+        user.points = (user.points or 0) - old_points + new_total_points
+        
+        # Update bid count if bid status changed
+        if old_bid != new_bid:
+            if new_bid:
+                user.bids = (user.bids or 0) + 1
+            else:
+                user.bids = max(0, (user.bids or 0) - 1)
+        
+        # Update performance record
+        performance.bid = new_bid
+        performance.rank = None  # Legacy field, not used in new system
+        performance.stage = new_stage
+        performance.overall_rank = new_overall_rank
+        performance.total_competitors = new_total_competitors
+        performance.decay_coefficient = 2.0 if (new_overall_rank is not None and new_total_competitors is not None) else None
+        performance.points = new_total_points
+        
+        db.session.commit()
+        
+        flash(f"Tournament results updated successfully! Your points changed by {new_total_points - old_points:+d}.", "success")
+        return redirect(url_for('profile.index', user_id=user_id))
+    
+    return render_template("tournaments/edit_results.html",
+                         performance=performance,
+                         tournament=tournament,
+                         roster_warning=roster_warning,
+                         deadline_warning=deadline_warning)
+
+@tournaments_bp.route('/delete_results/<int:performance_id>', methods=['POST'])
+@prevent_race_condition('delete_results', min_interval=2.0, redirect_on_duplicate=lambda uid, form: redirect(url_for('profile.index', user_id=uid)))
+def delete_results(performance_id):
+    """
+    Delete previously submitted tournament performance results.
+    
+    Allows users to remove their tournament results. Points are subtracted
+    from user's total and bid count is decremented if applicable.
+    
+    Args:
+        performance_id (int): The Tournament_Performance record to delete
+    
+    POST: Delete performance record and adjust user points
+    
+    Authorization:
+        - Only the user who submitted can delete their own results
+    
+    Points Adjustment:
+        - Subtracts performance.points from user.points
+        - Decrements user.bids if performance had a bid
+    
+    Returns:
+        POST: Redirect to user profile
+    """
+    from mason_snd.models.tournaments import Tournament_Performance
+    
+    user_id = session.get('user_id')
+    if not user_id:
+        flash("Must Be Logged In", "error")
+        return redirect_to_login()
+    
+    performance = Tournament_Performance.query.get_or_404(performance_id)
+    
+    # Check authorization - only the user who submitted can delete
+    if performance.user_id != user_id:
+        flash("You can only delete your own tournament results", "error")
+        return redirect(url_for('tournaments.index'))
+    
+    # Get user
+    user = User.query.filter_by(id=user_id).first()
+    
+    # Adjust user points
+    old_points = performance.points or 0
+    user.points = (user.points or 0) - old_points
+    
+    # Adjust bid count if applicable
+    if performance.bid:
+        user.bids = max(0, (user.bids or 0) - 1)
+    
+    # Delete the performance
+    db.session.delete(performance)
+    db.session.commit()
+    
+    flash(f"Tournament results deleted successfully. {old_points} points removed.", "success")
+    return redirect(url_for('profile.index', user_id=user_id))
 
 @tournaments_bp.route('/search_partners')
 def search_partners():

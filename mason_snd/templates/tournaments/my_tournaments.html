@@ -6,7 +6,7 @@
     <div class="sm:flex sm:items-center">
         <div class="sm:flex-auto">
             <h1 class="text-xl font-semibold text-gray-900">My Tournaments</h1>
-            <p class="mt-2 text-sm text-gray-700">A list of tournaments you attended or are attending. You can only submit your performance once, and then you can view your results (read-only).</p>
+            <p class="mt-2 text-sm text-gray-700">A list of tournaments you attended or are attending. You can submit, edit, or delete your performance results at any time.</p>
         </div>
     </div>
 
@@ -26,18 +26,36 @@
                     </a>
                     <p class="mt-2 text-xs text-center text-gray-500">Performance Deadline: {{ tournament.performance_deadline.strftime('%b %d, %Y') }}</p>
                 {% elif entry.performance %}
-                    <div class="bg-gray-50 p-4 rounded-md">
+                    <div class="bg-gray-50 p-4 rounded-md mb-3">
                         <h3 class="text-sm font-semibold text-gray-700 mb-2">Your Performance</h3>
-                        <ul class="text-sm text-gray-600">
-                            <li><span class="font-medium">Bid:</span> {{ 'Yes' if entry.performance.bid else 'No' }}</li>
-                            <li><span class="font-medium">Rank:</span> {{ entry.performance.rank }}</li>
+                        <ul class="text-sm text-gray-600 space-y-1">
+                            {% if entry.performance.overall_rank and entry.performance.total_competitors %}
+                            <li><span class="font-medium">Overall Rank:</span> {{ entry.performance.overall_rank }} / {{ entry.performance.total_competitors }}</li>
+                            {% else %}
+                            <li class="text-gray-400 italic">Overall Rank: Not provided (old format)</li>
+                            {% endif %}
                             <li><span class="font-medium">Stage:</span> 
                                 {% set stage_map = {0:'None',1:'Double Octafinals',2:'Octafinals',3:'Quarter Finals',4:'Semifinals',5:'Finals'} %}
                                 {{ stage_map[entry.performance.stage] if entry.performance.stage in stage_map else 'Unknown' }}
                             </li>
+                            <li><span class="font-medium">Bid:</span> {{ 'Yes' if entry.performance.bid else 'No' }}</li>
                             <li><span class="font-medium">Points:</span> {{ entry.performance.points }}</li>
                         </ul>
-                        <p class="mt-2 text-xs text-center text-gray-400">Submitted</p>
+                    </div>
+                    <div class="flex space-x-2">
+                        <a href="{{ url_for('tournaments.edit_results', performance_id=entry.performance.id) }}" 
+                           class="flex-1 text-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+                            Edit
+                        </a>
+                        <form method="POST" action="{{ url_for('tournaments.delete_results', performance_id=entry.performance.id) }}" 
+                              onsubmit="return confirm('Are you sure you want to delete your tournament results? This will remove {{ entry.performance.points }} points from your total.');"
+                              class="flex-1">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                            <button type="submit" 
+                                    class="w-full py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500">
+                                Delete
+                            </button>
+                        </form>
                     </div>
                 {% else %}
                     <p class="text-sm text-gray-400 text-center">Performance submission closed or not available.</p>
