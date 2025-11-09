@@ -1,0 +1,94 @@
+{% extends "tournaments/base.html" %}
+{% block title %}Signup Error{% endblock %}
+
+{% block content %}
+<div class="px-4 sm:px-6 lg:px-8">
+    <div class="mt-8 max-w-3xl mx-auto">
+        <!-- Error Banner -->
+        <div class="bg-red-100 border-2 border-red-500 rounded-lg p-8 mb-6 text-center">
+            <div class="flex justify-center mb-4">
+                <svg class="h-20 w-20 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                </svg>
+            </div>
+            <h1 class="text-3xl font-bold text-red-900 mb-2">Cannot Complete Signup</h1>
+            <p class="text-lg text-red-800">There are issues preventing your signup from being submitted.</p>
+        </div>
+
+        <!-- Error List -->
+        <div class="bg-white shadow-sm rounded-lg border border-gray-200 p-6 mb-6">
+            <h2 class="text-xl font-bold text-gray-900 mb-4">Issues Found</h2>
+            
+            <div class="space-y-4">
+                {% for error in validation_result.errors %}
+                <div class="bg-red-50 border-l-4 border-red-400 p-4">
+                    <div class="flex">
+                        <div class="flex-shrink-0">
+                            <svg class="h-5 w-5 text-red-400" fill="currentColor" viewBox="0 0 20 20">
+                                <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd" />
+                            </svg>
+                        </div>
+                        <div class="ml-3 flex-1">
+                            <h3 class="text-sm font-medium text-red-800">{{ error.message }}</h3>
+                            <div class="mt-2 text-sm text-red-700">
+                                <p><strong>How to fix:</strong> {{ error.fix_instructions }}</p>
+                            </div>
+                            {% if error.field %}
+                            <p class="mt-1 text-xs text-red-600">Field: {{ error.field }}</p>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+
+
+        <!-- Warnings (if any) -->
+        {% if validation_result.warnings %}
+        <div class="bg-yellow-50 border-l-4 border-yellow-400 p-4 mb-6">
+            <div class="flex">
+                <div class="flex-shrink-0">
+                    <svg class="h-5 w-5 text-yellow-400" fill="currentColor" viewBox="0 0 20 20">
+                        <path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd" />
+                    </svg>
+                </div>
+                <div class="ml-3">
+                    <h3 class="text-sm font-medium text-yellow-800">Additional Warnings</h3>
+                    <div class="mt-2 text-sm text-yellow-700 space-y-1">
+                        {% for warning in validation_result.warnings %}
+                        <p>{{ warning.message }}</p>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Action Buttons -->
+        <div class="flex justify-between items-center mb-6">
+            <a href="{{ url_for('tournaments.index') }}" class="inline-flex items-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[color:var(--color-primary-500)]">
+                <svg class="mr-2 h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+                </svg>
+                Back to Tournaments
+            </a>
+
+            {% if tournament_id %}
+            <a href="{{ url_for('tournaments.signup', tournament_id=tournament_id) }}" class="inline-flex items-center px-6 py-3 border border-transparent text-base font-medium rounded-md text-white bg-[color:var(--color-primary-600)] hover:bg-[color:var(--color-primary-700)] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[color:var(--color-primary-500)]">
+                Try Again
+                <svg class="ml-2 h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                </svg>
+            </a>
+            {% endif %}
+        </div>
+
+        <!-- Help Box -->
+        <div class="bg-gray-50 border border-gray-200 rounded-lg p-6">
+            <h3 class="text-lg font-semibold text-gray-900 mb-3">Need Help?</h3>
+            <p class="text-sm text-gray-700 mb-3">If you're having trouble resolving these issues, please contact Wissam Nusair</p>
+        </div>
+    </div>
+</div>
+{% endblock %}

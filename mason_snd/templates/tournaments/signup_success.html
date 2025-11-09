@@ -1,0 +1,139 @@
+{% extends "tournaments/base.html" %}
+{% block title %}Signup Success!{% endblock %}
+
+{% block content %}
+<div class="px-4 sm:px-6 lg:px-8">
+    <div class="mt-8 max-w-3xl mx-auto">
+        <!-- Success Banner -->
+        <div class="bg-green-100 border-2 border-green-500 rounded-lg p-8 mb-6 text-center">
+            <div class="flex justify-center mb-4">
+                <svg class="h-20 w-20 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+            </div>
+            <h1 class="text-3xl font-bold text-green-900 mb-2">Signup Successful!</h1>
+            <p class="text-lg text-green-800">Your tournament registration has been confirmed.</p>
+        </div>
+
+        <!-- Confirmation Details -->
+        <div class="bg-white shadow-sm rounded-lg border border-gray-200 p-6 mb-6">
+            <h2 class="text-xl font-bold text-gray-900 mb-4">Confirmation Details</h2>
+            
+            <div class="space-y-4">
+                <div class="bg-gray-50 rounded p-4">
+                    <p class="text-sm text-gray-600 mb-1">Confirmation Number</p>
+                    <p class="text-2xl font-mono font-bold text-gray-900">{{ confirmation_id }}</p>
+                    <p class="text-xs text-gray-500 mt-1">Save this number for your records</p>
+                </div>
+
+                <div class="grid grid-cols-2 gap-4 text-sm">
+                    <div>
+                        <p class="text-gray-600">Tournament:</p>
+                        <p class="font-medium text-gray-900">{{ tournament.name }}</p>
+                    </div>
+                    <div>
+                        <p class="text-gray-600">Date:</p>
+                        <p class="font-medium text-gray-900">{{ tournament.date.strftime('%B %d, %Y') }}</p>
+                    </div>
+                    <div>
+                        <p class="text-gray-600">Location:</p>
+                        <p class="font-medium text-gray-900">{{ tournament.address }}</p>
+                    </div>
+                    <div>
+                        <p class="text-gray-600">Submitted:</p>
+                        <p class="font-medium text-gray-900">{{ submitted_at.strftime('%I:%M %p on %b %d, %Y') }}</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Events Registered -->
+        <div class="bg-white shadow-sm rounded-lg border border-gray-200 p-6 mb-6">
+            <h3 class="text-lg font-semibold text-gray-900 mb-4">Events You're Registered For</h3>
+            <ul class="space-y-3">
+                {% for event_info in events_registered %}
+                <li class="flex items-start bg-green-50 rounded p-3">
+                    <svg class="h-6 w-6 text-green-600 mt-0.5 mr-3 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                        <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd" />
+                    </svg>
+                    <div class="flex-1">
+                        <p class="font-medium text-gray-900">{{ event_info.name }} {{ event_info.emoji }}</p>
+                        {% if event_info.partner %}
+                        <p class="text-sm text-gray-700">Partner: {{ event_info.partner.first_name }} {{ event_info.partner.last_name }}</p>
+                        {% endif %}
+                        <p class="text-xs text-gray-600 mt-1">Signup ID: {{ event_info.signup_id }}</p>
+                    </div>
+                </li>
+                {% endfor %}
+            </ul>
+        </div>
+
+        <!-- Judge Information -->
+        {% if bringing_judge %}
+        <div class="bg-blue-50 border border-blue-200 rounded-lg p-6 mb-6">
+            <h3 class="text-lg font-semibold text-blue-900 mb-3">Next Step: Select Your Judge</h3>
+            <p class="text-sm text-blue-800 mb-4">You indicated you are bringing a judge. Please select which judge you will bring.</p>
+            <a href="{{ url_for('tournaments.bringing_judge', tournament_id=tournament.id) }}" class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+                Select Judge Now
+                <svg class="ml-2 h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3" />
+                </svg>
+            </a>
+        </div>
+        {% endif %}
+
+        <!-- What's Next -->
+        <div class="bg-white shadow-sm rounded-lg border border-gray-200 p-6 mb-6">
+            <h3 class="text-lg font-semibold text-gray-900 mb-4">What's Next?</h3>
+            <ol class="list-decimal ml-5 space-y-2 text-sm text-gray-700">
+                <li>Your signup has been saved to the database</li>
+                <li>You can view your signup on the <a href="{{ url_for('tournaments.index') }}" class="text-[color:var(--color-primary-600)] hover:underline">Tournaments page</a></li>
+                <li>Tournament rosters will be generated closer to the tournament date</li>
+                <li>You will be notified when the roster is published</li>
+                <li>If you need to make changes, contact your coach or an administrator</li>
+            </ol>
+        </div>
+
+        <!-- Verification for User -->
+        <div class="bg-yellow-50 border-l-4 border-yellow-400 p-4 mb-6">
+            <div class="flex">
+                <div class="flex-shrink-0">
+                    <svg class="h-5 w-5 text-yellow-400" fill="currentColor" viewBox="0 0 20 20">
+                        <path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd" />
+                    </svg>
+                </div>
+                <div class="ml-3">
+                    <h3 class="text-sm font-medium text-yellow-800">Save This Page</h3>
+                    <div class="mt-2 text-sm text-yellow-700">
+                        <p>Take a screenshot or save your confirmation number: <strong>{{ confirmation_id }}</strong></p>
+                        <p class="mt-1">If you don't see yourself on the roster later, this is your proof of signup.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Action Buttons -->
+        <div class="flex justify-center space-x-4">
+            {% if bringing_judge %}
+            <a href="{{ url_for('tournaments.bringing_judge', tournament_id=tournament.id) }}" class="inline-flex items-center px-6 py-3 border border-transparent text-base font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+                Select Judge
+                <svg class="ml-2 h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3" />
+                </svg>
+            </a>
+            {% endif %}
+            
+            <a href="{{ url_for('tournaments.index') }}" class="inline-flex items-center px-6 py-3 border border-gray-300 shadow-sm text-base font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[color:var(--color-primary-500)]">
+                View All Tournaments
+            </a>
+        </div>
+
+        <!-- Database Proof -->
+        <div class="mt-8 text-xs text-gray-500 text-center space-y-1">
+            <p>Database Transaction ID: {{ transaction_id }}</p>
+            <p>Timestamp: {{ submitted_at.isoformat() }}</p>
+            <p>Total Signups Created: {{ signup_count }}</p>
+        </div>
+    </div>
+</div>
+{% endblock %}

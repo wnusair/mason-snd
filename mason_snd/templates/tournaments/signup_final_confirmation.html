@@ -1,0 +1,114 @@
+{% extends "tournaments/base.html" %}
+{% block title %}Final Confirmation{% endblock %}
+
+{% block content %}
+<div class="px-4 sm:px-6 lg:px-8">
+    <div class="sm:flex sm:items-center">
+        <div class="sm:flex-auto">
+            <h1 class="text-xl font-semibold text-gray-900">FINAL CONFIRMATION - STEP 2 OF 2</h1>
+            <p class="mt-2 text-sm text-gray-700">This is your last chance to review before submitting.</p>
+        </div>
+    </div>
+
+    <div class="mt-8 max-w-3xl mx-auto">
+        <!-- Critical Warning -->
+        <div class="mb-6 bg-red-100 border-2 border-red-500 rounded-lg p-6">
+            <div class="flex">
+                <div class="flex-shrink-0">
+                    <svg class="h-8 w-8 text-red-600" fill="currentColor" viewBox="0 0 20 20">
+                        <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd" />
+                    </svg>
+                </div>
+                <div class="ml-4 flex-1">
+                    <h3 class="text-lg font-bold text-red-900">READ CAREFULLY BEFORE SUBMITTING</h3>
+                    <div class="mt-2 text-sm text-red-900 space-y-2">
+                        <p><strong>Once you click "Submit Signup", you cannot undo this action.</strong></p>
+                        <p>By submitting:</p>
+                        <ul class="list-disc ml-5 space-y-1">
+                            <li>You are committing to attend this tournament</li>
+                            <li>If you're bringing a judge, they MUST attend</li>
+                            <li>If you have partners, you have coordinated with them</li>
+                            <li>Your information will be used to generate the tournament roster</li>
+                            <li>Dropping out without notice may affect future tournament eligibility</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Quick Summary -->
+        <div class="bg-white shadow-sm rounded-lg border border-gray-200 p-6 mb-6">
+            <h2 class="text-lg font-bold text-gray-900 mb-4">Quick Summary</h2>
+            <div class="space-y-2 text-sm">
+                <p><strong>Tournament:</strong> {{ tournament.name }}</p>
+                <p><strong>Date:</strong> {{ tournament.date.strftime('%B %d, %Y') }}</p>
+                <p><strong>Events:</strong> {{ signup_data.events|length }} event(s)</p>
+            </div>
+        </div>
+
+        <!-- What happens next -->
+        <div class="bg-blue-50 border border-blue-200 rounded-lg p-6 mb-6">
+            <h3 class="text-lg font-semibold text-blue-900 mb-3">What Happens Next?</h3>
+            <ol class="list-decimal ml-5 space-y-2 text-sm text-blue-900">
+                <li>Your signup will be immediately recorded in the database</li>
+                <li>You will receive a confirmation screen with your signup ID</li>
+                <li>You can view your signup on the tournaments page</li>
+                <li>{% if signup_data.bringing_judge %}You will be directed to select which judge you're bringing{% else %}You're all set!{% endif %}</li>
+                <li>If you need to make changes, contact your coach or an administrator</li>
+            </ol>
+        </div>
+
+        <!-- Final Confirmation Form -->
+        <form method="POST" action="{{ url_for('tournaments.signup_submit') }}">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+            <input type="hidden" name="signup_data_json" value="{{ signup_data_json }}"/>
+            
+            <div class="bg-red-50 border-2 border-red-400 rounded-lg p-6 mb-6">
+                <h3 class="text-lg font-semibold text-red-900 mb-4">⚠️ FINAL CONFIRMATION</h3>
+                <div class="space-y-3">
+                    <label class="flex items-start">
+                        <input type="checkbox" name="final_confirm_reviewed" required class="mt-1 h-5 w-5 rounded border-gray-300 text-red-600 focus:ring-red-500">
+                        <span class="ml-3 text-base font-medium text-red-900">
+                            I have carefully reviewed ALL information and understand this signup is FINAL.
+                        </span>
+                    </label>
+                    
+                    <label class="flex items-start">
+                        <input type="checkbox" name="final_confirm_no_mistakes" required class="mt-1 h-5 w-5 rounded border-gray-300 text-red-600 focus:ring-red-500">
+                        <span class="ml-3 text-base font-medium text-red-900">
+                            I confirm there are NO ERRORS in my signup information.
+                        </span>
+                    </label>
+                    
+                    <label class="flex items-start">
+                        <input type="checkbox" name="final_confirm_understand_consequences" required class="mt-1 h-5 w-5 rounded border-gray-300 text-red-600 focus:ring-red-500">
+                        <span class="ml-3 text-base font-medium text-red-900">
+                            I understand the consequences of dropping out or providing false information.
+                        </span>
+                    </label>
+                </div>
+            </div>
+
+            <div class="flex justify-between items-center">
+                <a href="{{ url_for('tournaments.signup', tournament_id=tournament.id) }}" class="inline-flex items-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[color:var(--color-primary-500)]">
+                    <svg class="mr-2 h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+                    </svg>
+                    Cancel and Go Back
+                </a>
+
+                <button type="submit" class="inline-flex items-center px-8 py-4 border-2 border-green-600 text-lg font-bold rounded-md text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 shadow-lg">
+                    <svg class="mr-2 h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    SUBMIT SIGNUP - FINAL
+                </button>
+            </div>
+        </form>
+
+        <div class="mt-4 text-center text-sm text-gray-600">
+            <p>Having second thoughts? You can still go back and cancel.</p>
+        </div>
+    </div>
+</div>
+{% endblock %}

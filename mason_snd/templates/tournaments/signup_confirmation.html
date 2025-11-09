@@ -1,0 +1,154 @@
+{% extends "tournaments/base.html" %}
+{% block title %}Confirm Tournament Signup{% endblock %}
+
+{% block content %}
+<div class="px-4 sm:px-6 lg:px-8">
+    <div class="sm:flex sm:items-center">
+        <div class="sm:flex-auto">
+            <h1 class="text-xl font-semibold text-gray-900">Confirm Your Signup</h1>
+            <p class="mt-2 text-sm text-gray-700">Please carefully review your information before submitting.</p>
+        </div>
+    </div>
+
+    <div class="mt-8 max-w-3xl mx-auto">
+        <!-- Warnings (if any) -->
+        {% if validation_result.warnings %}
+        <div class="mb-6 bg-yellow-50 border-l-4 border-yellow-400 p-4">
+            <div class="flex">
+                <div class="flex-shrink-0">
+                    <svg class="h-5 w-5 text-yellow-400" fill="currentColor" viewBox="0 0 20 20">
+                        <path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd" />
+                    </svg>
+                </div>
+                <div class="ml-3">
+                    <h3 class="text-sm font-medium text-yellow-800">Please Note</h3>
+                    <div class="mt-2 text-sm text-yellow-700 space-y-1">
+                        {% for warning in validation_result.warnings %}
+                        <p><strong>{{ warning.message }}</strong> - {{ warning.fix_instructions }}</p>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Tournament Info -->
+        <div class="bg-white shadow-sm rounded-lg border border-gray-200 p-6 mb-6">
+            <h2 class="text-xl font-bold text-gray-900 mb-4">{{ tournament.name }}</h2>
+            <div class="grid grid-cols-2 gap-4 text-sm">
+                <div>
+                    <p class="text-gray-600">Date:</p>
+                    <p class="font-medium">{{ tournament.date.strftime('%B %d, %Y') }}</p>
+                </div>
+                <div>
+                    <p class="text-gray-600">Location:</p>
+                    <p class="font-medium">{{ tournament.address }}</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Selected Events -->
+        <div class="bg-white shadow-sm rounded-lg border border-gray-200 p-6 mb-6">
+            <h3 class="text-lg font-semibold text-gray-900 mb-4">Events You're Signing Up For</h3>
+            <ul class="space-y-3">
+                {% for event_info in signup_data.events %}
+                <li class="flex items-start">
+                    <svg class="h-5 w-5 text-green-500 mt-0.5 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                        <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd" />
+                    </svg>
+                    <div class="flex-1">
+                        <p class="font-medium text-gray-900">{{ event_info.name }} {{ event_info.emoji }}</p>
+                        {% if event_info.partner %}
+                        <p class="text-sm text-gray-600">Partner: {{ event_info.partner.first_name }} {{ event_info.partner.last_name }}</p>
+                        {% endif %}
+                    </div>
+                </li>
+                {% endfor %}
+            </ul>
+        </div>
+
+        <!-- Form Responses -->
+        <div class="bg-white shadow-sm rounded-lg border border-gray-200 p-6 mb-6">
+            <h3 class="text-lg font-semibold text-gray-900 mb-4">Your Responses</h3>
+            <dl class="space-y-3">
+                {% for field_id, response in signup_data.form_responses.items() %}
+                {% set field = form_fields[field_id] %}
+                <div>
+                    <dt class="text-sm font-medium text-gray-600">{{ field.label }}{% if field.required %} *{% endif %}</dt>
+                    <dd class="mt-1 text-sm text-gray-900">{{ response or '(No response)' }}</dd>
+                </div>
+                {% endfor %}
+            </dl>
+        </div>
+
+        <!-- Judge Information -->
+        {% if signup_data.bringing_judge %}
+        <div class="bg-blue-50 border border-blue-200 rounded-lg p-6 mb-6">
+            <h3 class="text-lg font-semibold text-blue-900 mb-2">Judge Commitment</h3>
+            <p class="text-sm text-blue-800">You've indicated you are bringing a judge. You'll select which judge in the next step.</p>
+        </div>
+        {% endif %}
+
+        <!-- Final Confirmation Form -->
+        <form method="POST" action="{{ url_for('tournaments.signup_final_confirm') }}">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+            <input type="hidden" name="signup_data_json" value="{{ signup_data_json }}"/>
+            
+            <div class="bg-red-50 border-2 border-red-300 rounded-lg p-6 mb-6">
+                <h3 class="text-lg font-semibold text-red-900 mb-4">⚠️ CONFIRMATION REQUIRED - STEP 1 OF 2</h3>
+                <div class="space-y-3">
+                    <label class="flex items-start">
+                        <input type="checkbox" name="confirm_info_accurate" required class="mt-1 h-4 w-4 rounded border-gray-300 text-[color:var(--color-primary-600)] focus:ring-[color:var(--color-primary-500)]">
+                        <span class="ml-3 text-sm text-red-900">
+                            I confirm that ALL information above is accurate and complete. I understand that submitting inaccurate information may result in my removal from the roster.
+                        </span>
+                    </label>
+                    
+                    <label class="flex items-start">
+                        <input type="checkbox" name="confirm_commitment" required class="mt-1 h-4 w-4 rounded border-gray-300 text-[color:var(--color-primary-600)] focus:ring-[color:var(--color-primary-500)]">
+                        <span class="ml-3 text-sm text-red-900">
+                            I commit to attending {{ tournament.name }} on {{ tournament.date.strftime('%B %d, %Y') }}. I understand that dropping out without notice may affect my ability to sign up for future tournaments.
+                        </span>
+                    </label>
+                    
+                    {% if signup_data.bringing_judge %}
+                    <label class="flex items-start">
+                        <input type="checkbox" name="confirm_judge" required class="mt-1 h-4 w-4 rounded border-gray-300 text-[color:var(--color-primary-600)] focus:ring-[color:var(--color-primary-500)]">
+                        <span class="ml-3 text-sm text-red-900">
+                            I confirm that I will bring a qualified judge to this tournament. I understand that failure to provide a judge may result in my removal from the roster or penalty fees.
+                        </span>
+                    </label>
+                    {% endif %}
+                    
+                    {% for event_info in signup_data.events %}
+                    {% if event_info.partner %}
+                    <label class="flex items-start">
+                        <input type="checkbox" name="confirm_partner_{{ event_info.id }}" required class="mt-1 h-4 w-4 rounded border-gray-300 text-[color:var(--color-primary-600)] focus:ring-[color:var(--color-primary-500)]">
+                        <span class="ml-3 text-sm text-red-900">
+                            I confirm that {{ event_info.partner.first_name }} {{ event_info.partner.last_name }} has agreed to be my partner for {{ event_info.name }}. I have coordinated with them about this tournament.
+                        </span>
+                    </label>
+                    {% endif %}
+                    {% endfor %}
+                </div>
+            </div>
+
+            <div class="flex justify-between items-center">
+                <a href="{{ url_for('tournaments.signup', tournament_id=tournament.id) }}" class="inline-flex items-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[color:var(--color-primary-500)]">
+                    <svg class="mr-2 h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+                    </svg>
+                    Go Back and Edit
+                </a>
+
+                <button type="submit" class="inline-flex items-center px-6 py-3 border border-transparent text-base font-medium rounded-md text-white bg-yellow-600 hover:bg-yellow-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-yellow-500">
+                    Continue to Final Confirmation
+                    <svg class="ml-2 h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3" />
+                    </svg>
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}

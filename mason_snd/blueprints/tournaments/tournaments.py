@@ -21,7 +21,7 @@ Workflow:
     6. Admin finalizes and publishes results
 """
 
-from flask import Blueprint, render_template, request, redirect, url_for, flash, session, send_file
+from flask import Blueprint, render_template, request, redirect, url_for, flash, session, send_file, jsonify
 
 from mason_snd.extensions import db
 from mason_snd.models.auth import User, Judges
@@ -273,14 +273,17 @@ def add_form():
 )
 def signup():
     """
-    Handle tournament signup for students.
+    Handle tournament signup for students - NOW WITH ENHANCED VALIDATION.
     
     Students select which event(s) they're competing in at a tournament,
     indicate if they're bringing a judge, fill out custom form fields,
     and optionally select a partner for partner events.
     
+    IMPORTANT: Now redirects to multi-step confirmation process to ensure
+    no signups are lost or submitted incorrectly.
+    
     GET: Display signup form with available events and custom fields
-    POST: Process signup and create Tournament_Signups records
+    POST: Validate and redirect to confirmation flow (not direct submission)
     
     Features:
         - Multi-event signup (can sign up for multiple events at once)
@@ -1382,7 +1385,8 @@ def view_form_responses(tournament_id):
         flash(f"No form fields found for {tournament.name}", "warning")
         return redirect(url_for('tournaments.index'))
     
-    signups = Tournament_Signups.query.filter_by(tournament_id=tournament_id).all()
+    # Only show signups where is_going=True (confirmed attendees)
+    signups = Tournament_Signups.query.filter_by(tournament_id=tournament_id, is_going=True).all()
     
     user_responses = {}
     user_responses_json = {}
@@ -1464,7 +1468,8 @@ def download_form_responses(tournament_id):
         flash(f"No form fields found for {tournament.name}", "warning")
         return redirect(url_for('tournaments.view_form_responses', tournament_id=tournament_id))
     
-    signups = Tournament_Signups.query.filter_by(tournament_id=tournament_id).all()
+    # Only include signups where is_going=True (confirmed attendees)
+    signups = Tournament_Signups.query.filter_by(tournament_id=tournament_id, is_going=True).all()
     
     response_data = []
     
@@ -1680,3 +1685,427 @@ def download_ranked_signups(tournament_id):
                      as_attachment=True, 
                      download_name=filename,
                      mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+
+
+
+
+@tournaments_bp.route('/signup/requirements/<int:tournament_id>')
+def signup_requirements(tournament_id):
+    """Pre-signup requirements check screen.
+    
+    Shows user a checklist of requirements they must meet before
+    they can proceed to the signup form.
+    """
+    from mason_snd.utils.tournament_signup_validator import get_signup_requirements_summary
+    
+    user_id = session.get('user_id')
+    if not user_id:
+        return redirect_to_login("Please log in to sign up for tournaments")
+    
+    requirements = get_signup_requirements_summary(user_id, tournament_id)
+    
+    if 'error' in requirements:
+        flash(requirements['error'], 'error')
+        return redirect(url_for('tournaments.index'))
+    
+    return render_template(
+        'tournaments/signup_requirements.html',
+        requirements=requirements,
+        tournament_id=tournament_id
+    )
+
+
+@tournaments_bp.route('/signup/confirm', methods=['POST'])
+def signup_confirmation():
+    """First confirmation screen - review all info and initial confirmations."""
+    from mason_snd.utils.tournament_signup_validator import TournamentSignupValidator
+    import json
+    
+    user_id = session.get('user_id')
+    if not user_id:
+        return redirect_to_login("Please log in")
+    
+    tournament_id = request.form.get('tournament_id')
+    if not tournament_id:
+        flash("No tournament selected", "error")
+        return redirect(url_for('tournaments.index'))
+    
+    tournament = Tournament.query.get(tournament_id)
+    if not tournament:
+        flash("Tournament not found", "error")
+        return redirect(url_for('tournaments.index'))
+    
+    # Gather all form data
+    selected_event_ids = [int(eid) for eid in request.form.getlist('user_event')]
+    
+    # Build partners dict
+    partners = {}
+    for event_id in selected_event_ids:
+        partner_id = request.form.get(f'partner_{event_id}')
+        if partner_id:
+            try:
+                partners[event_id] = int(partner_id)
+            except (ValueError, TypeError):
+                pass
+    
+    # Build form responses dict
+    form_responses = {}
+    for field in tournament.form_fields:
+        response = request.form.get(f'field_{field.id}')
+        # Store the response even if None - validator will handle it
+        # Convert None to empty string to avoid issues
+        form_responses[field.id] = response if response is not None else ''
+    
+    # DEBUG: Print detailed form data
+    print("\n" + "="*80)
+    print("TOURNAMENT SIGNUP DEBUG INFO")
+    print("="*80)
+    print(f"Tournament ID: {tournament_id}")
+    print(f"Tournament Name: {tournament.name}")
+    print(f"User ID: {user_id}")
+    print(f"\nSelected Event IDs: {selected_event_ids}")
+    print(f"\nPartners: {partners}")
+    print(f"\nForm Fields and Responses:")
+    for field in tournament.form_fields:
+        response = form_responses.get(field.id, 'NOT FOUND')
+        print(f"  Field ID {field.id} - '{field.label}' (required={field.required}, type={field.type})")
+        print(f"    Response: '{response}' (length: {len(str(response)) if response else 0})")
+    print("="*80 + "\n")
+    
+    # Validate the signup data
+    validator = TournamentSignupValidator(user_id, tournament_id)
+    validation_result = validator.validate_signup_request({
+        'selected_event_ids': selected_event_ids,
+        'form_responses': form_responses,
+        'partners': partners
+    })
+    
+    # DEBUG: Print validation results
+    print("\n" + "="*80)
+    print("VALIDATION RESULTS")
+    print("="*80)
+    print(f"Is Valid: {validation_result.is_valid}")
+    print(f"\nErrors ({len(validation_result.errors)}):")
+    for error in validation_result.errors:
+        print(f"  - Field: {error.field}")
+        print(f"    Message: {error.message}")
+        print(f"    Fix: {error.fix_instructions}")
+    print(f"\nWarnings ({len(validation_result.warnings)}):")
+    for warning in validation_result.warnings:
+        print(f"  - {warning.message}")
+    print(f"\nRequirements Met:")
+    for req, met in validation_result.requirements_met.items():
+        print(f"  {req}: {met}")
+    print("="*80 + "\n")
+    
+    if not validation_result.is_valid:
+        return render_template(
+            'tournaments/signup_error.html',
+            validation_result=validation_result,
+            tournament_id=tournament_id
+        )
+    
+    # Build event info for display
+    events_info = []
+    for event_id in selected_event_ids:
+        event = Event.query.get(event_id)
+        if event:
+            event_info = {
+                'id': event_id,
+                'name': event.event_name,
+                'emoji': event.event_emoji,
+                'partner': None
+            }
+            
+            if event_id in partners:
+                partner = User.query.get(partners[event_id])
+                if partner:
+                    event_info['partner'] = {
+                        'id': partner.id,
+                        'name': f"{partner.first_name} {partner.last_name}",
+                        'email': partner.email
+                    }
+            
+            events_info.append(event_info)
+    
+    # Build signup data structure - keep integer keys for template
+    signup_data = {
+        'tournament_id': tournament_id,
+        'events': events_info,
+        'form_responses': form_responses
+    }
+    
+    # Build JSON-serializable version with string keys
+    signup_data_for_json = {
+        'tournament_id': tournament_id,
+        'events': events_info,
+        'form_responses': {str(k): v for k, v in form_responses.items()}
+    }
+    
+    signup_data_json = json.dumps(signup_data_for_json)
+    form_fields = {field.id: field for field in tournament.form_fields}
+    
+    return render_template(
+        'tournaments/signup_confirmation.html',
+        tournament=tournament,
+        signup_data=signup_data,
+        signup_data_json=signup_data_json,
+        form_fields=form_fields,
+        validation_result=validation_result
+    )
+
+
+@tournaments_bp.route('/signup/final_confirm', methods=['POST'])
+def signup_final_confirm():
+    """Second confirmation screen - final warnings before submit."""
+    import json
+    
+    user_id = session.get('user_id')
+    if not user_id:
+        return redirect_to_login("Please log in")
+    
+    signup_data_json = request.form.get('signup_data_json')
+    if not signup_data_json:
+        flash("Session expired. Please start signup again.", "error")
+        return redirect(url_for('tournaments.index'))
+    
+    try:
+        signup_data = json.loads(signup_data_json)
+    except json.JSONDecodeError:
+        flash("Invalid signup data. Please start again.", "error")
+        return redirect(url_for('tournaments.index'))
+    
+    tournament_id = signup_data.get('tournament_id')
+    tournament = Tournament.query.get(tournament_id)
+    
+    if not tournament:
+        flash("Tournament not found", "error")
+        return redirect(url_for('tournaments.index'))
+    
+    # Verify confirmations from first screen
+    required_confirmations = ['confirm_info_accurate', 'confirm_commitment']
+    for conf in required_confirmations:
+        if not request.form.get(conf):
+            flash("You must check all confirmation boxes to proceed", "error")
+            return redirect(url_for('tournaments.signup', tournament_id=tournament_id))
+    
+    return render_template(
+        'tournaments/signup_final_confirmation.html',
+        tournament=tournament,
+        signup_data=signup_data,
+        signup_data_json=signup_data_json
+    )
+
+
+@tournaments_bp.route('/signup/submit', methods=['POST'])
+def signup_submit():
+    """Actually process and save the signup to database with transaction safety."""
+    import json
+    import hashlib
+    
+    user_id = session.get('user_id')
+    if not user_id:
+        return redirect_to_login("Please log in")
+    
+    signup_data_json = request.form.get('signup_data_json')
+    if not signup_data_json:
+        flash("Session expired. Please start signup again.", "error")
+        return redirect(url_for('tournaments.index'))
+    
+    try:
+        signup_data = json.loads(signup_data_json)
+    except json.JSONDecodeError:
+        flash("Invalid signup data. Please start again.", "error")
+        return redirect(url_for('tournaments.index'))
+    
+    # Verify all final confirmations
+    required_final_confirmations = [
+        'final_confirm_reviewed',
+        'final_confirm_no_mistakes',
+        'final_confirm_understand_consequences'
+    ]
+    for conf in required_final_confirmations:
+        if not request.form.get(conf):
+            flash("You must check all confirmation boxes to submit", "error")
+            tournament_id = signup_data.get('tournament_id')
+            return redirect(url_for('tournaments.signup', tournament_id=tournament_id))
+    
+    tournament_id = signup_data.get('tournament_id')
+    tournament = Tournament.query.get(tournament_id)
+    
+    if not tournament:
+        flash("Tournament not found", "error")
+        return redirect(url_for('tournaments.index'))
+    
+    # Re-validate one more time
+    from mason_snd.utils.tournament_signup_validator import TournamentSignupValidator
+    
+    selected_event_ids = [event['id'] for event in signup_data.get('events', [])]
+    partners = {}
+    for event in signup_data.get('events', []):
+        if event.get('partner'):
+            partners[event['id']] = event['partner']['id']
+    
+    # Convert form_responses keys back to integers (they become strings in JSON)
+    form_responses_raw = signup_data.get('form_responses', {})
+    form_responses = {}
+    for key, value in form_responses_raw.items():
+        try:
+            form_responses[int(key)] = value
+        except (ValueError, TypeError):
+            form_responses[key] = value
+    
+    # DEBUG: Print form responses conversion
+    print("\n" + "="*80)
+    print("FORM RESPONSES CONVERSION DEBUG")
+    print("="*80)
+    print(f"Raw form_responses from JSON: {form_responses_raw}")
+    print(f"Converted form_responses: {form_responses}")
+    print("="*80 + "\n")
+    
+    validator = TournamentSignupValidator(user_id, tournament_id)
+    validation_result = validator.validate_signup_request({
+        'selected_event_ids': selected_event_ids,
+        'form_responses': form_responses,
+        'partners': partners
+    })
+    
+    if not validation_result.is_valid:
+        flash("Validation failed. Please try again.", "error")
+        return render_template(
+            'tournaments/signup_error.html',
+            validation_result=validation_result,
+            tournament_id=tournament_id
+        )
+    
+    # Begin database transaction
+    now = datetime.now(EST)
+    created_signups = []
+    
+    try:
+        # Create Tournament_Signups for each event
+        for event_data in signup_data.get('events', []):
+            event_id = event_data['id']
+            partner_id = event_data.get('partner', {}).get('id') if event_data.get('partner') else None
+            
+            signup = Tournament_Signups.query.filter_by(
+                user_id=user_id,
+                tournament_id=tournament_id,
+                event_id=event_id
+            ).first()
+            
+            if not signup:
+                signup = Tournament_Signups(
+                    user_id=user_id,
+                    tournament_id=tournament_id,
+                    event_id=event_id,
+                    is_going=True,
+                    partner_id=partner_id,
+                    created_at=now
+                )
+                db.session.add(signup)
+            else:
+                signup.is_going = True
+                signup.partner_id = partner_id
+                signup.created_at = now
+            
+            db.session.flush()
+            created_signups.append({
+                'event_id': event_id,
+                'event_name': event_data['name'],
+                'event_emoji': event_data.get('emoji', ''),
+                'signup_id': signup.id,
+                'partner': event_data.get('partner')
+            })
+            
+            # If partner event, create/update partner's signup
+            if partner_id:
+                partner_signup = Tournament_Signups.query.filter_by(
+                    user_id=partner_id,
+                    tournament_id=tournament_id,
+                    event_id=event_id
+                ).first()
+                
+                if not partner_signup:
+                    partner_signup = Tournament_Signups(
+                        user_id=partner_id,
+                        tournament_id=tournament_id,
+                        event_id=event_id,
+                        is_going=True,
+                        partner_id=user_id,
+                        created_at=now
+                    )
+                    db.session.add(partner_signup)
+                else:
+                    partner_signup.partner_id = user_id
+                    if not partner_signup.is_going:
+                        partner_signup.is_going = True
+                        partner_signup.created_at = now
+            
+            # Create Tournament_Judges entry
+            existing_judge = Tournament_Judges.query.filter_by(
+                child_id=user_id,
+                tournament_id=tournament_id,
+                event_id=event_id
+            ).first()
+            
+            if not existing_judge:
+                judge_entry = Tournament_Judges(
+                    accepted=False,
+                    judge_id=None,
+                    child_id=user_id,
+                    tournament_id=tournament_id,
+                    event_id=event_id
+                )
+                db.session.add(judge_entry)
+        
+        # Create Form_Responses
+        for field_id, response in form_responses.items():
+            old_response = Form_Responses.query.filter_by(
+                tournament_id=tournament_id,
+                user_id=user_id,
+                field_id=field_id
+            ).first()
+            
+            if old_response:
+                db.session.delete(old_response)
+            
+            new_response = Form_Responses(
+                tournament_id=tournament_id,
+                user_id=user_id,
+                field_id=field_id,
+                response=response,
+                submitted_at=now
+            )
+            db.session.add(new_response)
+        
+        # Commit all changes atomically
+        db.session.commit()
+        
+        # Generate confirmation ID
+        confirmation_string = f"{user_id}-{tournament_id}-{now.isoformat()}"
+        confirmation_id = hashlib.sha256(confirmation_string.encode()).hexdigest()[:16].upper()
+        transaction_id = hashlib.sha256(f"{confirmation_string}-{len(created_signups)}".encode()).hexdigest()[:24].upper()
+        
+        return render_template(
+            'tournaments/signup_success.html',
+            tournament=tournament,
+            events_registered=created_signups,
+            confirmation_id=confirmation_id,
+            transaction_id=transaction_id,
+            submitted_at=now,
+            signup_count=len(created_signups)
+        )
+        
+    except Exception as e:
+        db.session.rollback()
+        print(f"ERROR during signup submission: {str(e)}")
+        flash(
+            f"An error occurred while saving your signup: {str(e)}. "
+            "Please try again. If the problem persists, contact an administrator.",
+            "error"
+        )
+        return redirect(url_for('tournaments.signup', tournament_id=tournament_id))
+
+
+# Enhanced signup routes are now registered above directly in this file
