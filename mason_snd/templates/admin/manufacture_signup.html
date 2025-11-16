@@ -1,0 +1,136 @@
+{% extends "admin/base.html" %}
+{% block title %}Manufacture Signup - {{ tournament.name }}{% endblock %}
+
+{% block content %}
+<div class="px-4 sm:px-6 lg:px-8">
+    <div class="sm:flex sm:items-center">
+        <div class="sm:flex-auto">
+            <h1 class="text-2xl font-bold text-gray-900">Add Signup</h1>
+            <p class="mt-1 text-sm text-gray-500">
+                Create a signup for {{ tournament.name }}
+            </p>
+        </div>
+        <div class="mt-4 sm:mt-0 sm:ml-16 sm:flex-none">
+            <a href="{{ url_for('admin.view_tournament_signups', tournament_id=tournament.id) }}" 
+               class="inline-flex items-center justify-center rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50">
+                Back to Signups
+            </a>
+        </div>
+    </div>
+
+    <div class="mt-8 max-w-2xl">
+        <form method="POST" class="space-y-6">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+            
+            <div class="bg-white shadow-sm ring-1 ring-gray-900/5 sm:rounded-xl">
+                <div class="px-4 py-6 sm:p-8">
+                    <div class="grid max-w-2xl grid-cols-1 gap-x-6 gap-y-8">
+                        <!-- User Search -->
+                        <div class="col-span-full">
+                            <label for="user_search" class="block text-sm font-medium leading-6 text-gray-900">
+                                Search Student
+                            </label>
+                            <div class="mt-2">
+                                <input type="text" id="user_search" 
+                                       placeholder="Type to search by name or email..." 
+                                       class="block w-full rounded-md border-0 py-1.5 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6">
+                                <input type="hidden" name="user_id" id="user_id" required>
+                                <div id="search_results" class="mt-2 max-h-60 overflow-y-auto bg-white border border-gray-300 rounded-md hidden"></div>
+                                <p id="selected_user" class="mt-2 text-sm text-gray-600 hidden"></p>
+                            </div>
+                        </div>
+
+                        <!-- Event Selection -->
+                        <div class="col-span-full">
+                            <label class="block text-sm font-medium leading-6 text-gray-900">
+                                Select Events
+                            </label>
+                            <div class="mt-2 space-y-2">
+                                {% for event in events %}
+                                <div class="relative flex items-start">
+                                    <div class="flex h-6 items-center">
+                                        <input id="event_{{ event.id }}" name="event_ids" value="{{ event.id }}" type="checkbox" 
+                                               class="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-600">
+                                    </div>
+                                    <div class="ml-3 text-sm leading-6">
+                                        <label for="event_{{ event.id }}" class="font-medium text-gray-900">
+                                            {{ event.event_name }}
+                                            <span class="text-gray-500">
+                                                ({% if event.event_type == 0 %}Speech{% elif event.event_type == 1 %}LD{% elif event.event_type == 2 %}PF{% endif %})
+                                            </span>
+                                        </label>
+                                    </div>
+                                </div>
+                                {% endfor %}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="flex items-center justify-end gap-x-6 border-t border-gray-900/10 px-4 py-4 sm:px-8">
+                    <a href="{{ url_for('admin.view_tournament_signups', tournament_id=tournament.id) }}" 
+                       class="text-sm font-semibold leading-6 text-gray-900">
+                        Cancel
+                    </a>
+                    <button type="submit" 
+                            class="rounded-md bg-indigo-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-indigo-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600">
+                        Create Signup
+                    </button>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+const users = {{ users_json|safe }};
+const userSearchInput = document.getElementById('user_search');
+const userIdInput = document.getElementById('user_id');
+const searchResults = document.getElementById('search_results');
+const selectedUserDisplay = document.getElementById('selected_user');
+
+userSearchInput.addEventListener('input', function() {
+    const query = this.value.toLowerCase();
+    
+    if (query.length < 2) {
+        searchResults.classList.add('hidden');
+        return;
+    }
+    
+    const matches = users.filter(user => 
+        user.name.toLowerCase().includes(query) || 
+        user.email.toLowerCase().includes(query)
+    ).slice(0, 10);
+    
+    if (matches.length === 0) {
+        searchResults.innerHTML = '<div class="p-2 text-sm text-gray-500">No users found</div>';
+        searchResults.classList.remove('hidden');
+        return;
+    }
+    
+    searchResults.innerHTML = matches.map(user => `
+        <div class="p-2 hover:bg-gray-100 cursor-pointer border-b border-gray-200" 
+             onclick="selectUser(${user.id}, '${user.name}', '${user.email}')">
+            <div class="font-medium text-gray-900">${user.name}</div>
+            <div class="text-sm text-gray-500">${user.email}</div>
+        </div>
+    `).join('');
+    
+    searchResults.classList.remove('hidden');
+});
+
+function selectUser(id, name, email) {
+    userIdInput.value = id;
+    userSearchInput.value = '';
+    searchResults.classList.add('hidden');
+    selectedUserDisplay.textContent = `Selected: ${name} (${email})`;
+    selectedUserDisplay.classList.remove('hidden');
+}
+
+// Hide search results when clicking outside
+document.addEventListener('click', function(e) {
+    if (!userSearchInput.contains(e.target) && !searchResults.contains(e.target)) {
+        searchResults.classList.add('hidden');
+    }
+});
+</script>
+{% endblock %}

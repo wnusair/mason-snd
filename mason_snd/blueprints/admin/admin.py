@@ -45,6 +45,7 @@ from mason_snd.models.deletion_utils import (
     delete_requirement_safely, delete_multiple_requirements, get_requirement_deletion_preview
 )
 from mason_snd.utils.race_protection import prevent_race_condition
+from mason_snd.utils.auth_helpers import redirect_to_login
 
 from werkzeug.security import generate_password_hash, check_password_hash
 
@@ -3876,3 +3877,213 @@ def delete_event_type(type_id):
     
     flash(f'Event type "{name}" deleted successfully', 'success')
     return redirect(url_for('admin.event_types'))
+
+
+@admin_bp.route('/manufacture_signup/<int:tournament_id>', methods=['GET', 'POST'])
+@prevent_race_condition('manufacture_signup', min_interval=2.0, redirect_on_duplicate=lambda uid, form: redirect(url_for('admin.view_tournament_signups', tournament_id=form.get('tournament_id', 0))))
+def manufacture_signup(tournament_id):
+    """
+    Manually create a tournament signup (admin only).
+    
+    Allows admins to create signups for students without requiring them to
+    fill out the form. Bypasses all form validation and directly creates
+    Tournament_Signups records.
+    
+    GET: Display form to select user and events
+    POST: Create signup records
+    
+    Access: Requires role >= 2 (Admin)
+    
+    Returns:
+        GET: Rendered manufacture signup form
+        POST: Redirect to tournament signups view
+    """
+    user_id = session.get('user_id')
+    if not user_id:
+        flash('Please log in', 'error')
+        return redirect_to_login()
+    
+    user = User.query.filter_by(id=user_id).first()
+    if not user or user.role < 2:
+        flash('You are not authorized to access this page', 'error')
+        return redirect(url_for('main.index'))
+    
+    tournament = Tournament.query.get_or_404(tournament_id)
+    
+    if request.method == 'POST':
+        selected_user_id = request.form.get('user_id')
+        event_ids = request.form.getlist('event_ids')
+        
+        if not selected_user_id:
+            flash('Please select a user', 'error')
+            return redirect(url_for('admin.manufacture_signup', tournament_id=tournament_id))
+        
+        if not event_ids:
+            flash('Please select at least one event', 'error')
+            return redirect(url_for('admin.manufacture_signup', tournament_id=tournament_id))
+        
+        selected_user = User.query.get(int(selected_user_id))
+        if not selected_user:
+            flash('User not found', 'error')
+            return redirect(url_for('admin.manufacture_signup', tournament_id=tournament_id))
+        
+        created_count = 0
+        signup_time = datetime.now(EST)
+        
+        # Create form responses for required fields with placeholder text
+        form_fields = Form_Fields.query.filter_by(tournament_id=tournament.id).all()
+        
+        # Check if user already has form responses
+        existing_responses = Form_Responses.query.filter_by(
+            tournament_id=tournament.id,
+            user_id=selected_user.id
+        ).first()
+        
+        # Always create at least one form response to ensure signup is visible
+        # in both admin view and my_tournaments view
+        if not existing_responses:
+            if form_fields:
+                # Create placeholder responses for all form fields
+                for field in form_fields:
+                    response = Form_Responses(
+                        tournament_id=tournament.id,
+                        user_id=selected_user.id,
+                        field_id=field.id,
+                        response="[Admin added signup]",
+                        submitted_at=signup_time
+                    )
+                    db.session.add(response)
+            else:
+                # No form fields exist, create a dummy response to mark signup as complete
+                # This ensures the signup appears in my_tournaments view
+                # Note: We need at least one form field, so create a placeholder if none exist
+                placeholder_field = Form_Fields(
+                    tournament_id=tournament.id,
+                    label="Admin Signup",
+                    field_type="text",
+                    required=False,
+                    order=0
+                )
+                db.session.add(placeholder_field)
+                db.session.flush()  # Get the field ID
+                
+                response = Form_Responses(
+                    tournament_id=tournament.id,
+                    user_id=selected_user.id,
+                    field_id=placeholder_field.id,
+                    response="[Admin added signup]",
+                    submitted_at=signup_time
+                )
+                db.session.add(response)
+        
+        for event_id in event_ids:
+            event = Event.query.get(int(event_id))
+            if not event:
+                continue
+            
+            # Check if signup already exists
+            existing_signup = Tournament_Signups.query.filter_by(
+                user_id=selected_user.id,
+                tournament_id=tournament.id,
+                event_id=event.id
+            ).first()
+            
+            if existing_signup:
+                # Update existing signup to mark as going
+                existing_signup.is_going = True
+                existing_signup.created_at = signup_time
+            else:
+                # Create new signup
+                new_signup = Tournament_Signups(
+                    user_id=selected_user.id,
+                    tournament_id=tournament.id,
+                    event_id=event.id,
+                    is_going=True,
+                    bringing_judge=False,
+                    created_at=signup_time
+                )
+                db.session.add(new_signup)
+            
+            created_count += 1
+        
+        db.session.commit()
+        flash(f'Successfully created {created_count} signup(s) for {selected_user.first_name} {selected_user.last_name}', 'success')
+        return redirect(url_for('admin.view_tournament_signups', tournament_id=tournament.id))
+    
+    # GET request - show form
+    users = User.query.order_by(User.first_name, User.last_name).all()
+    events = Event.query.order_by(Event.event_name).all()
+    
+    # Prepare user data for JavaScript search
+    import json
+    users_json = json.dumps([{
+        'id': u.id,
+        'name': f"{u.first_name} {u.last_name}",
+        'email': u.email
+    } for u in users])
+    
+    return render_template('admin/manufacture_signup.html', 
+                         tournament=tournament, 
+                         users_json=users_json,
+                         events=events)
+
+
+@admin_bp.route('/delete_signup/<int:signup_id>', methods=['POST'])
+@prevent_race_condition('delete_signup', min_interval=1.0, redirect_on_duplicate=lambda uid, form: redirect(url_for('admin.view_tournament_signups', tournament_id=form.get('tournament_id', 0))))
+def delete_signup(signup_id):
+    """
+    Delete a tournament signup (admin only).
+    
+    Removes a specific signup record and associated form responses.
+    
+    Args:
+        signup_id: The Tournament_Signups record ID to delete
+    
+    Access: Requires role >= 2 (Admin)
+    
+    Returns:
+        Redirect to tournament signups view
+    """
+    user_id = session.get('user_id')
+    if not user_id:
+        flash('Please log in', 'error')
+        return redirect_to_login()
+    
+    user = User.query.filter_by(id=user_id).first()
+    if not user or user.role < 2:
+        flash('You are not authorized to perform this action', 'error')
+        return redirect(url_for('main.index'))
+    
+    signup = Tournament_Signups.query.get_or_404(signup_id)
+    tournament_id = signup.tournament_id
+    user_id_to_delete = signup.user_id
+    
+    # Get user info for flash message
+    signup_user = User.query.get(signup.user_id)
+    event = Event.query.get(signup.event_id)
+    
+    user_name = f"{signup_user.first_name} {signup_user.last_name}" if signup_user else "Unknown"
+    event_name = event.event_name if event else "Unknown Event"
+    
+    # Delete the signup
+    db.session.delete(signup)
+    
+    # Only delete form responses if this was the user's last signup for this tournament
+    remaining_signups = Tournament_Signups.query.filter_by(
+        tournament_id=tournament_id,
+        user_id=user_id_to_delete
+    ).filter(Tournament_Signups.id != signup_id).count()
+    
+    if remaining_signups == 0:
+        # This was the user's last signup for this tournament, safe to delete form responses
+        Form_Responses.query.filter_by(
+            tournament_id=tournament_id,
+            user_id=user_id_to_delete
+        ).delete()
+    
+    db.session.commit()
+    
+    flash(f'Deleted signup for {user_name} in {event_name}', 'success')
+    return redirect(url_for('admin.view_tournament_signups', tournament_id=tournament_id))
+
+

@@ -612,6 +612,68 @@ def bringing_judge(tournament_id):
         selected_judge_id=selected_judge_id
     )
 
+@tournaments_bp.route('/edit_tournament/<int:tournament_id>', methods=['GET', 'POST'])
+@prevent_race_condition('edit_tournament', min_interval=2.0, redirect_on_duplicate=lambda uid, form: redirect(url_for('tournaments.index')))
+def edit_tournament(tournament_id):
+    """
+    Edit tournament information (admin only).
+    
+    GET: Display tournament edit form
+    POST: Update tournament with provided details
+    
+    Form Fields:
+        - name: Tournament name
+        - address: Tournament location
+        - date: Tournament date and time (YYYY-MM-DDTHH:MM)
+        - signup_deadline: Deadline for signups (YYYY-MM-DDTHH:MM)
+        - performance_deadline: Deadline for results submission (YYYY-MM-DDTHH:MM)
+    
+    Access: Requires role >= 2 (Admin)
+    
+    Returns:
+        GET: Rendered tournament edit form
+        POST: Redirect to tournaments index with success message
+    """
+    user_id = session.get('user_id')
+    if not user_id:
+        return redirect_to_login("Please log in")
+    
+    user = User.query.filter_by(id=user_id).first()
+    if not user or user.role < 2:
+        flash("You are not authorized to access this page", "error")
+        return redirect(url_for('tournaments.index'))
+    
+    tournament = Tournament.query.get_or_404(tournament_id)
+    
+    if request.method == "POST":
+        name = request.form.get("name")
+        address = request.form.get("address")
+        date_str = request.form.get("date")
+        signup_deadline_str = request.form.get("signup_deadline")
+        performance_deadline_str = request.form.get("performance_deadline")
+
+        try:
+            # Convert string inputs to datetime objects
+            date = datetime.strptime(date_str, "%Y-%m-%dT%H:%M")
+            signup_deadline = datetime.strptime(signup_deadline_str, "%Y-%m-%dT%H:%M")
+            performance_deadline = datetime.strptime(performance_deadline_str, "%Y-%m-%dT%H:%M")
+        except ValueError:
+            flash("Invalid date format. Please use the date pickers.", "error")
+            return render_template("tournaments/edit_tournament.html", tournament=tournament)
+
+        tournament.name = name
+        tournament.address = address
+        tournament.date = date
+        tournament.signup_deadline = signup_deadline
+        tournament.performance_deadline = performance_deadline
+
+        db.session.commit()
+        flash(f"Tournament '{name}' updated successfully", "success")
+        return redirect(url_for('tournaments.index'))
+
+    return render_template("tournaments/edit_tournament.html", tournament=tournament)
+
+
 @tournaments_bp.route('/delete_tournament/<int:tournament_id>', methods=['POST'])
 def delete_tournament(tournament_id):
     """
@@ -774,9 +836,27 @@ def my_tournaments():
             tournament.performance_deadline = EST.localize(tournament.performance_deadline)
 
         # Check if user attended (signed up and is_going)
-        signup = Tournament_Signups.query.filter_by(user_id=user_id, tournament_id=tournament.id, is_going=True).first()
+        # Query for any signup for this tournament where is_going=True
+        signup = Tournament_Signups.query.filter_by(
+            user_id=user_id, 
+            tournament_id=tournament.id, 
+            is_going=True
+        ).first()
+        
         if not signup:
             continue  # Only show tournaments the user attended
+        
+        # Verify user has submitted form responses (matches admin view logic)
+        # This ensures manufactured signups have proper form responses created
+        has_form_responses = Form_Responses.query.filter_by(
+            tournament_id=tournament.id,
+            user_id=user_id
+        ).first() is not None
+        
+        if not has_form_responses:
+            # User has signup but no form responses - likely incomplete/broken signup
+            # Skip it to avoid confusion
+            continue
 
         # Check if user already submitted performance
         performance = Tournament_Performance.query.filter_by(user_id=user_id, tournament_id=tournament.id).first()
