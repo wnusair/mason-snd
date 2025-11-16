@@ -368,7 +368,7 @@ def manage_members(event_id):
         tournament_points = user.tournament_points or 0
         effort_points = user.effort_points or 0
         total_points = tournament_points + effort_points
-        weighted_points = round(tournament_points * tournament_weight + effort_points * effort_weight, 2)
+        weighted_points = user.weighted_points
         members.append({
             "user": user,
             "effort_score": ue.effort_score,
@@ -710,7 +710,7 @@ def download_event_members(event_id):
         tournament_points = user.tournament_points or 0
         effort_points = user.effort_points or 0
         total_points = tournament_points + effort_points
-        weighted_points = round(tournament_points * tournament_weight + effort_points * effort_weight, 2)
+        weighted_points = user.weighted_points
         
         writer.writerow([
             f"{user.first_name} {user.last_name}",
@@ -806,7 +806,7 @@ def download_all_events_stats():
             tournament_points = user.tournament_points or 0
             effort_points = user.effort_points or 0
             total_points = tournament_points + effort_points
-            weighted_points = round(tournament_points * tournament_weight + effort_points * effort_weight, 2)
+            weighted_points = user.weighted_points
             writer.writerow([
                 f"{user.first_name} {user.last_name}",
                 event.event_name,

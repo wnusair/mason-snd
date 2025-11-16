@@ -170,6 +170,37 @@ class User(db.Model):
         scores = Effort_Score.query.filter_by(user_id=self.id).all()
         return sum([s.score or 0 for s in scores])
 
+    @property
+    def weighted_points(self):
+        """Calculate weighted points with drop penalty applied.
+        
+        Weighted points = (tournament_points * tournament_weight) + (effort_points * effort_weight) - (drops * 10)
+        
+        Each drop deducts 10 points from the weighted score, affecting:
+        - Roster generation rankings
+        - Manage members display
+        - User rankings and analytics
+        - All systems using weighted_points for sorting/comparison
+        
+        Returns:
+            float: Weighted points with drop penalty applied, rounded to 2 decimals.
+        """
+        from mason_snd.models.metrics import MetricsSettings
+        
+        settings = MetricsSettings.query.first()
+        if not settings:
+            settings = MetricsSettings()
+            db.session.add(settings)
+            db.session.commit()
+        
+        tournament_weight = settings.tournament_weight
+        effort_weight = settings.effort_weight
+        
+        base_weighted = (self.tournament_points * tournament_weight) + (self.effort_points * effort_weight)
+        drop_penalty = (self.drops or 0) * 10
+        
+        return round(base_weighted - drop_penalty, 2)
+
     account_claimed = db.Column(db.Boolean, default=False)
 
 class User_Published_Rosters(db.Model):

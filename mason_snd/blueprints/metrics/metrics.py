@@ -333,9 +333,7 @@ def get_user_performance_distribution():
     
     user_scores = []
     for user in users:
-        tournament_pts = user.tournament_points or 0
-        effort_pts = user.effort_points or 0
-        weighted_score = tournament_pts * tournament_weight + effort_pts * effort_weight
+        weighted_score = user.weighted_points
         
         if weighted_score > 0:
             user_scores.append((user, weighted_score))
@@ -493,10 +491,9 @@ def index():
     
     top_performers = []
     for u in top_performers_query:
-        weighted_score = (u.tournament_points or 0) * tournament_weight + (u.effort_points or 0) * effort_weight
         top_performers.append({
             'user': u,
-            'weighted_score': weighted_score,
+            'weighted_score': u.weighted_points,
             'total_score': (u.tournament_points or 0) + (u.effort_points or 0)
         })
     
@@ -578,7 +575,7 @@ def user_metrics():
         if sort == 'total_points':
             key_func = lambda u: (u.tournament_points or 0) + (u.effort_points or 0)
         elif sort == 'weighted_points':
-            key_func = lambda u: (u.tournament_points or 0) * tournament_weight + (u.effort_points or 0) * effort_weight
+            key_func = lambda u: u.weighted_points
         elif sort == 'tournament_points':
             key_func = lambda u: u.tournament_points or 0
         elif sort == 'effort_points':
@@ -687,7 +684,7 @@ def download_user_metrics():
         if sort == 'total_points':
             key_func = lambda u: (u.tournament_points or 0) + (u.effort_points or 0)
         elif sort == 'weighted_points':
-            key_func = lambda u: (u.tournament_points or 0) * tournament_weight + (u.effort_points or 0) * effort_weight
+            key_func = lambda u: u.weighted_points
         elif sort == 'tournament_points':
             key_func = lambda u: u.tournament_points or 0
         elif sort == 'effort_points':
@@ -729,7 +726,7 @@ def download_user_metrics():
         tournament_points = user.tournament_points or 0
         effort_points = user.effort_points or 0
         total_points = tournament_points + effort_points
-        weighted_points = round(tournament_points * tournament_weight + effort_points * effort_weight, 2)
+        weighted_points = user.weighted_points
 
         # Determine Parent/Child status
         is_parent = Judges.query.filter_by(judge_id=user.id).first() is not None
@@ -849,7 +846,7 @@ def event_detail(event_id):
         
         # Calculate statistics
         total_points = (user.tournament_points or 0) + (user.effort_points or 0)
-        weighted_points = (user.tournament_points or 0) * tournament_weight + (user.effort_points or 0) * effort_weight
+        weighted_points = user.weighted_points
         
         bid_count = sum(1 for p in all_performances if p.bid)
         avg_tournament_points = round(sum(p.points or 0 for p in all_performances) / len(all_performances), 2) if all_performances else 0
@@ -996,7 +993,7 @@ def user_detail(user_id):
     performances = Tournament_Performance.query.filter_by(user_id=user_id).join(Tournament).order_by(Tournament.date).all()
     
     total_points = (user.tournament_points or 0) + (user.effort_points or 0)
-    weighted_points = (user.tournament_points or 0) * tournament_weight + (user.effort_points or 0) * effort_weight
+    weighted_points = user.weighted_points
 
     # Tournament progression analysis
     progression_data = []
@@ -1062,7 +1059,7 @@ def user_detail(user_id):
     all_users = User.query.filter(User.id.in_(db.session.query(users_with_performances.c.id))).all()
     user_rank = 1
     for other_user in all_users:
-        other_weighted = (other_user.tournament_points or 0) * tournament_weight + (other_user.effort_points or 0) * effort_weight
+        other_weighted = other_user.weighted_points
         if other_weighted > weighted_points:
             user_rank += 1
 
@@ -1124,7 +1121,7 @@ def user_detail(user_id):
         )]
         
         top_events.append({
-            'emoji': event_data['event'].event_emoji or '🎯',
+            'emoji': event_data['event'].event_emoji or '',
             'event_name': event_data['event'].event_name,
             'participation_count': len(user_performances_in_event),
             'avg_points': event_data['avg_effort_score']
@@ -1467,7 +1464,7 @@ def tournament_detail(tournament_id):
         user_events = [s.event.event_name for s in user_signups if s.event]
         
         total_points = (user.tournament_points or 0) + (user.effort_points or 0)
-        weighted_points = (user.tournament_points or 0) * tournament_weight + (user.effort_points or 0) * effort_weight
+        weighted_points = user.weighted_points
         
         top_performers.append({
             'user': user,
@@ -1620,7 +1617,8 @@ def events_overview():
         total_tournament_points = sum(tournament_points)
         total_effort_points = sum(effort_points)
         total_points = total_tournament_points + total_effort_points
-        weighted_points = total_tournament_points * tournament_weight + total_effort_points * effort_weight
+        # Sum individual weighted_points (includes drop penalties for each user)
+        weighted_points = sum(u.weighted_points for u in participants)
         
         # Effort scores analysis
         effort_scores = Effort_Score.query.filter_by(event_id=event.id).all()
@@ -1869,7 +1867,8 @@ def download_events():
         total_tournament_points = sum(u.tournament_points or 0 for u in users)
         total_effort_points = sum(u.effort_points or 0 for u in users)
         total_points = total_tournament_points + total_effort_points
-        weighted_points = total_tournament_points * tournament_weight + total_effort_points * effort_weight
+        # Sum individual weighted_points (includes drop penalties for each user)
+        weighted_points = sum(u.weighted_points for u in users)
         
         events_data.append({
             'event_name': event.event_name,
@@ -2047,7 +2046,7 @@ def my_metrics():
     total_tournament_points = user.tournament_points or 0
     total_effort_points = user.effort_points or 0
     total_points = total_tournament_points + total_effort_points
-    weighted_points = total_tournament_points * tournament_weight + total_effort_points * effort_weight
+    weighted_points = user.weighted_points
     total_bids = sum(1 for p in performances if p.bid)
     
     # Performance statistics
@@ -2075,7 +2074,7 @@ def my_metrics():
     user_rank = 1
     total_active_users = len(all_active_users)
     for other_user in all_active_users:
-        other_weighted = (other_user.tournament_points or 0) * tournament_weight + (other_user.effort_points or 0) * effort_weight
+        other_weighted = other_user.weighted_points
         if other_weighted > weighted_points:
             user_rank += 1
     
@@ -2315,7 +2314,7 @@ def my_ranking():
     tournament_weight, effort_weight = get_point_weights()
     
     # Calculate user's weighted score
-    user_weighted_score = (user.tournament_points or 0) * tournament_weight + (user.effort_points or 0) * effort_weight
+    user_weighted_score = user.weighted_points
     
     # Get all users with some activity for ranking
     users_with_tournament_points = db.session.query(User.id).join(Tournament_Performance).distinct().subquery()
@@ -2335,7 +2334,7 @@ def my_ranking():
     users_below_me = 0
     
     for other_user in all_active_users:
-        other_weighted = (other_user.tournament_points or 0) * tournament_weight + (other_user.effort_points or 0) * effort_weight
+        other_weighted = other_user.weighted_points
         if other_weighted > user_weighted_score:
             user_rank += 1
             users_above_me += 1
@@ -2361,7 +2360,7 @@ def my_ranking():
             # Calculate user's rank in this event
             event_rank = 1
             for other_user in event_users:
-                other_weighted = (other_user.tournament_points or 0) * tournament_weight + (other_user.effort_points or 0) * effort_weight
+                other_weighted = other_user.weighted_points
                 if other_weighted > user_weighted_score:
                     event_rank += 1
             
@@ -2468,7 +2467,7 @@ def download_user_metrics_for_tournament(tournament_id):
     for p in performances:
         user = p.user
         total_points = (user.tournament_points or 0) + (user.effort_points or 0)
-        weighted_points = (user.tournament_points or 0) * tournament_weight + (user.effort_points or 0) * effort_weight
+        weighted_points = user.weighted_points
         writer.writerow([
             f"{user.first_name} {user.last_name}", 
             total_points, 

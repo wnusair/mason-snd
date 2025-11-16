@@ -120,12 +120,20 @@ EST = pytz.timezone('US/Eastern')
 rosters_bp = Blueprint('rosters', __name__, template_folder='templates')
 
 def calculate_weighted_points(user):
+    """Calculate weighted points for a user, including drop penalties.
+    
+    Now uses the User.weighted_points property which automatically applies
+    drop penalties (-10 points per drop).
+    
+    Args:
+        user: User object or None
+    
+    Returns:
+        float: Weighted points with drop penalties applied, or 0 if no user
+    """
     if not user:
         return 0
-    tournament_weight, effort_weight = get_point_weights()
-    tournament_pts = user.tournament_points if hasattr(user, 'tournament_points') else 0
-    effort_pts = user.effort_points if hasattr(user, 'effort_points') else 0
-    return round((tournament_pts * tournament_weight) + (effort_pts * effort_weight), 2)
+    return getattr(user, 'weighted_points', 0)
 
 @rosters_bp.route('/')
 def index():

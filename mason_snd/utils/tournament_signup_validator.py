@@ -288,9 +288,9 @@ class TournamentSignupValidator:
             
             if not response:
                 missing_required.append(field.label)
-                print(f"  ❌ MISSING - Added to missing_required list")
+                print(f"  MISSING - Added to missing_required list")
             else:
-                print(f"  ✓ Valid")
+                print(f"  Valid")
         
         print(f"\nTotal missing required fields: {len(missing_required)}")
         if missing_required:

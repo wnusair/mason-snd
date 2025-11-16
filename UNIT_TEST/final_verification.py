@@ -43,9 +43,9 @@ def run_final_verification():
         }
         
         if production_check['safe']:
-            print("   ✅ Production safety guard operational")
+            print("   Production safety guard operational")
         else:
-            print(f"   ⚠️  Production safety concern: {production_check}")
+            print(f"   Production safety concern: {production_check}")
             verification_results['overall_success'] = False
             
     except Exception as e:

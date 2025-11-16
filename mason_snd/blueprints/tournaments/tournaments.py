@@ -1759,7 +1759,7 @@ def download_ranked_signups(tournament_id):
         
         tournament_pts = user_obj.tournament_points if hasattr(user_obj, 'tournament_points') else 0
         effort_pts = user_obj.effort_points if hasattr(user_obj, 'effort_points') else 0
-        weighted_pts = round((tournament_pts * tournament_weight) + (effort_pts * effort_weight), 2)
+        weighted_pts = user_obj.weighted_points if hasattr(user_obj, 'weighted_points') else 0
         
         ranked_data.append({
             'Event': event_name,

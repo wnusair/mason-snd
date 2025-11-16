@@ -393,7 +393,7 @@ def run_quick_test():
         print(f"Failed: {summary['failed_tests']}")
         print(f"Success Rate: {summary['overall_success_rate']:.1f}%")
     
-    print(f"Overall Success: {'✅ YES' if results['overall_success'] else '❌ NO'}")
+    print(f"Overall Success: {'YES' if results['overall_success'] else 'NO'}")
     print(f"Duration: {results.get('duration', 0):.1f} seconds")
     
     if results.get('test_results', {}).get('report', {}).get('recommendations'):

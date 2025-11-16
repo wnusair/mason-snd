@@ -377,12 +377,7 @@ def user_detail(user_id):
     tournament_points = user.tournament_points or 0
     effort_points = user.effort_points or 0
     total_points = tournament_points + effort_points
-    settings = MetricsSettings.query.first()
-    if not settings:
-        tournament_weight, effort_weight = 0.7, 0.3
-    else:
-        tournament_weight, effort_weight = settings.tournament_weight, settings.effort_weight
-    weighted_points = round(tournament_points * tournament_weight + effort_points * effort_weight, 2)
+    weighted_points = user.weighted_points
 
     # Emergency/child info
     if user.is_parent:
@@ -2180,9 +2175,9 @@ def run_quick_test():
         results = controller.run_comprehensive_test_suite(quick_config)
         
         if results.get('overall_success', False):
-            flash('✅ Quick test completed successfully! All systems operational.', 'success')
+            flash('Quick test completed successfully! All systems operational.', 'success')
         else:
-            flash('⚠️ Quick test completed with issues. Check test results for details.', 'warning')
+            flash('Quick test completed with issues. Check test results for details.', 'warning')
         
         # Store results in session for display
         session['last_test_results'] = {
@@ -2193,7 +2188,7 @@ def run_quick_test():
         }
         
     except Exception as e:
-        flash(f'❌ Test execution failed: {str(e)}', 'error')
+        flash(f'Test execution failed: {str(e)}', 'error')
     
     return redirect(url_for('admin.testing_suite'))
 
@@ -2258,9 +2253,9 @@ def run_full_test():
         results = controller.run_comprehensive_test_suite(full_config)
         
         if results.get('overall_success', False):
-            flash('✅ Full test suite completed successfully! System is production-ready.', 'success')
+            flash('Full test suite completed successfully! System is production-ready.', 'success')
         else:
-            flash('⚠️ Full test suite completed with issues. Review detailed results.', 'warning')
+            flash('Full test suite completed with issues. Review detailed results.', 'warning')
         
         # Store results in session for display
         session['last_test_results'] = {
@@ -2272,7 +2267,7 @@ def run_full_test():
         }
         
     except Exception as e:
-        flash(f'❌ Full test execution failed: {str(e)}', 'error')
+        flash(f'Full test execution failed: {str(e)}', 'error')
     
     return redirect(url_for('admin.testing_suite'))
 
@@ -2331,11 +2326,11 @@ def verify_system():
             success_rate = (successful_tests / total_tests) * 100 if total_tests > 0 else 0
         
         if success_rate >= 90:
-            flash(f'✅ System verification passed! Success rate: {success_rate:.1f}%', 'success')
+            flash(f'System verification passed! Success rate: {success_rate:.1f}%', 'success')
         elif success_rate >= 70:
-            flash(f'⚠️ System verification completed with warnings. Success rate: {success_rate:.1f}%', 'warning')
+            flash(f'System verification completed with warnings. Success rate: {success_rate:.1f}%', 'warning')
         else:
-            flash(f'❌ System verification failed. Success rate: {success_rate:.1f}%', 'error')
+            flash(f'System verification failed. Success rate: {success_rate:.1f}%', 'error')
         
         # Store verification results
         session['last_verification_results'] = {
@@ -2347,7 +2342,7 @@ def verify_system():
         }
         
     except Exception as e:
-        flash(f'❌ System verification failed: {str(e)}', 'error')
+        flash(f'System verification failed: {str(e)}', 'error')
     
     return redirect(url_for('admin.testing_suite'))
 
@@ -2400,9 +2395,9 @@ def cleanup_test_data():
         total_cleaned = cleanup_results.get('test_databases_removed', 0) + cleanup_results.get('temp_directories_removed', 0)
         
         if cleanup_results.get('errors'):
-            flash(f'⚠️ Cleanup completed with {len(cleanup_results["errors"])} errors. {total_cleaned} items cleaned.', 'warning')
+            flash(f'Cleanup completed with {len(cleanup_results["errors"])} errors. {total_cleaned} items cleaned.', 'warning')
         else:
-            flash(f'✅ Emergency cleanup completed successfully. {total_cleaned} test resources removed.', 'success')
+            flash(f'Emergency cleanup completed successfully. {total_cleaned} test resources removed.', 'success')
         
         # Store cleanup results
         session['last_cleanup_results'] = {
@@ -2412,7 +2407,7 @@ def cleanup_test_data():
         }
         
     except Exception as e:
-        flash(f'❌ Emergency cleanup failed: {str(e)}', 'error')
+        flash(f'Emergency cleanup failed: {str(e)}', 'error')
     
     return redirect(url_for('admin.testing_suite'))
 
