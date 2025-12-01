@@ -82,41 +82,64 @@
 </div>
 
 <script>
-const users = {{ users_json|safe }};
 const userSearchInput = document.getElementById('user_search');
 const userIdInput = document.getElementById('user_id');
 const searchResults = document.getElementById('search_results');
 const selectedUserDisplay = document.getElementById('selected_user');
+let searchTimeout = null;
 
 userSearchInput.addEventListener('input', function() {
-    const query = this.value.toLowerCase();
+    const query = this.value.trim();
+    
+    // Clear previous timeout
+    if (searchTimeout) {
+        clearTimeout(searchTimeout);
+    }
     
     if (query.length < 2) {
         searchResults.classList.add('hidden');
         return;
     }
     
-    const matches = users.filter(user => 
-        user.name.toLowerCase().includes(query) || 
-        user.email.toLowerCase().includes(query)
-    ).slice(0, 10);
-    
-    if (matches.length === 0) {
-        searchResults.innerHTML = '<div class="p-2 text-sm text-gray-500">No users found</div>';
-        searchResults.classList.remove('hidden');
-        return;
-    }
-    
-    searchResults.innerHTML = matches.map(user => `
-        <div class="p-2 hover:bg-gray-100 cursor-pointer border-b border-gray-200" 
-             onclick="selectUser(${user.id}, '${user.name}', '${user.email}')">
-            <div class="font-medium text-gray-900">${user.name}</div>
-            <div class="text-sm text-gray-500">${user.email}</div>
-        </div>
-    `).join('');
-    
+    // Show loading state
+    searchResults.innerHTML = '<div class="p-2 text-sm text-gray-500">Searching...</div>';
     searchResults.classList.remove('hidden');
+    
+    // Debounce the search to avoid too many requests
+    searchTimeout = setTimeout(() => {
+        fetch(`{{ url_for('admin.search_users_for_signup') }}?q=${encodeURIComponent(query)}`)
+            .then(response => response.json())
+            .then(data => {
+                if (data.error) {
+                    searchResults.innerHTML = `<div class="p-2 text-sm text-red-600">${data.error}</div>`;
+                    return;
+                }
+                
+                if (!data.users || data.users.length === 0) {
+                    searchResults.innerHTML = '<div class="p-2 text-sm text-gray-500">No users found</div>';
+                    return;
+                }
+                
+                searchResults.innerHTML = data.users.map(user => `
+                    <div class="p-2 hover:bg-gray-100 cursor-pointer border-b border-gray-200" 
+                         onclick="selectUser(${user.id}, '${escapeHtml(user.name)}', '${escapeHtml(user.email)}')">
+                        <div class="font-medium text-gray-900">${escapeHtml(user.name)}</div>
+                        <div class="text-sm text-gray-500">${escapeHtml(user.email)}</div>
+                    </div>
+                `).join('');
+            })
+            .catch(error => {
+                console.error('Search error:', error);
+                searchResults.innerHTML = '<div class="p-2 text-sm text-red-600">Error searching users</div>';
+            });
+    }, 300); // 300ms debounce
 });
+
+function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
 
 function selectUser(id, name, email) {
     userIdInput.value = id;

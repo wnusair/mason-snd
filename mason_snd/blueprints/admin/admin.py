@@ -3955,9 +3955,8 @@ def manufacture_signup(tournament_id):
                 placeholder_field = Form_Fields(
                     tournament_id=tournament.id,
                     label="Admin Signup",
-                    field_type="text",
-                    required=False,
-                    order=0
+                    type="text",
+                    required=False
                 )
                 db.session.add(placeholder_field)
                 db.session.flush()  # Get the field ID
@@ -4006,21 +4005,58 @@ def manufacture_signup(tournament_id):
         return redirect(url_for('admin.view_tournament_signups', tournament_id=tournament.id))
     
     # GET request - show form
-    users = User.query.order_by(User.first_name, User.last_name).all()
     events = Event.query.order_by(Event.event_name).all()
-    
-    # Prepare user data for JavaScript search
-    import json
-    users_json = json.dumps([{
-        'id': u.id,
-        'name': f"{u.first_name} {u.last_name}",
-        'email': u.email
-    } for u in users])
     
     return render_template('admin/manufacture_signup.html', 
                          tournament=tournament, 
-                         users_json=users_json,
                          events=events)
+
+
+@admin_bp.route('/search_users_for_signup')
+def search_users_for_signup():
+    """
+    Server-side AJAX endpoint for searching users when manufacturing signups.
+    Handles large user databases efficiently by only returning matching results.
+    
+    Query Parameters:
+        q: Search query (first name, last name, or email)
+    
+    Returns:
+        JSON response with matching users array
+    """
+    user_id = session.get('user_id')
+    if not user_id:
+        return jsonify({'error': 'Not logged in'}), 401
+    
+    user = User.query.filter_by(id=user_id).first()
+    if not user or user.role < 2:
+        return jsonify({'error': 'Unauthorized'}), 403
+    
+    query = request.args.get('q', '').strip()
+    
+    if not query or len(query) < 2:
+        return jsonify({'users': []})
+    
+    # Search for users by name or email
+    users = User.query.filter(
+        db.or_(
+            User.first_name.ilike(f'%{query}%'),
+            User.last_name.ilike(f'%{query}%'),
+            User.email.ilike(f'%{query}%'),
+            db.func.concat(User.first_name, ' ', User.last_name).ilike(f'%{query}%')
+        )
+    ).order_by(User.first_name, User.last_name).limit(20).all()
+    
+    return jsonify({
+        'users': [
+            {
+                'id': u.id,
+                'name': f"{u.first_name} {u.last_name}",
+                'email': u.email
+            }
+            for u in users
+        ]
+    })
 
 
 @admin_bp.route('/delete_signup/<int:signup_id>', methods=['POST'])
