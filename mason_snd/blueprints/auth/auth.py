@@ -14,6 +14,7 @@ Key Features:
 """
 
 from flask import Blueprint, render_template, request, redirect, url_for, flash, session
+from urllib.parse import urlparse, urljoin
 
 from mason_snd.extensions import db
 from mason_snd.models.auth import User, Judges
@@ -58,6 +59,13 @@ def redirect_to_login(next_url=None):
     if next_url:
         return redirect(url_for('auth.login', next=next_url))
     return redirect(url_for('auth.login'))
+
+
+def is_safe_url(target):
+    host_url = request.host_url
+    ref_url = urlparse(host_url)
+    test_url = urlparse(urljoin(host_url, target))
+    return test_url.scheme in ("http", "https") and ref_url.netloc == test_url.netloc
 
 
 def make_all_requirements():
@@ -445,11 +453,9 @@ def login():
             
             flash("Logged in successfully!")
             
-            # Validate that next_page is safe (relative URL, not absolute)
-            if next_page and next_page.startswith('/'):
+            if next_page and is_safe_url(next_page):
                 return redirect(next_page)
-            else:
-                return redirect(url_for('profile.index', user_id=user.id))
+            return redirect(url_for('profile.index', user_id=user.id))
         else:
             flash("Invalid email or password")
 
